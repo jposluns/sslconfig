@@ -29,6 +29,8 @@ user app on >REPLACE_WITH_LONG_RANDOM_PASSWORD ~app:* +@read +@write
 
 That grants the `app` user access to keys matching `app:*` with read and write command categories only. Generate passwords per [authentication.md](authentication.md). Disable the `default` user (`user default off`) only after every client authenticates as a named user, or you will lock services out.
 
+MFA: Redis has no second-factor dialogue; `tls-auth-clients yes` (mutual TLS, below) is the second factor for clients, and human paths to the host go behind MFA per [mfa.md](mfa.md).
+
 ## 3. Enable TLS
 
 Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), then replace the plaintext port with a TLS listener:

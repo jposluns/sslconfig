@@ -31,6 +31,7 @@ Once TLS is on, connect via `https://`; the server no longer answers plain `http
 - Do not set `c.ServerApp.ip = '0.0.0.0'` (or `--ip 0.0.0.0`) without the password from step 1 **and** TLS from step 2 in place.
 - Never blank the token or password settings to make login prompts go away; that is exactly the configuration internet scanners look for.
 - A reverse proxy with its own auth ([nginx.md](nginx.md), [caddy.md](caddy.md)) or Cloudflare Access ([cloudflare.md](cloudflare.md)) in front of a loopback-bound Jupyter is a sound alternative to native TLS, and adds a second factor in the Access case.
+- MFA: the Jupyter password is single-factor, so the fronting options above are where the second factor comes from; multi-user deployments on JupyterHub can delegate login to an OIDC/OAuth provider that enforces MFA. Options in [mfa.md](mfa.md).
 
 ## 4. Verify
 

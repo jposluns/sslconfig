@@ -66,6 +66,8 @@ Mutual TLS for machine-to-machine access:
     ssl_verify_client on;
 ```
 
+Basic authentication is single-factor. For human-facing sites, add MFA with the `auth_request` mechanism pointed at an [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
 ## 4. Verify
 
 ```bash

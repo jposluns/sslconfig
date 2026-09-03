@@ -47,6 +47,8 @@ st.write(f"Hello, {st.user.name}")
 
 Notes from the Streamlit docs: this is authentication only (identity, not per-resource authorization), the identity cookie lasts 30 days and that period is not configurable, and `secrets.toml` holds the client secret, so it must never be committed. Confirm that your installed Streamlit version includes these functions; they are absent from older releases.
 
+MFA: `st.login()` delegates authentication to the OIDC provider, so enforce MFA there (Google, Microsoft Entra ID, Okta, Keycloak, and authentik all support it). Without OIDC, front the app per section 3. Options in [mfa.md](mfa.md).
+
 ## 3. Alternatives when OIDC is not available
 
 - Basic auth at a reverse proxy in front of a loopback-bound app ([nginx.md](nginx.md), [caddy.md](caddy.md)).

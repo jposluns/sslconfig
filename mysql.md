@@ -36,6 +36,8 @@ ALTER USER 'batch'@'10.0.0.%' REQUIRE X509;
 
 Account hygiene per [authentication.md](authentication.md): keep the default `caching_sha2_password` plugin for new accounts (MySQL 8) rather than re-enabling `mysql_native_password`, remove anonymous accounts, and give the application a least-privilege user, never `root`.
 
+MFA: MySQL 8.0.27 and later support up to 3 authentication factors per account, with factors 2 and 3 supplied by external plugins; the server-side FIDO plugin ships only in Enterprise Edition. On Community builds, treat `REQUIRE X509` client certificates as the practical second factor, and put human access paths behind MFA per [mfa.md](mfa.md).
+
 ## 3. Client side
 
 Require identity verification of the server in addition to encryption:
@@ -68,4 +70,5 @@ ss -tlnp | grep 3306        # loopback only, unless remote access is deliberate
 ## Sources (checked September 2026)
 
 - MySQL encrypted connections: https://dev.mysql.com/doc/refman/8.0/en/using-encrypted-connections.html
+- MySQL multifactor authentication: https://dev.mysql.com/doc/refman/8.0/en/multifactor-authentication.html
 - MariaDB TLS documentation: https://mariadb.com/kb/en/secure-connections-overview/

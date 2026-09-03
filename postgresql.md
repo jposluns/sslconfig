@@ -32,6 +32,8 @@ Passwords set before `password_encryption = scram-sha-256` remain MD5-hashed; re
 
 For machine-to-machine links, add certificate verification on top of SCRAM: set `ssl_ca_file` in `postgresql.conf` and append `clientcert=verify-full` to the `hostssl` line (PostgreSQL 12 and later).
 
+MFA: the PostgreSQL wire protocol has no TOTP dialogue. Treat `clientcert=verify-full` as the second factor for direct connections, chain the `radius` authentication method to an MFA service (for example the Duo Authentication Proxy) where policy requires it, and put the human paths to the host (SSH, admin UIs) behind MFA per [mfa.md](mfa.md).
+
 ## 3. Client side
 
 Require identity verification in the connection settings, in addition to encryption:

@@ -17,7 +17,7 @@ TLS without authentication leaves a service open to the whole internet over an e
    python3 -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
    Load secrets from environment variables or a secret manager. Add `.env` to `.gitignore` before the first commit, and scan the repository for leaked secrets (for example with gitleaks) before pushing. A secret that has reached a public repository, a chat, or a log is compromised: rotate it, since deleting the file does not unpublish it.
-6. **Prefer SSO/OIDC over local accounts** where the product supports it, and enable MFA wherever available. [Cloudflare Access](cloudflare.md) puts SSO or one-time-PIN login in front of any web app without changing the app.
+6. **Prefer SSO/OIDC over local accounts** where the product supports it, and enable MFA wherever available. [Cloudflare Access](cloudflare.md) puts SSO or one-time-PIN login in front of any web app without changing the app. Where no native MFA exists, add it with an identity layer, an app-level TOTP library, or a hosted service, per [mfa.md](mfa.md).
 7. **Scope machine access.** API clients get their own tokens with the least privilege the task needs, not an admin password. Support and exercise rotation; set expiry where the platform allows it.
 8. **Harden sessions.** Set cookies `Secure`, `HttpOnly`, and `SameSite` (`Lax` or `Strict`), sign them with a strong random secret, and expire them. Invalidate sessions on password change.
 9. **Rate-limit authentication endpoints** and lock or delay after repeated failures. Log authentication successes and failures with source address and account, and keep the logs long enough to investigate an incident. fail2ban is a low-effort control for SSH and login panels on Linux hosts.

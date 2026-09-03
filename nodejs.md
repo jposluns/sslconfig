@@ -73,6 +73,8 @@ app.use('/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20 }));
 
 API keys and tokens come from `process.env`, never from literals in the source. Generate them per [authentication.md](authentication.md) and compare with `crypto.timingSafeEqual` where you check them yourself.
 
+MFA: add TOTP with [otplib](https://github.com/yeojz/otplib) plus the [qrcode](https://www.npmjs.com/package/qrcode) package for enrolment QR codes, or front the app with an identity layer; requirements and options in [mfa.md](mfa.md).
+
 ## 4. Client-side TLS discipline
 
 - Never set `NODE_TLS_REJECT_UNAUTHORIZED=0` and never pass `rejectUnauthorized: false`; both disable certificate validation for every connection.

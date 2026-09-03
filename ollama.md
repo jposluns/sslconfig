@@ -57,6 +57,8 @@ Generate the token per [authentication.md](authentication.md) and keep it out of
 
 Follow [cloudflare.md](cloudflare.md) with the tunnel route pointed at `http://localhost:11434` and an Access policy (or service token for API clients) on the hostname. The Ollama FAQ itself documents fronting the server with a tunnel; adding Access is what makes it authenticated.
 
+MFA: Ollama has no login of its own, so a second factor can only come from the fronting layer: an Access policy backed by an MFA-enforcing identity provider, or an [Authelia](https://www.authelia.com/)-protected proxy. Options in [mfa.md](mfa.md).
+
 ## Verify
 
 ```bash

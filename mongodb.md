@@ -27,6 +27,8 @@ db.createUser({
 
 Create a separate least-privilege user per application (for example `readWrite` on its own database), per [authentication.md](authentication.md). Modern MongoDB authenticates with SCRAM-SHA-256 by default.
 
+MFA: the wire protocol has no TOTP dialogue in Community edition; x.509 client-certificate authentication is the second factor for direct connections, and human paths to the host (SSH, admin UIs) go behind MFA per [mfa.md](mfa.md).
+
 ## 2. Enable TLS
 
 Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), concatenate certificate and key into one PEM, and require TLS:

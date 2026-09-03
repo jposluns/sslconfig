@@ -16,6 +16,8 @@ demo.launch(
 
 `auth` also accepts a list of `(user, password)` tuples or a callable `f(username, password) -> bool`, which lets you check hashed credentials per [authentication.md](authentication.md). Keep the credentials in environment variables, not in the script.
 
+MFA: `auth` is single-factor. The callable form allows a TOTP step (for example, verify a [pyotp](https://github.com/pyauth/pyotp) code appended to the password); fronting the app with Cloudflare Access or an Authelia-protected proxy is the cleaner route. Options in [mfa.md](mfa.md).
+
 ## 2. Enable TLS
 
 For a public deployment, prefer a reverse proxy or tunnel in front of a loopback-bound Gradio app: [caddy.md](caddy.md), [nginx.md](nginx.md), or [cloudflare.md](cloudflare.md). Gradio can also serve HTTPS itself with a certificate from [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md):

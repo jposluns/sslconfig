@@ -71,6 +71,8 @@ SSLVerifyClient require
 SSLVerifyDepth 2
 ```
 
+Basic authentication is single-factor, and Authelia documents Apache as unsupported for its portal. For human-facing sites, add MFA by making Apache an OIDC client with [mod_auth_openidc](https://github.com/OpenIDC/mod_auth_openidc), with MFA enforced at the identity provider, or by fronting the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
 ## 5. Verify
 
 ```bash

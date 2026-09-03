@@ -74,6 +74,8 @@ http:
           - "admin:$2y$05$REPLACE_WITH_HASH"
 ```
 
+basicAuth is single-factor. For human-facing sites, add MFA with the `forwardAuth` middleware pointed at [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy), or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
 ## 4. Verify
 
 ```bash

@@ -62,7 +62,7 @@ Caddy obtains and renews the certificate automatically ([free-certificates.md](f
 
 ## 3. Authentication and secrets
 
-- The proxy is the natural place for a first authentication gate (basic auth per the proxy guides, or Cloudflare Access); the application still needs its own login for anything multi-user ([authentication.md](authentication.md)).
+- The proxy is the natural place for a first authentication gate (basic auth per the proxy guides, or Cloudflare Access); the application still needs its own login for anything multi-user ([authentication.md](authentication.md)). The proxy is also where MFA attaches for human-facing services ([mfa.md](mfa.md)).
 - Pass secrets at runtime through environment files or Docker/Compose secrets. Never bake them into the image: `ENV API_KEY=...` in a Dockerfile ships the key to every registry the image touches, and `docker history` shows build arguments.
 - Keep `.env` in `.gitignore`, and run containers as a non-root user (`USER` in the Dockerfile) so a compromised app is not root in the container.
 - Databases in containers still need their own TLS and authentication when anything outside the Compose network connects: see [postgresql.md](postgresql.md), [mysql.md](mysql.md), [mongodb.md](mongodb.md), and [redis.md](redis.md).

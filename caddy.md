@@ -63,6 +63,8 @@ To protect only part of a site, wrap the directive in a matcher:
     }
 ```
 
+`basic_auth` is single-factor. For human-facing sites, add MFA with the `forward_auth` directive (Caddy 2.5.1 and later) pointed at an [Authelia](https://www.authelia.com/) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
 ## 4. Verify
 
 ```bash

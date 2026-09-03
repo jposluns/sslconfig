@@ -61,6 +61,8 @@ auth.require = ( "/" =>
 
 Create the user file with Apache's `htpasswd` (package `apache2-utils` or `httpd-tools`). The lighttpd htpasswd backend reads `user:crypt()-hashed-password` entries; check the mod_auth documentation below for the hash algorithms your lighttpd build accepts before choosing an `htpasswd` flag.
 
+Basic authentication is single-factor, and lighttpd is absent from Authelia's supported-proxy list. Add MFA by fronting the service with Cloudflare Access ([cloudflare.md](cloudflare.md)) or an MFA-capable proxy; options in [mfa.md](mfa.md).
+
 ## 4. Verify
 
 ```bash

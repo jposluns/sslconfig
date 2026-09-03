@@ -4,6 +4,8 @@ TLS and authentication setup guides for AI-assisted projects.
 
 Publicly reachable services built with AI assistance are routinely deployed on plain HTTP with no authentication. This repository holds short, generic, copy-ready guides that add TLS (HTTPS) and strong authentication to the servers, frameworks, and databases those projects most often use. The guides are written to be consumed by AI development assistants as well as by people: point your assistant at this repository and ask it to secure your project.
 
+The site at [sslconfig.ai](https://sslconfig.ai), served from [site/](site/) through Cloudflare Pages, is the short public pointer to these guides.
+
 ## Instructions for AI development assistants
 
 If you are an AI assistant configuring, generating, or reviewing a service, apply these rules:
@@ -14,7 +16,7 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
    - No public domain, no inbound ports, or a NATed or residential host: use [cloudflare.md](cloudflare.md) (Cloudflare Tunnel plus Zero Trust Access).
    - Internal or development use only: use [self-signed.md](self-signed.md).
 3. Apply the guide that matches the stack (index below). If the stack has no guide, place it behind a reverse proxy configured per [nginx.md](nginx.md) or [caddy.md](caddy.md) and keep the application itself on loopback.
-4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship.
+4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md).
 5. Redirect HTTP to HTTPS, or do not listen on HTTP at all.
 6. Run the verification checklist below before reporting the work as complete. Report any item you could not test instead of asserting that it passed.
 
@@ -27,6 +29,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/ssl_services/<
 | [free-certificates.md](free-certificates.md) | Free publicly trusted certificates via ACME (Let's Encrypt, ZeroSSL), issuance, and automated renewal |
 | [self-signed.md](self-signed.md) | OpenSSL and mkcert certificates when a public CA is not an option, plus distributing trust to clients |
 | [authentication.md](authentication.md) | Password storage, MFA, API keys, sessions, rate limiting, and secret handling |
+| [mfa.md](mfa.md) | MFA options: identity layers with QR-code TOTP enrolment, app libraries, SSH modules, Duo |
 | [cloudflare.md](cloudflare.md) | Cloudflare Tunnel and Zero Trust Access: authenticated external access with no open inbound ports |
 | [apache.md](apache.md) | Apache HTTP Server: TLS, redirect, HSTS, basic auth, client certificates |
 | [nginx.md](nginx.md) | nginx: TLS, redirect, HSTS, basic auth, client certificates, reverse proxy |
@@ -65,6 +68,7 @@ Run these after configuration. All must pass before the service is considered pr
 6. No default credentials remain, and no secret (password, key, token, certificate private key) is committed to the repository. Scan before pushing, for example with gitleaks.
 7. Renewal is automated where ACME is used: `sudo certbot renew --dry-run` passes, or the server (Caddy, Traefik) manages renewal itself.
 8. Public endpoints have been scanned with the [Qualys SSL Labs test](https://www.ssllabs.com/ssltest/) or [testssl.sh](https://github.com/drwetter/testssl.sh).
+9. Human-facing logins carry a second factor where the stack supports one; [mfa.md](mfa.md) lists the options, and the per-tool guides state what is viable.
 
 ## Scope and currency
 

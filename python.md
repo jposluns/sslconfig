@@ -66,6 +66,7 @@ token = secrets.token_urlsafe(32)
 
 - FastAPI's security utilities (`fastapi.security`) implement OAuth2/OIDC flows and API-key headers; use them rather than parsing `Authorization` by hand.
 - Rate-limit login routes (for example with a proxy-level limit or a library such as slowapi for ASGI apps).
+- MFA: add TOTP with [pyotp](https://github.com/pyauth/pyotp) plus the [qrcode](https://pypi.org/project/qrcode/) package for enrolment QR codes; [django-otp](https://pypi.org/project/django-otp/) integrates this into Django. Requirements and options in [mfa.md](mfa.md).
 
 ## 4. Client-side TLS discipline
 

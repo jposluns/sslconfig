@@ -49,6 +49,8 @@ A tunnel publishes the app; Access is what makes it authenticated. In the Zero T
 
 Every request to the hostname now hits a Cloudflare login page first; only identities matching the policy reach the app.
 
+MFA: the emailed one-time PIN proves control of a mailbox only. For anything sensitive, connect an identity provider and enforce MFA there; Access then inherits it. Broader options: [mfa.md](mfa.md).
+
 For APIs and machine clients, create a **service token** in the Zero Trust dashboard (Access service authentication section), add a **Service Auth** policy to the application, and send the token with each request:
 
 ```bash
