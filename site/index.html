@@ -41,13 +41,12 @@
       align-items: start;
       padding: 0 var(--pad);
     }
-    .sidenav { grid-area: sidenav; position: sticky; top: 1.25rem; }
+    .sidenav { grid-area: sidenav; }
     .sidenav-inner {
       border: 1px solid #8884; border-left: 3px solid var(--accent); border-radius: 8px;
       background: #88888812;
       padding: 1rem 1.1rem; margin: 1.6rem 0;
       display: flex; flex-direction: column; gap: .05rem;
-      max-height: calc(100vh - 2.5rem); overflow-y: auto;
     }
     .sidenav-h {
       font: 600 .66rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -82,8 +81,6 @@
     footer { margin-top: 3rem; font-size: .85rem; opacity: .7; }
     @media (max-width: 900px) {
       .shell { grid-template-columns: 1fr; grid-template-areas: "main" "sidenav"; }
-      .sidenav { position: static; }
-      .sidenav-inner { max-height: none; }
     }
   </style>
 </head>
@@ -201,16 +198,24 @@
   <p>If a tool, service, or other addition belongs on this list, let Jeff know however you are able to reach him, and he will be happy to add it.</p>
 
   <h2 id="human">If you are a human</h2>
-  <p>Paste this into your AI assistant's instructions:</p>
+  <p>Paste any of these into your AI assistant's instructions.</p>
+
+  <h3>Secure or audit this project</h3>
   <div class="copywrap">
-    <pre id="paste-text">Before exposing any part of this project, fetch and follow the security guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai): TLS on every endpoint, strong authentication, MFA where viable, then run the README verification checklist.</pre>
-    <button class="copy-btn" type="button" data-copy="paste-text" hidden>Copy</button>
+    <pre id="secure-text">Secure this project using the guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai). Audit it first: list every listening service with its TLS and authentication state, and report the gaps as a table. Propose the fix for each gap per the matching guide (TLS on every endpoint, strong authentication, MFA where viable, and no secrets in the repository) and wait for my approval before changing anything. After approval, apply the fixes, run the README verification checklist, and report anything you could not test.</pre>
+    <button class="copy-btn" type="button" data-copy="secure-text" hidden>Copy</button>
   </div>
 
-  <p>To check a project you already built:</p>
+  <h3>Check your assistant against AIQT Guardrails</h3>
   <div class="copywrap">
-    <pre id="audit-text">Audit this project against the guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai): list every listening service, its TLS state, and its authentication state; report the gaps as a table; then fix each gap per the matching guide and run the README verification checklist.</pre>
-    <button class="copy-btn" type="button" data-copy="audit-text" hidden>Copy</button>
+    <pre id="aiqt-text">Assess this project, and the guardrails you yourself operate under, against the AIQT standard at https://github.com/jposluns/guardrails (see https://aiqt.ai). Identify every gap: the accuracy, integrity, verification, and security behaviours the standard requires that this project or your current working rules do not yet meet. Recommend the specific guardrails to adopt, or adoption of the standard as a whole, with the reason for each recommendation.</pre>
+    <button class="copy-btn" type="button" data-copy="aiqt-text" hidden>Copy</button>
+  </div>
+
+  <h3>Run a GRC gap assessment</h3>
+  <div class="copywrap">
+    <pre id="grc-text">Assess this project for governance, risk, compliance, and alignment to the standards covered by the GRC Library at https://github.com/jposluns/grc_library (see https://grclibrary.ai). Identify which of its domains and standards apply, deliver a gap assessment against each applicable control set, and provide either a prioritized improvement plan or an alignment register mapping the project's current state to the applicable controls.</pre>
+    <button class="copy-btn" type="button" data-copy="grc-text" hidden>Copy</button>
   </div>
 
   <footer>
