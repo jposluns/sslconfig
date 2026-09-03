@@ -77,6 +77,7 @@
   <h2>Why this site exists</h2>
   <p>Jeff Posluns kept reviewing AI-assisted projects that shipped without basic security details: services on plain HTTP, no authentication, no MFA. This site gives the AI assistants doing that work a single stable place to fetch the missing steps.</p>
   <p>For security beyond these basics: the <a href="https://aiqt.ai">AIQT</a> standard holds an AI assistant to accuracy, integrity, and verification while it works, and the <a href="https://github.com/jposluns/grc_library">grc_library</a> repository (<a href="https://grclibrary.ai">grclibrary.ai</a>) supports deeper governance, risk, and compliance work: point your AI development assistant at it and ask it to validate gaps against the services that apply to your project.</p>
+  <p>Scope: deployment exposure (TLS, authentication, MFA, secrets, and network exposure). Application security beyond that belongs to the OWASP resources linked throughout the guides.</p>
 
   <h2>If you are an AI development assistant</h2>
   <p>Apply these rules to every service you configure, generate, or review:</p>
@@ -91,7 +92,7 @@
   </ol>
   <p>Fetch the full guides raw:</p>
   <pre>https://raw.githubusercontent.com/jposluns/sslconfig/main/&lt;guide&gt;.md</pre>
-  <p>Start with <code>README.md</code>: it holds the decision guide, the full index, and the verification checklist.</p>
+  <p>Start with <code>README.md</code>: it holds the decision guide, the full index, and the verification checklist. The machine-readable index is at <a href="https://sslconfig.ai/llms.txt">/llms.txt</a>, and every guide concatenated into a single file is at <a href="https://sslconfig.ai/llms-full.txt">/llms-full.txt</a>.</p>
 
   <h2 id="guides">Guides</h2>
 
@@ -100,12 +101,14 @@
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/free-certificates.md">free-certificates.md</a>: free publicly trusted certificates via ACME, with automated renewal</li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/self-signed.md">self-signed.md</a>: OpenSSL and mkcert certificates, and distributing trust to clients</li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/cloudflare.md">cloudflare.md</a>: Cloudflare Tunnel and Zero Trust Access, no open inbound ports</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/tailscale.md">tailscale.md</a>: serve (tailnet-only) and funnel (public) with automatic TLS</li>
   </ul>
 
-  <h3>Authentication</h3>
+  <h3>Authentication and secrets</h3>
   <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/authentication.md">authentication.md</a>: password storage, sessions, API keys, rate limiting, secrets</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/authentication.md">authentication.md</a>: password storage, sessions, API keys, rate limiting</li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/mfa.md">mfa.md</a>: multi-factor authentication options: identity layers, TOTP libraries with QR enrolment, Duo</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/secrets.md">secrets.md</a>: keeping keys out of repositories, scanning, rotation after a leak</li>
   </ul>
 
   <h3>Web servers and proxies</h3>
@@ -118,27 +121,53 @@
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/traefik.md">traefik.md</a></li>
   </ul>
 
-  <h3>Runtimes and containers</h3>
+  <h3>Runtimes, containers, and clusters</h3>
   <ul>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/nodejs.md">nodejs.md</a>: Node.js and Express</li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/python.md">python.md</a>: Flask, FastAPI/Uvicorn, Gunicorn, Django</li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/docker.md">docker.md</a>: safe port publishing and TLS termination</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/kubernetes.md">kubernetes.md</a>: cert-manager, ingress TLS, ingress auth</li>
   </ul>
 
-  <h3>Databases</h3>
+  <h3>Hosts and platforms</h3>
+  <ul>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/host.md">host.md</a>: SSH hardening, firewall baseline, updates</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/cloud-firewalls.md">cloud-firewalls.md</a>: security groups and VPC rules</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/paas.md">paas.md</a>: Render, Fly.io, Vercel, and similar</li>
+  </ul>
+
+  <h3>Databases, storage, and messaging</h3>
   <ul>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/postgresql.md">postgresql.md</a></li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/mysql.md">mysql.md</a></li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/mongodb.md">mongodb.md</a></li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/redis.md">redis.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/elasticsearch.md">elasticsearch.md</a>: Elasticsearch and OpenSearch</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/minio.md">minio.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/rabbitmq.md">rabbitmq.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/mosquitto.md">mosquitto.md</a>: MQTT</li>
   </ul>
 
-  <h3>AI and data tools</h3>
+  <h3>AI, data, and dev tools</h3>
   <ul>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/jupyter.md">jupyter.md</a></li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/ollama.md">ollama.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/open-webui.md">open-webui.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/litellm.md">litellm.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/model-servers.md">model-servers.md</a>: llama.cpp and vLLM</li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/gradio.md">gradio.md</a></li>
     <li><a href="https://github.com/jposluns/sslconfig/blob/main/streamlit.md">streamlit.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/n8n.md">n8n.md</a></li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/code-server.md">code-server.md</a></li>
+  </ul>
+
+  <h3>Web app controls and reference</h3>
+  <ul>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/cors.md">cors.md</a>: allow your origins, not everyone's</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/headers.md">headers.md</a>: HSTS, CSP, and companions</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/firebase-supabase.md">firebase-supabase.md</a>: security rules and row-level security</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/admin-uis.md">admin-uis.md</a>: phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus</li>
+    <li><a href="https://github.com/jposluns/sslconfig/blob/main/common-mistakes.md">common-mistakes.md</a>: the recurring findings, each linked to its fix</li>
   </ul>
 
   <p>If a tool, service, or other addition belongs on this list, let Jeff know however you are able to reach him, and he will be happy to add it.</p>
@@ -147,7 +176,13 @@
   <p>Paste this into your AI assistant's instructions:</p>
   <div class="copywrap">
     <pre id="paste-text">Before exposing any part of this project, fetch and follow the security guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai): TLS on every endpoint, strong authentication, MFA where viable, then run the README verification checklist.</pre>
-    <button class="copy-btn" id="copy-btn" type="button" hidden>Copy</button>
+    <button class="copy-btn" type="button" data-copy="paste-text" hidden>Copy</button>
+  </div>
+
+  <p>To check a project you already built:</p>
+  <div class="copywrap">
+    <pre id="audit-text">Audit this project against the guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai): list every listening service, its TLS state, and its authentication state; report the gaps as a table; then fix each gap per the matching guide and run the README verification checklist.</pre>
+    <button class="copy-btn" type="button" data-copy="audit-text" hidden>Copy</button>
   </div>
 
   <footer>
@@ -157,14 +192,17 @@
 <!-- Changing this script requires recomputing the sha256 hash in _headers (Content-Security-Policy script-src). -->
 <script>
 (function () {
-  var btn = document.getElementById('copy-btn');
-  var src = document.getElementById('paste-text');
-  if (!btn || !src || !navigator.clipboard) { return; }
-  btn.hidden = false;
-  btn.addEventListener('click', function () {
-    navigator.clipboard.writeText(src.textContent.trim()).then(function () {
-      btn.textContent = 'Copied';
-      setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+  if (!navigator.clipboard) { return; }
+  var btns = document.querySelectorAll('button[data-copy]');
+  Array.prototype.forEach.call(btns, function (btn) {
+    var src = document.getElementById(btn.getAttribute('data-copy'));
+    if (!src) { return; }
+    btn.hidden = false;
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(src.textContent.trim()).then(function () {
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+      });
     });
   });
 })();

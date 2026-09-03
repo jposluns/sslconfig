@@ -20,7 +20,7 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
 5. Redirect HTTP to HTTPS, or do not listen on HTTP at all.
 6. Run the verification checklist below before reporting the work as complete. Report any item you could not test instead of asserting that it passed.
 
-Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<default-branch>/<guide>.md` (for example `.../main/nginx.md` once the repository default branch is `main`).
+Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<default-branch>/<guide>.md` (for example `.../main/nginx.md`). Every guide concatenated into a single file: https://sslconfig.ai/llms-full.txt (also [site/llms-full.txt](site/llms-full.txt) in this repository); the machine-readable index is https://sslconfig.ai/llms.txt
 
 ## Guide index
 
@@ -48,11 +48,31 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [ollama.md](ollama.md) | Ollama: no built-in auth or TLS; protect it with a proxy or tunnel |
 | [gradio.md](gradio.md) | Gradio: launch() auth and TLS parameters, share link risks |
 | [streamlit.md](streamlit.md) | Streamlit: TLS options, native OIDC login, reverse proxy deployment |
+| [tailscale.md](tailscale.md) | Tailscale serve (tailnet-only) and funnel (public) with automatic TLS |
+| [host.md](host.md) | Host baseline: SSH hardening, firewall default-deny, brute-force protection, updates |
+| [secrets.md](secrets.md) | Secrets: repository hygiene, scanning, rotation after a leak, sops/age |
+| [cloud-firewalls.md](cloud-firewalls.md) | Security groups and VPC rules: no 0.0.0.0/0 on databases, SSH posture |
+| [paas.md](paas.md) | Render, Fly.io, Vercel, and similar: platform TLS, your auth and secrets |
+| [kubernetes.md](kubernetes.md) | cert-manager ACME, ingress TLS, ingress basic auth |
+| [elasticsearch.md](elasticsearch.md) | Elasticsearch and OpenSearch: keep the built-in security on |
+| [minio.md](minio.md) | MinIO: root credentials, certs directory TLS, scoped access keys |
+| [rabbitmq.md](rabbitmq.md) | RabbitMQ: users and permissions, TLS listener, guest account |
+| [mosquitto.md](mosquitto.md) | Mosquitto (MQTT): per-device credentials, TLS listener, mutual TLS |
+| [open-webui.md](open-webui.md) | Open WebUI: signup control, pending role, fronting TLS |
+| [litellm.md](litellm.md) | LiteLLM proxy: master key, per-app virtual keys |
+| [model-servers.md](model-servers.md) | llama.cpp and vLLM: loopback, API keys, TLS in front |
+| [n8n.md](n8n.md) | n8n: listen address, native TLS, owner setup, MFA enforcement |
+| [code-server.md](code-server.md) | code-server: SSH forwarding first, password auth, TLS |
+| [admin-uis.md](admin-uis.md) | phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus: never public |
+| [firebase-supabase.md](firebase-supabase.md) | Firebase rules and Supabase RLS: the rules are the security |
+| [cors.md](cors.md) | CORS: exact origins, never * with credentials |
+| [headers.md](headers.md) | Security headers: HSTS, CSP, and companions for your app |
+| [common-mistakes.md](common-mistakes.md) | The recurring findings, each linked to its fix |
 
 ## Decision guide
 
 - Public web app with its own domain: [free-certificates.md](free-certificates.md), then the guide for your web server or proxy, then [authentication.md](authentication.md).
-- App on a home server, behind NAT, or without a domain you control at the DNS level: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app.
+- App on a home server, behind NAT, or without a domain you control at the DNS level: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. [tailscale.md](tailscale.md) is the tailnet-based alternative.
 - Internal tool, staging, or local development: [self-signed.md](self-signed.md), with authentication still enabled.
 - Databases and model servers (PostgreSQL, MySQL, MongoDB, Redis, Ollama): keep them off public interfaces entirely where possible; the per-tool guides cover TLS and authentication for the cases where network exposure is unavoidable.
 
@@ -73,6 +93,8 @@ Run these after configuration. All must pass before the service is considered pr
 ## Scope and currency
 
 The guides use placeholders (`example.com`, `app.example.com`, `203.0.113.10`) that you must replace. Configuration syntax was checked against the vendor documentation cited in each guide as of September 2026; directives and dashboard menu locations change, so verify version-specific items against the current documentation for your installed version. Each guide lists its sources.
+
+Scope: deployment exposure (TLS, authentication, MFA, secrets, and network exposure). Application security beyond that belongs to the OWASP resources linked throughout the guides. To propose a tool or guide, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 

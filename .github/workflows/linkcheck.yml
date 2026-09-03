@@ -1,0 +1,31 @@
+name: Weekly link check
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  lychee:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          fail: true
+          args: >-
+            --no-progress
+            --accept 200,201,204,301,302,403,429,999
+            --exclude '[<>]'
+            --exclude '\$'
+            --exclude 'example\.(com|test)'
+            --exclude 'app\.internal'
+            --exclude 'localhost'
+            --exclude '127\.0\.0\.1'
+            './*.md'
+            './site/index.html'
+            './site/llms.txt'

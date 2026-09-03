@@ -1,0 +1,2884 @@
+# sslconfig.ai: all guides in one file
+
+> Generated from https://github.com/jposluns/sslconfig (CC0 1.0).
+> Per-guide index: https://sslconfig.ai/llms.txt
+
+======================================================================
+==> README.md
+======================================================================
+
+# sslconfig
+
+TLS and authentication setup guides for AI-assisted projects.
+
+Publicly reachable services built with AI assistance are routinely deployed on plain HTTP with no authentication. This repository holds short, generic, copy-ready guides that add TLS (HTTPS) and strong authentication to the servers, frameworks, and databases those projects most often use. The guides are written to be consumed by AI development assistants as well as by people: point your assistant at this repository and ask it to secure your project.
+
+The site at [sslconfig.ai](https://sslconfig.ai), served from [site/](site/) through Cloudflare Pages, is the short public pointer to these guides.
+
+## Instructions for AI development assistants
+
+If you are an AI assistant configuring, generating, or reviewing a service, apply these rules:
+
+1. Treat every service as internet-reachable unless you have confirmed otherwise. Bind services to `127.0.0.1` by default and expose them only through a TLS-terminating layer that requires authentication.
+2. Choose the certificate path before writing configuration:
+   - Public DNS name and reachable ports 80/443: use [free-certificates.md](free-certificates.md).
+   - No public domain, no inbound ports, or a NATed or residential host: use [cloudflare.md](cloudflare.md) (Cloudflare Tunnel plus Zero Trust Access).
+   - Internal or development use only: use [self-signed.md](self-signed.md).
+3. Apply the guide that matches the stack (index below). If the stack has no guide, place it behind a reverse proxy configured per [nginx.md](nginx.md) or [caddy.md](caddy.md) and keep the application itself on loopback.
+4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md).
+5. Redirect HTTP to HTTPS, or do not listen on HTTP at all.
+6. Run the verification checklist below before reporting the work as complete. Report any item you could not test instead of asserting that it passed.
+
+Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<default-branch>/<guide>.md` (for example `.../main/nginx.md`). Every guide concatenated into a single file: https://sslconfig.ai/llms-full.txt (also [site/llms-full.txt](site/llms-full.txt) in this repository); the machine-readable index is https://sslconfig.ai/llms.txt
+
+## Guide index
+
+| Guide | Covers |
+|---|---|
+| [free-certificates.md](free-certificates.md) | Free publicly trusted certificates via ACME (Let's Encrypt, ZeroSSL), issuance, and automated renewal |
+| [self-signed.md](self-signed.md) | OpenSSL and mkcert certificates when a public CA is not an option, plus distributing trust to clients |
+| [authentication.md](authentication.md) | Password storage, MFA, API keys, sessions, rate limiting, and secret handling |
+| [mfa.md](mfa.md) | MFA options: identity layers with QR-code TOTP enrolment, app libraries, SSH modules, Duo |
+| [cloudflare.md](cloudflare.md) | Cloudflare Tunnel and Zero Trust Access: authenticated external access with no open inbound ports |
+| [apache.md](apache.md) | Apache HTTP Server: TLS, redirect, HSTS, basic auth, client certificates |
+| [nginx.md](nginx.md) | nginx: TLS, redirect, HSTS, basic auth, client certificates, reverse proxy |
+| [lighttpd.md](lighttpd.md) | lighttpd: TLS via mod_openssl, redirect, basic auth |
+| [caddy.md](caddy.md) | Caddy: automatic HTTPS, internal CA, basic auth |
+| [haproxy.md](haproxy.md) | HAProxy: TLS termination, redirect, HSTS, basic auth |
+| [traefik.md](traefik.md) | Traefik: ACME resolvers, HTTPS redirection, basic auth middleware |
+| [nodejs.md](nodejs.md) | Node.js and Express: HTTPS server, security headers, sessions, password hashing |
+| [python.md](python.md) | Flask, FastAPI/Uvicorn, Gunicorn, Django: TLS options and secure settings |
+| [docker.md](docker.md) | Docker and Compose: safe port publishing, the UFW bypass problem, TLS termination |
+| [postgresql.md](postgresql.md) | PostgreSQL: server TLS, SCRAM authentication, pg_hba rules, verified client connections |
+| [mysql.md](mysql.md) | MySQL and MariaDB: required TLS transport, per-user TLS, modern auth plugins |
+| [mongodb.md](mongodb.md) | MongoDB: requireTLS, authorization, admin user creation, bind address |
+| [redis.md](redis.md) | Redis: TLS listener, ACLs, requirepass, bind and protected mode |
+| [jupyter.md](jupyter.md) | Jupyter Server, Lab, and Notebook: hashed password and TLS |
+| [ollama.md](ollama.md) | Ollama: no built-in auth or TLS; protect it with a proxy or tunnel |
+| [gradio.md](gradio.md) | Gradio: launch() auth and TLS parameters, share link risks |
+| [streamlit.md](streamlit.md) | Streamlit: TLS options, native OIDC login, reverse proxy deployment |
+| [tailscale.md](tailscale.md) | Tailscale serve (tailnet-only) and funnel (public) with automatic TLS |
+| [host.md](host.md) | Host baseline: SSH hardening, firewall default-deny, brute-force protection, updates |
+| [secrets.md](secrets.md) | Secrets: repository hygiene, scanning, rotation after a leak, sops/age |
+| [cloud-firewalls.md](cloud-firewalls.md) | Security groups and VPC rules: no 0.0.0.0/0 on databases, SSH posture |
+| [paas.md](paas.md) | Render, Fly.io, Vercel, and similar: platform TLS, your auth and secrets |
+| [kubernetes.md](kubernetes.md) | cert-manager ACME, ingress TLS, ingress basic auth |
+| [elasticsearch.md](elasticsearch.md) | Elasticsearch and OpenSearch: keep the built-in security on |
+| [minio.md](minio.md) | MinIO: root credentials, certs directory TLS, scoped access keys |
+| [rabbitmq.md](rabbitmq.md) | RabbitMQ: users and permissions, TLS listener, guest account |
+| [mosquitto.md](mosquitto.md) | Mosquitto (MQTT): per-device credentials, TLS listener, mutual TLS |
+| [open-webui.md](open-webui.md) | Open WebUI: signup control, pending role, fronting TLS |
+| [litellm.md](litellm.md) | LiteLLM proxy: master key, per-app virtual keys |
+| [model-servers.md](model-servers.md) | llama.cpp and vLLM: loopback, API keys, TLS in front |
+| [n8n.md](n8n.md) | n8n: listen address, native TLS, owner setup, MFA enforcement |
+| [code-server.md](code-server.md) | code-server: SSH forwarding first, password auth, TLS |
+| [admin-uis.md](admin-uis.md) | phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus: never public |
+| [firebase-supabase.md](firebase-supabase.md) | Firebase rules and Supabase RLS: the rules are the security |
+| [cors.md](cors.md) | CORS: exact origins, never * with credentials |
+| [headers.md](headers.md) | Security headers: HSTS, CSP, and companions for your app |
+| [common-mistakes.md](common-mistakes.md) | The recurring findings, each linked to its fix |
+
+## Decision guide
+
+- Public web app with its own domain: [free-certificates.md](free-certificates.md), then the guide for your web server or proxy, then [authentication.md](authentication.md).
+- App on a home server, behind NAT, or without a domain you control at the DNS level: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. [tailscale.md](tailscale.md) is the tailnet-based alternative.
+- Internal tool, staging, or local development: [self-signed.md](self-signed.md), with authentication still enabled.
+- Databases and model servers (PostgreSQL, MySQL, MongoDB, Redis, Ollama): keep them off public interfaces entirely where possible; the per-tool guides cover TLS and authentication for the cases where network exposure is unavoidable.
+
+## Verification checklist
+
+Run these after configuration. All must pass before the service is considered protected.
+
+1. No plaintext listener on a public interface: `ss -tlnp` (Linux) shows nothing bound to `0.0.0.0` or a public address on a plain HTTP port, except a listener whose only job is to redirect to HTTPS.
+2. Redirect works: `curl -sI http://example.com/` returns `301` or `308` with a `Location: https://...` header.
+3. TLS works: `curl -sI https://example.com/` succeeds without `-k`.
+4. Old protocols are refused: `openssl s_client -connect example.com:443 -tls1_1` fails to negotiate (TLS 1.2 is the minimum everywhere in these guides).
+5. Authentication is enforced: an unauthenticated request to any non-public path returns `401`, `403`, or a login redirect, never data. Test the API paths as well as the home page.
+6. No default credentials remain, and no secret (password, key, token, certificate private key) is committed to the repository. Scan before pushing, for example with gitleaks.
+7. Renewal is automated where ACME is used: `sudo certbot renew --dry-run` passes, or the server (Caddy, Traefik) manages renewal itself.
+8. Public endpoints have been scanned with the [Qualys SSL Labs test](https://www.ssllabs.com/ssltest/) or [testssl.sh](https://github.com/drwetter/testssl.sh).
+9. Human-facing logins carry a second factor where the stack supports one; [mfa.md](mfa.md) lists the options, and the per-tool guides state what is viable.
+
+## Scope and currency
+
+The guides use placeholders (`example.com`, `app.example.com`, `203.0.113.10`) that you must replace. Configuration syntax was checked against the vendor documentation cited in each guide as of September 2026; directives and dashboard menu locations change, so verify version-specific items against the current documentation for your installed version. Each guide lists its sources.
+
+Scope: deployment exposure (TLS, authentication, MFA, secrets, and network exposure). Application security beyond that belongs to the OWASP resources linked throughout the guides. To propose a tool or guide, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Licence
+
+Everything in this repository (the guides, the configuration samples, and the site) is dedicated to the public domain under [CC0 1.0 Universal](LICENSE). Copy and reuse it freely; no attribution is required.
+
+======================================================================
+==> free-certificates.md
+======================================================================
+
+# Free publicly trusted certificates (ACME)
+
+Publicly trusted certificates are free through ACME certificate authorities such as Let's Encrypt and ZeroSSL. Browsers and libraries accept them without any client-side configuration, which makes them the correct choice for every service with a public DNS name. Use [self-signed.md](self-signed.md) only when no public domain exists, or [cloudflare.md](cloudflare.md) when the host cannot accept inbound connections.
+
+## Prerequisites
+
+- A DNS record (`A` or `AAAA`, or `CNAME`) for the hostname, pointing at the server.
+- For the HTTP-01 challenge: inbound port 80 reachable from the internet.
+- For the TLS-ALPN-01 challenge (used by Caddy and Traefik): inbound port 443.
+- For the DNS-01 challenge (required for wildcard certificates): API access to the DNS provider.
+
+If none of these is possible, use [cloudflare.md](cloudflare.md) instead.
+
+## Certbot with Let's Encrypt
+
+Certbot is the reference ACME client. Install it from your distribution or via snap:
+
+```bash
+# Debian/Ubuntu
+sudo apt install certbot python3-certbot-nginx python3-certbot-apache
+
+# Any distribution with snapd
+sudo snap install --classic certbot
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
+```
+
+Issue and install in one step when certbot supports your web server:
+
+```bash
+sudo certbot --nginx  -d example.com -d www.example.com
+sudo certbot --apache -d example.com -d www.example.com
+```
+
+Issue only the certificate when you configure the server yourself, or when no web server is running yet:
+
+```bash
+# Standalone: certbot binds port 80 itself; stop anything using it first
+sudo certbot certonly --standalone -d example.com
+
+# Webroot: the existing web server keeps running and serves the challenge files
+sudo certbot certonly --webroot -w /var/www/html -d example.com
+```
+
+Wildcard certificates require the DNS-01 challenge through a DNS plugin (for example `python3-certbot-dns-cloudflare`), with provider API credentials in a root-owned file:
+
+```bash
+sudo certbot certonly --dns-cloudflare \
+  --dns-cloudflare-credentials /root/.secrets/cloudflare.ini \
+  -d example.com -d "*.example.com"
+```
+
+Certificates land in stable paths that server configuration should reference directly:
+
+```
+/etc/letsencrypt/live/example.com/fullchain.pem   # certificate plus chain
+/etc/letsencrypt/live/example.com/privkey.pem     # private key
+```
+
+## Renewal
+
+Let's Encrypt certificates are valid for 90 days at the time of writing, so renewal must be automated. Package and snap installs of certbot register a systemd timer or cron job that runs `certbot renew` for you. Confirm that it works and reload the server after each renewal:
+
+```bash
+sudo certbot renew --dry-run
+sudo certbot renew --deploy-hook "systemctl reload nginx"
+```
+
+Set the deploy hook once with `certonly`/`renew`, or drop a script into `/etc/letsencrypt/renewal-hooks/deploy/`. A certificate that issues once and then expires in production is the most common ACME failure; the dry run belongs in your deployment checklist.
+
+## Rate limits
+
+Let's Encrypt enforces per-domain issuance limits. Test against the staging environment (`certbot --staging` or `--test-cert`) until the configuration works, then issue the real certificate. Current limits: https://letsencrypt.org/docs/rate-limits/
+
+## Alternatives
+
+- **ZeroSSL**: free certificates over ACME. Some clients need External Account Binding (EAB) credentials from the ZeroSSL dashboard; the acme.sh client registers with ZeroSSL by default.
+- **acme.sh**: a dependency-light shell ACME client supporting many DNS providers, useful where certbot is unavailable. Install from the repository release rather than piping a downloaded script straight into a shell. https://github.com/acmesh-official/acme.sh
+- **Caddy and Traefik**: obtain and renew certificates themselves with no external client; see [caddy.md](caddy.md) and [traefik.md](traefik.md). This is the lowest-effort correct option for new deployments.
+- **Cloudflare origin certificates**: free and valid for long periods, but trusted only by Cloudflare's edge, so they are usable only behind the Cloudflare proxy; see [cloudflare.md](cloudflare.md).
+
+## Verify
+
+```bash
+sudo certbot certificates                       # what is issued and when it expires
+curl -sI https://example.com/                   # succeeds without -k
+openssl s_client -connect example.com:443 -servername example.com </dev/null \
+  | openssl x509 -noout -issuer -dates
+```
+
+A certificate alone does not protect anything: continue with the server guide for your stack and with [authentication.md](authentication.md).
+
+## Sources (checked September 2026)
+
+- Let's Encrypt documentation: https://letsencrypt.org/docs/
+- Certbot instructions: https://certbot.eff.org/
+- ZeroSSL: https://zerossl.com/
+- acme.sh: https://github.com/acmesh-official/acme.sh
+
+======================================================================
+==> self-signed.md
+======================================================================
+
+# Self-signed certificates
+
+Use a self-signed certificate when the service has no public DNS name, when an ACME CA cannot reach it, and when [cloudflare.md](cloudflare.md) is not an option: internal tools, lab and development environments, and machine-to-machine links on private networks. For anything a browser user or external party reaches, prefer [free-certificates.md](free-certificates.md); self-signed certificates trigger browser warnings and every client must be configured to trust them.
+
+Self-signed TLS still matters. It encrypts credentials and data in transit; without it, authentication tokens cross the network in cleartext.
+
+## 1. Generate a certificate with OpenSSL
+
+RSA, single command (OpenSSL 1.1.1 or later for `-addext`):
+
+```bash
+openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
+  -keyout server.key -out server.crt \
+  -subj "/CN=app.internal" \
+  -addext "subjectAltName=DNS:app.internal,DNS:localhost,IP:127.0.0.1,IP:203.0.113.10"
+```
+
+ECDSA (smaller and faster; generate the key first, then the certificate):
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out server.key
+openssl req -x509 -key server.key -sha256 -days 365 -out server.crt \
+  -subj "/CN=app.internal" \
+  -addext "subjectAltName=DNS:app.internal,IP:203.0.113.10"
+```
+
+Rules that make the certificate actually work:
+
+- The `subjectAltName` list must contain every DNS name and IP address clients will use to reach the service. Modern clients validate SAN entries and ignore the CN.
+- `-nodes` leaves the key unencrypted so services can start unattended; protect it with file permissions instead.
+- Track the `-days` expiry. Nothing renews a self-signed certificate for you; put the date in your calendar or monitoring.
+
+## 2. Protect the private key
+
+```bash
+chmod 600 server.key
+chown <service-user> server.key
+```
+
+Never commit a private key to version control. Add `*.key` and `*.pem` to `.gitignore` before generating anything inside a repository, and treat any key that has ever been committed or pasted into a chat as compromised: regenerate it.
+
+## 3. mkcert for local development
+
+[mkcert](https://github.com/FiloSottile/mkcert) creates a local CA, installs it into your OS and browser trust stores, and issues certificates that your own machine trusts with no warnings:
+
+```bash
+mkcert -install
+mkcert app.test localhost 127.0.0.1 ::1
+```
+
+This is for development machines only. The generated CA can sign for any name, so its key must never leave the developer's machine, and mkcert certificates must never serve real users.
+
+## 4. Make clients trust the certificate; never disable verification
+
+Distribute the certificate (or your internal CA certificate) to clients instead of turning verification off:
+
+```bash
+# Debian/Ubuntu system trust store
+sudo cp server.crt /usr/local/share/ca-certificates/app-internal.crt
+sudo update-ca-certificates
+
+# RHEL/Fedora system trust store
+sudo cp server.crt /etc/pki/ca-trust/source/anchors/app-internal.crt
+sudo update-ca-trust
+
+# Per-tool
+curl --cacert server.crt https://app.internal/
+export REQUESTS_CA_BUNDLE=/path/to/server.crt      # Python requests
+export NODE_EXTRA_CA_CERTS=/path/to/server.crt     # Node.js
+```
+
+Do not ship `curl -k`, `verify=False`, `rejectUnauthorized: false`, or `NODE_TLS_REJECT_UNAUTHORIZED=0` in committed code. Each of these disables TLS validation entirely, for attacker-controlled certificates as much as for your own, and they reliably survive into production.
+
+## 5. Verify
+
+```bash
+openssl x509 -in server.crt -noout -subject -dates -ext subjectAltName
+openssl s_client -connect app.internal:443 -CAfile server.crt </dev/null
+```
+
+## Limits to plan around
+
+Self-signed certificates have no revocation and no third-party accountability, and trust distribution is manual. When the audience grows beyond a small internal group, move to [free-certificates.md](free-certificates.md) or put the service behind [cloudflare.md](cloudflare.md). Authentication is still required either way: see [authentication.md](authentication.md).
+
+## Sources (checked September 2026)
+
+- OpenSSL documentation: https://www.openssl.org/docs/
+- mkcert: https://github.com/FiloSottile/mkcert
+
+======================================================================
+==> cloudflare.md
+======================================================================
+
+# Cloudflare Tunnel and Zero Trust Access
+
+This is the recommended path when the host cannot or should not accept inbound connections: home labs, NATed machines, cloud VMs you want to keep closed, and any project without its own TLS setup. `cloudflared` opens an outbound-only tunnel to Cloudflare's edge, the edge serves your hostname over HTTPS with a Cloudflare-managed certificate, and Cloudflare Access places authentication (SSO or emailed one-time PIN) in front of the app without any application changes. No inbound firewall ports are opened at all.
+
+## 1. Prerequisites
+
+- A domain added to Cloudflare (the free plan is sufficient), with Cloudflare as its DNS.
+- A Zero Trust organization on the account. At the time of writing the free tier covers up to 50 users; verify current limits at https://www.cloudflare.com/plans/zero-trust-services/
+- `cloudflared` installed on the host that can reach the service (packages for Linux, macOS, and Windows: https://github.com/cloudflare/cloudflared).
+
+## 2. Create the tunnel (dashboard-managed, recommended)
+
+Per the Cloudflare docs as of June 2026 (menu locations change; the sources below are authoritative):
+
+1. In the Cloudflare dashboard go to **Networking > Tunnels** and create a tunnel (connector type `cloudflared`).
+2. Copy the installation command the dashboard shows for your OS and run it on the host. It embeds a tunnel token and installs `cloudflared` as a service (`cloudflared service install <TOKEN>` on Linux).
+3. Add a route: **Routes > Add route > Published application**, choose the subdomain (for example `app.example.com`), and set the service URL to the local service, for example `http://localhost:3000`.
+
+The app is now reachable at `https://app.example.com` over TLS terminated at Cloudflare's edge. Traffic between `cloudflared` and Cloudflare travels inside the encrypted tunnel; the `http://localhost:3000` hop stays on the host itself.
+
+## 3. CLI alternative (locally-managed tunnel)
+
+```bash
+cloudflared tunnel login
+cloudflared tunnel create myapp
+cloudflared tunnel route dns myapp app.example.com
+```
+
+`~/.cloudflared/config.yml`:
+
+```yaml
+tunnel: <TUNNEL-UUID>
+credentials-file: /home/user/.cloudflared/<TUNNEL-UUID>.json
+ingress:
+  - hostname: app.example.com
+    service: http://localhost:3000
+  - service: http_status:404
+```
+
+Run with `cloudflared tunnel run myapp`, or install it as a service with `sudo cloudflared service install`. The credentials JSON and the tunnel token are secrets: they let anyone publish services on your hostname, so keep them out of repositories.
+
+## 4. Add authentication with Access
+
+A tunnel publishes the app; Access is what makes it authenticated. In the Zero Trust dashboard:
+
+1. Go to the **Access > Applications** section and add a **self-hosted** application for `app.example.com`.
+2. Create an **Allow** policy. Sensible starting rules: `Emails` listing specific addresses, or `Emails ending in` your domain.
+3. Choose login methods. The built-in **One-time PIN** (a code emailed to the allowed address) works with zero identity-provider setup; connect Google, GitHub, Microsoft Entra ID, or another IdP for SSO and MFA.
+
+Every request to the hostname now hits a Cloudflare login page first; only identities matching the policy reach the app.
+
+MFA: the emailed one-time PIN proves control of a mailbox only. For anything sensitive, connect an identity provider and enforce MFA there; Access then inherits it. Broader options: [mfa.md](mfa.md).
+
+For APIs and machine clients, create a **service token** in the Zero Trust dashboard (Access service authentication section), add a **Service Auth** policy to the application, and send the token with each request:
+
+```bash
+curl -H "CF-Access-Client-Id: <id>" \
+     -H "CF-Access-Client-Secret: <secret>" \
+     https://app.example.com/api
+```
+
+## 5. Close the side doors
+
+- Bind the application to `127.0.0.1` so the tunnel is the only path to it. If the app also listens publicly, Access is decorative.
+- Do not use quick tunnels (`cloudflared tunnel --url http://localhost:3000`, the random `trycloudflare.com` URLs) for anything real: they are unauthenticated and intended for short-lived testing.
+- If the origin must sit on a different machine from `cloudflared`, run TLS on that hop too (`service: https://...`; see [self-signed.md](self-signed.md)).
+- Related but distinct: for a directly-exposed origin behind Cloudflare's proxy (no tunnel), install a free **Cloudflare origin certificate** on the server and set the zone's TLS mode to **Full (strict)**. Origin certificates are trusted only by Cloudflare's edge, never by browsers directly.
+
+## 6. Verify
+
+- A private-browsing visit to `https://app.example.com` shows the Access login page, not the app.
+- `curl -sI https://app.example.com/` returns a redirect to the Access login, not application content.
+- With a service token, the same request returns application content.
+- `ss -tlnp` on the host shows the app bound to `127.0.0.1` only, and your firewall shows no inbound rule added for it.
+
+## Sources (checked September 2026)
+
+- Cloudflare Zero Trust documentation: https://developers.cloudflare.com/cloudflare-one/
+- Create a remotely-managed tunnel: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/
+- cloudflared releases: https://github.com/cloudflare/cloudflared
+
+======================================================================
+==> tailscale.md
+======================================================================
+
+# Tailscale: serve and funnel
+
+Tailscale gives the same no-open-inbound-ports posture as [cloudflare.md](cloudflare.md), built on WireGuard with device identity as the access control. Two commands matter, and they differ in exactly one thing: who can reach the service.
+
+## 1. tailscale serve: tailnet-only (authenticated by membership)
+
+```bash
+tailscale serve --bg localhost:3000
+```
+
+- Reachable only by devices in your tailnet, so access is authenticated by device identity and your tailnet ACLs.
+- HTTPS uses an automatically provisioned TLS certificate for the machine's tailnet name.
+- `--bg` keeps it running in the background; without it, the share stops with the session.
+
+This is the right default for admin panels, dashboards, Jupyter, and internal tools: no certificate work, no public exposure at all.
+
+## 2. tailscale funnel: public internet (bring your own auth)
+
+```bash
+tailscale funnel 3000
+```
+
+- Publishes the service to the entire internet at your `*.ts.net` hostname, TLS included.
+- Funnel itself adds **no per-request authentication**; the relay does not even decrypt your traffic. Anything funneled needs application-level login per [authentication.md](authentication.md) and, for human logins, [mfa.md](mfa.md), exactly as if it sat behind any public proxy.
+- Prerequisites per the docs: HTTPS certificates enabled for the tailnet, a `funnel` node attribute in the tailnet policy file, and MagicDNS.
+
+## 3. Choosing between them
+
+Serve for anything private (most things). Funnel or [cloudflare.md](cloudflare.md) for genuinely public services; Cloudflare Access adds managed login in front, which funnel does not, so prefer Access when the public service is for a defined set of people. Command syntax changed in Tailscale v1.52; on older clients consult `tailscale serve --help`.
+
+## 4. Verify
+
+```bash
+tailscale serve status
+curl -sI https://<machine>.<tailnet>.ts.net/     # from a tailnet device: works
+# From a non-tailnet network: serve URL unreachable; funnel URL reachable, so its app login must gate it.
+```
+
+## Sources (checked September 2026)
+
+- Tailscale serve: https://tailscale.com/kb/1242/tailscale-serve
+- Tailscale funnel: https://tailscale.com/kb/1223/funnel
+
+======================================================================
+==> authentication.md
+======================================================================
+
+# Strong authentication baseline
+
+TLS without authentication leaves a service open to the whole internet over an encrypted channel. These rules apply to every service in this repository's guides. `must` marks a requirement; `should` marks a recommendation.
+
+## Rules
+
+1. **Deny by default.** Every endpoint that is not deliberately public must require authentication, including APIs, health dashboards, admin panels, metrics, and message queues. Publish an explicit list of the paths that are public; everything else authenticates.
+2. **No default or shared credentials.** Change or disable every vendor default account before exposure. Each human gets an individual account; each service gets its own credential. Never ship credentials in code, containers, or documentation.
+3. **TLS first.** Credentials must only cross the network inside TLS. HTTP basic authentication and bearer tokens are acceptable only over HTTPS, because both send the secret with every request.
+4. **Hash passwords with a modern algorithm.** Store only argon2id or bcrypt hashes (per current OWASP guidance; scrypt and correctly parameterized PBKDF2 are also acceptable). Never store plaintext, and never use unsalted or fast hashes such as MD5 or SHA-256 for passwords.
+   - Node.js: `bcrypt` or `argon2` packages.
+   - Python: `argon2-cffi` or `bcrypt`.
+   - Shell (for htpasswd files): `htpasswd -B` (bcrypt).
+5. **Generate secrets randomly and keep them out of the repository.**
+   ```bash
+   openssl rand -base64 32
+   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+   Load secrets from environment variables or a secret manager. Add `.env` to `.gitignore` before the first commit, and scan the repository for leaked secrets (for example with gitleaks) before pushing. A secret that has reached a public repository, a chat, or a log is compromised: rotate it, since deleting the file does not unpublish it.
+6. **Prefer SSO/OIDC over local accounts** where the product supports it, and enable MFA wherever available. [Cloudflare Access](cloudflare.md) puts SSO or one-time-PIN login in front of any web app without changing the app. Where no native MFA exists, add it with an identity layer, an app-level TOTP library, or a hosted service, per [mfa.md](mfa.md).
+7. **Scope machine access.** API clients get their own tokens with the least privilege the task needs, not an admin password. Support and exercise rotation; set expiry where the platform allows it.
+8. **Harden sessions.** Set cookies `Secure`, `HttpOnly`, and `SameSite` (`Lax` or `Strict`), sign them with a strong random secret, and expire them. Invalidate sessions on password change.
+9. **Rate-limit authentication endpoints** and lock or delay after repeated failures. Log authentication successes and failures with source address and account, and keep the logs long enough to investigate an incident. fail2ban is a low-effort control for SSH and login panels on Linux hosts.
+10. **Least privilege everywhere.** Separate admin from daily-use accounts, and give database and OS service accounts only the rights the application uses.
+
+## Quick checks
+
+- Unauthenticated `curl` against a protected path returns `401`, `403`, or a login redirect, never data.
+- `git log -p | grep -iE 'password|secret|api[_-]?key'` over a new repository comes back empty (a scanner does this better; use one).
+- The user store contains no account named `admin`, `test`, or `demo` with a known or empty password.
+
+## Sources (checked September 2026)
+
+- OWASP Authentication Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- OWASP Password Storage Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+
+======================================================================
+==> mfa.md
+======================================================================
+
+# Multi-factor authentication (MFA)
+
+Passwords fail through phishing, reuse, and credential stuffing; a second factor keeps a stolen password from becoming access. This guide names the options and the references; it deliberately stops short of per-product walkthroughs, because an AI assistant that knows which option fits can implement it from the linked project documentation. The per-tool guides in this repository state what is viable for each stack.
+
+## What to do (AI assistants)
+
+1. Give every human-facing login on an exposed service a second factor where viable.
+2. Prefer, in this order:
+   1. Platform-native MFA, or OIDC/SSO login with MFA enforced at the identity provider.
+   2. An identity-aware layer in front of the app (Cloudflare Access, or a self-hosted portal below), which adds MFA without changing the app.
+   3. App-level TOTP through a library (below).
+   4. A hosted MFA service such as Duo.
+3. Prefer phishing-resistant factors (WebAuthn/passkeys) over TOTP where the platform offers them, and TOTP over emailed or SMS codes.
+4. When implementing TOTP yourself, the required pieces are: a random per-user secret; an `otpauth://` provisioning URI rendered as a QR code for the user's authenticator app; verification of 1 valid code before the factor activates; single-use recovery codes (stored hashed); rate limiting on code attempts; and TOTP secrets encrypted at rest and excluded from the repository (they cannot be hashed, since the server must read them to verify codes).
+
+## Identity layers (open source, QR-code TOTP enrolment built in)
+
+- **Authelia**: authentication portal that sits in front of a reverse proxy; per its support matrix it integrates with nginx (`auth_request`), Traefik (`forwardAuth`), Caddy (`forward_auth`, 2.5.1 and later), HAProxy (through a Lua module), and Envoy, while Apache and IIS are documented as unsupported. Second factors: TOTP, WebAuthn/passkeys, and mobile push. https://www.authelia.com/
+- **authentik**: self-hosted identity provider (OIDC and SAML) with TOTP and WebAuthn factors; apps behind it inherit its MFA. https://goauthentik.io/
+- **Keycloak**: full OIDC/SAML identity provider with built-in OTP enrolment; the standard choice when you also need user federation and roles. https://www.keycloak.org/
+- **oauth2-proxy**: puts any upstream behind an OIDC/OAuth2 provider; MFA is whatever that provider enforces. https://github.com/oauth2-proxy/oauth2-proxy
+
+## App-level TOTP libraries
+
+Each generates and verifies RFC 6238 codes and pairs with a QR library so users can enrol any authenticator app (Google Authenticator, Microsoft Authenticator, Aegis, FreeOTP, and password managers with TOTP support).
+
+- Python: [pyotp](https://github.com/pyauth/pyotp) with [qrcode](https://pypi.org/project/qrcode/); [django-otp](https://pypi.org/project/django-otp/) integrates this into Django.
+- Node.js: [otplib](https://github.com/yeojz/otplib) with [qrcode](https://www.npmjs.com/package/qrcode).
+- Go: [pquerna/otp](https://github.com/pquerna/otp), which includes QR image generation.
+
+## SSH and host logins
+
+- [google-authenticator-libpam](https://github.com/google/google-authenticator-libpam): PAM module adding per-user TOTP to SSH and console logins, with QR enrolment in the terminal (`libpam-google-authenticator` package on Debian/Ubuntu).
+- Duo Unix (`pam_duo`) adds push-approval MFA to SSH: https://duo.com/docs/duounix
+
+## Hosted MFA
+
+- **Duo**: the Duo Free edition covers up to 10 users with MFA and the Duo Mobile authenticator app (per https://duo.com/editions-and-pricing as of September 2026; verify current terms). Its Authentication Proxy speaks RADIUS and LDAP, which retrofits MFA onto VPNs and onto services with RADIUS support.
+- **Cloudflare Access** ([cloudflare.md](cloudflare.md)): the emailed one-time PIN proves control of a mailbox only; for sensitive apps connect an identity provider and enforce MFA there, which Access then inherits.
+
+Enforcing MFA once at a central identity provider is easier to operate and audit than separate factors per app; prefer it when more than 1 service is involved.
+
+## Where direct MFA is not viable
+
+Machine protocols (database wire protocols, model-server APIs) have no interactive second-factor dialogue. There the pattern is: mutual TLS client certificates as the possession factor for the service itself, and MFA on every human path that reaches the host (SSH, bastions, admin panels). The database guides in this repository apply this pattern.
+
+## Verify
+
+- A login with only the password fails once a second factor is enrolled.
+- Recovery codes are single-use, and their hashes rather than their values are stored.
+- Repeated wrong codes hit a rate limit or lockout.
+- No TOTP secret or recovery code appears in the repository or its history.
+
+## Standards and sources (checked September 2026)
+
+- TOTP: https://www.rfc-editor.org/rfc/rfc6238 ; HOTP: https://www.rfc-editor.org/rfc/rfc4226
+- `otpauth://` key URI format: https://github.com/google/google-authenticator/wiki/Key-Uri-Format
+- WebAuthn: https://www.w3.org/TR/webauthn-2/
+- Authelia proxy support matrix: https://www.authelia.com/integration/proxies/support/
+- Duo editions and pricing: https://duo.com/editions-and-pricing
+
+======================================================================
+==> secrets.md
+======================================================================
+
+# Secrets: keeping keys out of repositories
+
+Leaked API keys and credentials in public repositories are the most common security incident in AI-assisted projects, and scanners harvest fresh commits within minutes. [authentication.md](authentication.md) states the baseline; this guide covers the handling.
+
+## Rules
+
+1. **Secrets never enter version control.** Add `.env`, `*.key`, and `*.pem` to `.gitignore` before the first commit. Load secrets from environment variables or a secret manager (AWS Secrets Manager, Google Secret Manager, Azure Key Vault, or your platform's store per [paas.md](paas.md)).
+2. **Secrets never enter images or build logs.** `ENV` and `ARG` values in a Dockerfile ship with the image and appear in `docker history`; pass secrets at runtime instead ([docker.md](docker.md)). Do not print secrets in application or CI logs.
+3. **Generate secrets randomly** (`openssl rand -base64 32`; `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`), 1 per service and environment, never shared between staging and production.
+4. **Scan before every push.** [gitleaks](https://github.com/gitleaks/gitleaks) or [trufflehog](https://github.com/trufflesecurity/trufflehog) as a pre-commit hook and in CI:
+   ```bash
+   gitleaks git .          # scans the repository history
+   gitleaks dir .          # scans the working tree
+   ```
+5. **CI/CD secrets live in the platform's secret store** (for example GitHub Actions secrets), scoped to the jobs that need them, never echoed into logs or artefacts.
+
+## When a secret leaks
+
+Order matters:
+
+1. **Rotate first.** Revoke the exposed credential at its provider and issue a new one. A secret that reached a public repository, a chat, a log, or a paste is compromised even if deleted seconds later; scrapers and forks already have it.
+2. Only then clean the history if required (for example with [git-filter-repo](https://github.com/newren/git-filter-repo)), understanding that cleaning is hygiene, never containment: it does not unpublish anything.
+3. Check provider logs for use of the leaked credential during the exposure window.
+
+## Encrypting secrets that must be versioned
+
+When a team needs configuration secrets in git (for example GitOps deployments), encrypt them: [sops](https://github.com/getsops/sops) with [age](https://github.com/FiloSottile/age) keys encrypts the values inside YAML/JSON/ENV files while leaving the structure diffable. The decryption key itself stays out of the repository.
+
+## Verify
+
+```bash
+gitleaks git . && echo clean
+grep -rn "sk-\|AKIA\|-----BEGIN" --include="*.py" --include="*.js" --include="*.ts" --include="*.env" . | grep -v node_modules   # crude but fast
+```
+
+Both must come back empty on every push.
+
+## Sources (checked September 2026)
+
+- OWASP Secrets Management Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
+- gitleaks: https://github.com/gitleaks/gitleaks
+- trufflehog: https://github.com/trufflesecurity/trufflehog
+- sops: https://github.com/getsops/sops and age: https://github.com/FiloSottile/age
+- git-filter-repo: https://github.com/newren/git-filter-repo
+
+======================================================================
+==> apache.md
+======================================================================
+
+# Apache HTTP Server: TLS and authentication
+
+Applies to Apache 2.4. Get a certificate first: [free-certificates.md](free-certificates.md) for a public host (note that `certbot --apache` performs steps 1 to 3 of this guide for you), or [self-signed.md](self-signed.md) for internal use.
+
+## 1. Enable the modules
+
+```bash
+# Debian/Ubuntu
+sudo a2enmod ssl headers
+sudo a2ensite default-ssl        # or your own :443 vhost file
+
+# RHEL/Fedora
+sudo dnf install mod_ssl httpd-tools
+```
+
+## 2. Configure the HTTPS virtual host
+
+```apache
+<VirtualHost *:443>
+    ServerName example.com
+    DocumentRoot /var/www/html
+
+    SSLEngine on
+    SSLCertificateFile      /etc/letsencrypt/live/example.com/fullchain.pem
+    SSLCertificateKeyFile   /etc/letsencrypt/live/example.com/privkey.pem
+
+    # TLS 1.2 minimum. The TLSv1.3 keyword needs Apache 2.4.36+ with OpenSSL 1.1.1+;
+    # on older builds use: SSLProtocol all -SSLv3 -TLSv1 -TLSv1.1
+    SSLProtocol -all +TLSv1.2 +TLSv1.3
+
+    # Send HSTS only once HTTPS is confirmed working
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</VirtualHost>
+```
+
+On Apache 2.4.8 and later, `SSLCertificateFile` may contain the certificate plus its chain (certbot's `fullchain.pem`), and `SSLCertificateChainFile` is deprecated. For cipher suites beyond the protocol floor, generate a current list with the [Mozilla SSL Configuration Generator](https://ssl-config.mozilla.org/) rather than copying one from an old tutorial.
+
+## 3. Redirect HTTP to HTTPS
+
+```apache
+<VirtualHost *:80>
+    ServerName example.com
+    Redirect permanent / https://example.com/
+</VirtualHost>
+```
+
+Keep port 80 serving only this redirect (and ACME HTTP-01 challenges if certbot uses the webroot method).
+
+## 4. Require authentication
+
+Application-level login is preferable ([authentication.md](authentication.md)). To gate a whole site or path at the server, use basic authentication over TLS with bcrypt-hashed entries:
+
+```bash
+sudo htpasswd -B -c /etc/apache2/.htpasswd admin     # -c only for the first user
+```
+
+```apache
+<Location "/">
+    AuthType Basic
+    AuthName "Restricted"
+    AuthUserFile /etc/apache2/.htpasswd
+    Require valid-user
+</Location>
+```
+
+For machine-to-machine links, mutual TLS is stronger than passwords:
+
+```apache
+SSLCACertificateFile /etc/ssl/certs/internal-ca.crt
+SSLVerifyClient require
+SSLVerifyDepth 2
+```
+
+Basic authentication is single-factor, and Authelia documents Apache as unsupported for its portal. For human-facing sites, add MFA by making Apache an OIDC client with [mod_auth_openidc](https://github.com/OpenIDC/mod_auth_openidc), with MFA enforced at the identity provider, or by fronting the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
+## 5. Verify
+
+```bash
+sudo apachectl configtest && sudo systemctl reload apache2   # httpd on RHEL
+curl -sI http://example.com/            # expect 301 with a https:// Location
+curl -sI https://example.com/           # expect 200 without -k
+curl -s  https://example.com/           # expect 401 when basic auth is on
+```
+
+## Common mistakes
+
+- Serving the application on port 80 next to the HTTPS vhost instead of only redirecting.
+- Enabling `mod_ssl` without `Header`/HSTS, leaving downgrade open on repeat visits.
+- World-readable private keys; keep them `0600` and root-owned.
+- Protecting `/admin` but leaving `/api` open; `Require` rules apply per path, so enumerate what is public.
+
+## Sources (checked September 2026)
+
+- Apache SSL/TLS how-to: https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html
+- Apache authentication how-to: https://httpd.apache.org/docs/2.4/howto/auth.html
+- Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
+
+======================================================================
+==> nginx.md
+======================================================================
+
+# nginx: TLS and authentication
+
+Get a certificate first: [free-certificates.md](free-certificates.md) for a public host (note that `certbot --nginx` edits the server block for you), or [self-signed.md](self-signed.md) for internal use.
+
+## 1. HTTPS server block
+
+```nginx
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;                     # nginx 1.25.1+; on older versions: listen 443 ssl http2;
+    server_name example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    # Send HSTS only once HTTPS is confirmed working
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;      # your app, bound to loopback only
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+For explicit cipher lists, generate them with the [Mozilla SSL Configuration Generator](https://ssl-config.mozilla.org/) instead of copying from old tutorials; the protocol floor above is the part that must not be omitted.
+
+## 2. Redirect HTTP to HTTPS
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+## 3. Require authentication
+
+Application-level login is preferable ([authentication.md](authentication.md)). To gate a site or path at the proxy, use basic authentication over TLS:
+
+```bash
+sudo apt install apache2-utils          # provides htpasswd
+sudo htpasswd -B -c /etc/nginx/.htpasswd admin
+```
+
+```nginx
+    location / {
+        auth_basic           "Restricted";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        proxy_pass http://127.0.0.1:3000;
+    }
+```
+
+Mutual TLS for machine-to-machine access:
+
+```nginx
+    ssl_client_certificate /etc/ssl/certs/internal-ca.crt;
+    ssl_verify_client on;
+```
+
+Basic authentication is single-factor. For human-facing sites, add MFA with the `auth_request` mechanism pointed at an [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
+## 4. Verify
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -sI http://example.com/        # expect 301 with a https:// Location
+curl -sI https://example.com/       # expect 200 without -k
+curl -s  https://example.com/api    # expect 401/403 without credentials
+```
+
+## Common mistakes
+
+- The app still listens on `0.0.0.0:3000` next to the proxy, so the proxy's TLS and auth are bypassed. Bind the app to `127.0.0.1` and confirm with `ss -tlnp`.
+- `add_header` in a `location` block silently drops headers inherited from `server`; keep HSTS at the `server` level with `always`.
+- A default `server` block that still serves plain HTTP for unmatched hosts; give the catch-all server the same redirect.
+- `auth_basic` on `/` but a later `location` (for example `/static`) that re-opens access; `auth_basic off` should be a deliberate exception, not an accident.
+
+## Sources (checked September 2026)
+
+- Configuring HTTPS servers: https://nginx.org/en/docs/http/configuring_https_servers.html
+- ngx_http_auth_basic_module: https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html
+- Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
+
+======================================================================
+==> lighttpd.md
+======================================================================
+
+# lighttpd: TLS and authentication
+
+Applies to lighttpd 1.4.56 and later, which disables SSLv2/SSLv3/TLS 1.0/TLS 1.1 by default. Get a certificate first: [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md).
+
+## 1. Enable TLS
+
+```
+server.modules += ( "mod_openssl" )
+
+$SERVER["socket"] == ":443" {
+    ssl.engine  = "enable"
+    ssl.pemfile = "/etc/letsencrypt/live/example.com/fullchain.pem"
+    ssl.privkey = "/etc/letsencrypt/live/example.com/privkey.pem"
+}
+
+$SERVER["socket"] == "[::]:443" {
+    ssl.engine  = "enable"
+    ssl.pemfile = "/etc/letsencrypt/live/example.com/fullchain.pem"
+    ssl.privkey = "/etc/letsencrypt/live/example.com/privkey.pem"
+}
+```
+
+Version notes:
+
+- `ssl.privkey` exists from lighttpd 1.4.53. On older versions, concatenate certificate and key into one file and point `ssl.pemfile` at it.
+- To set the protocol floor explicitly (recent versions already default to TLS 1.2):
+
+```
+ssl.openssl.ssl-conf-cmd = ( "MinProtocol" => "TLSv1.2" )
+```
+
+## 2. Redirect HTTP to HTTPS
+
+`mod_redirect` is built in. Per the lighttpd wiki:
+
+```
+$HTTP["scheme"] == "http" {
+    url.redirect = ("" => "https://${url.authority}${url.path}${qsa}")
+    url.redirect-code = 308        # explicit on versions before 1.4.75
+}
+```
+
+## 3. Require authentication
+
+Application-level login is preferable ([authentication.md](authentication.md)). Basic authentication at the server, over TLS only:
+
+```
+server.modules += ( "mod_auth", "mod_authn_file" )
+
+auth.backend = "htpasswd"
+auth.backend.htpasswd.userfile = "/etc/lighttpd/lighttpd.user"
+
+auth.require = ( "/" =>
+  (
+    "method"  => "basic",
+    "realm"   => "Restricted",
+    "require" => "valid-user"
+  )
+)
+```
+
+Create the user file with Apache's `htpasswd` (package `apache2-utils` or `httpd-tools`). The lighttpd htpasswd backend reads `user:crypt()-hashed-password` entries; check the mod_auth documentation below for the hash algorithms your lighttpd build accepts before choosing an `htpasswd` flag.
+
+Basic authentication is single-factor, and lighttpd is absent from Authelia's supported-proxy list. Add MFA by fronting the service with Cloudflare Access ([cloudflare.md](cloudflare.md)) or an MFA-capable proxy; options in [mfa.md](mfa.md).
+
+## 4. Verify
+
+```bash
+sudo lighttpd -tt -f /etc/lighttpd/lighttpd.conf && sudo systemctl reload lighttpd
+curl -sI http://example.com/        # expect a redirect to https://
+curl -sI https://example.com/       # expect 401 without credentials once auth is on
+```
+
+## Common mistakes
+
+- Loading `mod_openssl` but leaving the `:80` socket serving content instead of only the redirect.
+- Forgetting the `[::]:443` socket, leaving IPv6 clients on plain HTTP.
+- Pointing `ssl.pemfile` at a certificate without its chain; use `fullchain.pem`.
+
+## Sources (checked September 2026)
+
+- lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
+- lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth
+- lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
+
+======================================================================
+==> caddy.md
+======================================================================
+
+# Caddy: TLS and authentication
+
+Caddy 2 obtains, installs, and renews publicly trusted certificates automatically and redirects HTTP to HTTPS by default. For a new deployment with a public domain, it is the shortest correct path to HTTPS: no ACME client, no renewal timer, no redirect block.
+
+## 1. Public site with automatic HTTPS
+
+`/etc/caddy/Caddyfile`:
+
+```caddyfile
+{
+    email admin@example.com        # ACME account contact for expiry notices
+}
+
+app.example.com {
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+Requirements: the DNS record points at this host, and ports 80 and 443 are reachable from the internet. Start or reload:
+
+```bash
+sudo systemctl reload caddy
+```
+
+That is the whole TLS setup. Certificates come from Let's Encrypt or ZeroSSL and renew automatically.
+
+## 2. Internal hosts without a public domain
+
+`tls internal` makes Caddy issue from its own local CA instead of a public one:
+
+```caddyfile
+app.internal {
+    tls internal
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+Clients must trust Caddy's root CA (on the Caddy host itself, `caddy trust` installs it into the local trust store). Distribution of that trust to other machines follows [self-signed.md](self-signed.md). To use certificate files you generated yourself instead: `tls /path/cert.pem /path/key.pem`.
+
+## 3. Require authentication
+
+Application-level login is preferable ([authentication.md](authentication.md)). At the proxy, use `basic_auth` (named `basicauth` before Caddy v2.8.0). Hash the password first:
+
+```bash
+caddy hash-password        # prompts, outputs a bcrypt hash
+```
+
+```caddyfile
+app.example.com {
+    basic_auth {
+        admin $2a$14$REPLACE_WITH_HASH_FROM_caddy_hash-password
+    }
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+To protect only part of a site, wrap the directive in a matcher:
+
+```caddyfile
+    @admin path /admin/*
+    basic_auth @admin {
+        admin $2a$14$REPLACE_WITH_HASH
+    }
+```
+
+`basic_auth` is single-factor. For human-facing sites, add MFA with the `forward_auth` directive (Caddy 2.5.1 and later) pointed at an [Authelia](https://www.authelia.com/) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
+## 4. Verify
+
+```bash
+caddy validate --config /etc/caddy/Caddyfile
+curl -sI http://app.example.com/     # expect a redirect to https://
+curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
+```
+
+## Common mistakes
+
+- The app also listens on a public interface, bypassing Caddy; bind it to `127.0.0.1`.
+- Blocking port 80 at the firewall: Caddy needs it for the HTTP-01 challenge and for the automatic redirect.
+- Putting the literal password in the Caddyfile; `basic_auth` takes the bcrypt hash, not the password.
+
+## Sources (checked September 2026)
+
+- Automatic HTTPS: https://caddyserver.com/docs/automatic-https
+- basic_auth directive: https://caddyserver.com/docs/caddyfile/directives/basic_auth
+- tls directive: https://caddyserver.com/docs/caddyfile/directives/tls
+
+======================================================================
+==> haproxy.md
+======================================================================
+
+# HAProxy: TLS termination and authentication
+
+Get a certificate first ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)). HAProxy loads the certificate and private key from one combined PEM file:
+
+```bash
+sudo mkdir -p /etc/haproxy/certs
+sudo bash -c 'cat /etc/letsencrypt/live/example.com/fullchain.pem \
+              /etc/letsencrypt/live/example.com/privkey.pem \
+              > /etc/haproxy/certs/example.com.pem'
+sudo chmod 600 /etc/haproxy/certs/example.com.pem
+```
+
+Re-run the concatenation from a certbot deploy hook so renewals reach HAProxy.
+
+## 1. Terminate TLS and redirect HTTP
+
+```haproxy
+global
+    ssl-default-bind-options ssl-min-ver TLSv1.2
+
+defaults
+    mode http
+    timeout connect 5s
+    timeout client  30s
+    timeout server  30s
+
+frontend web
+    bind :80
+    bind :443 ssl crt /etc/haproxy/certs/example.com.pem
+    http-request redirect scheme https code 301 unless { ssl_fc }
+    http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    default_backend app
+
+backend app
+    server app1 127.0.0.1:3000 check
+```
+
+`ssl-min-ver` requires HAProxy 1.8 or later. For explicit cipher lists use the [Mozilla SSL Configuration Generator](https://ssl-config.mozilla.org/).
+
+## 2. Require authentication
+
+Application-level login is preferable ([authentication.md](authentication.md)). At the proxy, define a userlist with a crypt(3)-hashed password and demand it:
+
+```bash
+openssl passwd -6        # prompts, outputs a $6$ SHA-512 crypt hash
+```
+
+```haproxy
+userlist admins
+    user admin password $6$REPLACE_WITH_HASH
+
+backend app
+    http-request auth realm Restricted unless { http_auth(admins) }
+    server app1 127.0.0.1:3000 check
+```
+
+Hashed `password` entries rely on the system's crypt(3); `$6$` works on glibc-based Linux. Avoid `insecure-password`, which stores the password in cleartext in the configuration file. For machine-to-machine access, client certificates are stronger: add `verify required ca-file /etc/ssl/certs/internal-ca.crt` to the `bind :443` line.
+
+Basic authentication here is single-factor. For human-facing sites, add MFA with an [Authelia](https://www.authelia.com/) portal (HAProxy is supported through Authelia's Lua module) or by fronting the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
+## 3. Verify
+
+```bash
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
+curl -sI http://example.com/        # expect 301 with a https:// Location
+curl -sI https://example.com/       # expect 401 without credentials once auth is on
+```
+
+## Common mistakes
+
+- Copying only `fullchain.pem` into the crt file; HAProxy needs the private key in the same PEM.
+- Renewing the certificate without rebuilding the combined PEM or reloading HAProxy.
+- Backends reachable directly on `0.0.0.0`, bypassing the proxy; bind them to `127.0.0.1` and confirm with `ss -tlnp`.
+
+## Sources (checked September 2026)
+
+- HAProxy documentation: https://www.haproxy.org/ (configuration manual for your installed version)
+- Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
+
+======================================================================
+==> traefik.md
+======================================================================
+
+# Traefik: automatic TLS and authentication middleware
+
+Applies to Traefik v2 and v3. Traefik obtains and renews certificates itself through ACME resolvers, which suits container deployments.
+
+## 1. Static configuration: entry points, redirect, ACME
+
+`traefik.yml`:
+
+```yaml
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@example.com
+      storage: /letsencrypt/acme.json
+      tlsChallenge: {}
+```
+
+`acme.json` must persist across restarts (volume-mount it) and be mode `600`. The TLS-ALPN challenge above needs port 443 reachable from the internet; use `httpChallenge` (port 80) or a `dnsChallenge` (wildcards, no inbound ports) where that fits better.
+
+Raise the protocol floor with a TLS options block in the dynamic configuration:
+
+```yaml
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+```
+
+## 2. Route a service with TLS (Docker labels)
+
+```yaml
+services:
+  app:
+    image: yourapp
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`app.example.com`)
+      - traefik.http.routers.app.entrypoints=websecure
+      - traefik.http.routers.app.tls.certresolver=letsencrypt
+      - traefik.http.services.app.loadbalancer.server.port=3000
+```
+
+Do not also publish the app's port with `ports:`; only Traefik publishes 80 and 443. See [docker.md](docker.md).
+
+## 3. Require authentication
+
+Application-level login is preferable ([authentication.md](authentication.md)). At the proxy, attach a basicAuth middleware with bcrypt entries from `htpasswd -nB admin`:
+
+```yaml
+    labels:
+      - traefik.http.middlewares.app-auth.basicauth.users=admin:$$2y$$05$$REPLACE_WITH_HASH
+      - traefik.http.routers.app.middlewares=app-auth
+```
+
+In Compose files every `$` in the hash must be doubled to `$$`. The file-provider equivalent, where no escaping is needed:
+
+```yaml
+http:
+  middlewares:
+    app-auth:
+      basicAuth:
+        users:
+          - "admin:$2y$05$REPLACE_WITH_HASH"
+```
+
+basicAuth is single-factor. For human-facing sites, add MFA with the `forwardAuth` middleware pointed at [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy), or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
+
+## 4. Verify
+
+```bash
+curl -sI http://app.example.com/     # expect a redirect to https://
+curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
+```
+
+Check the Traefik log for ACME errors on first start; issuance failures otherwise surface as a self-signed "TRAEFIK DEFAULT CERT" in the browser.
+
+## Common mistakes
+
+- Enabling the Traefik dashboard (`api.insecure=true` or an unprotected `api@internal` router) on a public entry point; keep it off or behind the auth middleware.
+- Forgetting to persist `acme.json`, which re-issues certificates on every restart and hits CA rate limits.
+- Single `$` in Compose basicauth labels, which breaks the hash silently.
+
+## Sources (checked September 2026)
+
+- Traefik documentation: https://doc.traefik.io/traefik/ (HTTPS/ACME, routers, and basicAuth middleware sections)
+
+======================================================================
+==> nodejs.md
+======================================================================
+
+# Node.js and Express: TLS and authentication
+
+Preferred production layout: bind the Node app to `127.0.0.1` and terminate TLS in a reverse proxy ([caddy.md](caddy.md), [nginx.md](nginx.md)) or behind [cloudflare.md](cloudflare.md). Node can also terminate TLS itself, shown below. Get a certificate per [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md).
+
+## 1. HTTPS directly in Node
+
+```js
+const https = require('node:https');
+const fs = require('node:fs');
+const express = require('express');
+
+const app = express();
+
+const options = {
+  key:  fs.readFileSync('/etc/ssl/private/server.key'),
+  cert: fs.readFileSync('/etc/ssl/certs/server.crt'),   // certificate plus chain
+};
+
+https.createServer(options, app).listen(443);
+
+// Port 80 exists only to redirect
+require('node:http').createServer((req, res) => {
+  res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` });
+  res.end();
+}).listen(80);
+```
+
+Binding ports below 1024 needs root or `CAP_NET_BIND_SERVICE`; running the app as root is a bad trade, which is one more reason to prefer the proxy layout.
+
+## 2. Behind a proxy: tell Express about it
+
+```js
+app.set('trust proxy', 1);   // makes req.secure and secure cookies work behind 1 proxy hop
+```
+
+Security headers, including Strict-Transport-Security, via helmet:
+
+```js
+const helmet = require('helmet');
+app.use(helmet());
+```
+
+## 3. Authentication
+
+Follow [authentication.md](authentication.md). The pieces most Node projects need:
+
+Password hashing (bcrypt; the `argon2` package is the equivalent alternative):
+
+```js
+const bcrypt = require('bcrypt');
+const hash = await bcrypt.hash(password, 12);
+const ok   = await bcrypt.compare(password, hash);
+```
+
+Sessions with hardened cookies (express-session):
+
+```js
+const session = require('express-session');
+app.use(session({
+  secret: process.env.SESSION_SECRET,      // long random value from the environment
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: true, httpOnly: true, sameSite: 'lax' },
+}));
+```
+
+Rate-limit the login route (express-rate-limit v7):
+
+```js
+const rateLimit = require('express-rate-limit');
+app.use('/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20 }));
+```
+
+API keys and tokens come from `process.env`, never from literals in the source. Generate them per [authentication.md](authentication.md) and compare with `crypto.timingSafeEqual` where you check them yourself.
+
+MFA: add TOTP with [otplib](https://github.com/yeojz/otplib) plus the [qrcode](https://www.npmjs.com/package/qrcode) package for enrolment QR codes, or front the app with an identity layer; requirements and options in [mfa.md](mfa.md).
+
+## 4. Client-side TLS discipline
+
+- Never set `NODE_TLS_REJECT_UNAUTHORIZED=0` and never pass `rejectUnauthorized: false`; both disable certificate validation for every connection.
+- For an internal CA or self-signed server, point Node at the CA instead: `NODE_EXTRA_CA_CERTS=/path/ca.crt` (see [self-signed.md](self-signed.md)).
+
+## 5. Verify
+
+```bash
+curl -sI http://example.com/         # expect 301 with a https:// Location
+curl -sI https://example.com/        # succeeds without -k; shows helmet's headers
+curl -s  https://example.com/api     # expect 401/403 without credentials
+ss -tlnp | grep node                 # behind a proxy: bound to 127.0.0.1 only
+```
+
+## Sources (checked September 2026)
+
+- Node.js HTTPS module: https://nodejs.org/api/https.html
+- Express behind proxies: https://expressjs.com/en/guide/behind-proxies.html
+- helmet: https://helmetjs.github.io/
+
+======================================================================
+==> python.md
+======================================================================
+
+# Python web apps: TLS and authentication
+
+Covers Flask, FastAPI/Uvicorn, Gunicorn, and Django. Preferred production layout: bind the app server to `127.0.0.1` and terminate TLS in a reverse proxy ([caddy.md](caddy.md), [nginx.md](nginx.md)) or behind [cloudflare.md](cloudflare.md). The app servers can also terminate TLS themselves, shown below. Certificates: [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md).
+
+## 1. TLS per server
+
+Flask's built-in server (development only; it is not a production server, TLS or not):
+
+```python
+app.run(host="127.0.0.1", port=8443, ssl_context=("cert.pem", "key.pem"))
+# ssl_context="adhoc" generates a throwaway self-signed cert; requires pyOpenSSL
+```
+
+Gunicorn (Flask/Django/WSGI in production):
+
+```bash
+gunicorn --bind 0.0.0.0:8443 \
+  --certfile /etc/ssl/certs/server.crt \
+  --keyfile  /etc/ssl/private/server.key \
+  app:app
+```
+
+Uvicorn (FastAPI/ASGI):
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8443 \
+  --ssl-certfile /etc/ssl/certs/server.crt \
+  --ssl-keyfile  /etc/ssl/private/server.key
+```
+
+Bind to `0.0.0.0` only when the process itself terminates TLS and authentication is in place; otherwise keep `127.0.0.1`.
+
+## 2. Django settings for HTTPS
+
+```python
+SECURE_SSL_REDIRECT = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # only behind a proxy that sets it
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+```
+
+`SECURE_PROXY_SSL_HEADER` must be set only when a proxy you control always sets that header; otherwise clients can spoof it. Run `python manage.py check --deploy` and fix what it reports.
+
+## 3. Authentication
+
+Follow [authentication.md](authentication.md). Framework specifics:
+
+- Django's built-in auth already hashes passwords correctly; do not replace it with custom code.
+- Flask and FastAPI have no user store; hash passwords with `argon2-cffi` or `bcrypt`:
+
+```python
+from argon2 import PasswordHasher
+ph = PasswordHasher()
+hash_ = ph.hash(password)
+ph.verify(hash_, password)   # raises on mismatch
+```
+
+- Generate tokens and secrets with the standard library, and load them from the environment:
+
+```python
+import secrets
+token = secrets.token_urlsafe(32)
+```
+
+- FastAPI's security utilities (`fastapi.security`) implement OAuth2/OIDC flows and API-key headers; use them rather than parsing `Authorization` by hand.
+- Rate-limit login routes (for example with a proxy-level limit or a library such as slowapi for ASGI apps).
+- MFA: add TOTP with [pyotp](https://github.com/pyauth/pyotp) plus the [qrcode](https://pypi.org/project/qrcode/) package for enrolment QR codes; [django-otp](https://pypi.org/project/django-otp/) integrates this into Django. Requirements and options in [mfa.md](mfa.md).
+
+## 4. Client-side TLS discipline
+
+Never ship `verify=False` (requests/httpx) or `ssl._create_unverified_context`. For an internal CA, point the client at it instead:
+
+```bash
+export REQUESTS_CA_BUNDLE=/path/ca.crt   # requests
+export SSL_CERT_FILE=/path/ca.crt        # httpx and the ssl module
+```
+
+## 5. Verify
+
+```bash
+curl -sI https://example.com/        # succeeds without -k
+curl -s  https://example.com/api     # expect 401/403 without credentials
+ss -tlnp | grep -E 'gunicorn|uvicorn|python'   # behind a proxy: 127.0.0.1 only
+```
+
+## Sources (checked September 2026)
+
+- Gunicorn documentation (settings reference): https://docs.gunicorn.org/
+- Uvicorn settings reference: https://github.com/encode/uvicorn/blob/master/docs/settings.md
+- Django deployment checklist: https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
+- argon2-cffi: https://argon2-cffi.readthedocs.io/
+
+======================================================================
+==> docker.md
+======================================================================
+
+# Docker and Compose: exposure, TLS, and authentication
+
+Containers are where accidental exposure happens most. Two Docker behaviours cause it:
+
+1. `ports: - "3000:3000"` (or `-p 3000:3000`) publishes on `0.0.0.0`, every interface.
+2. On Linux, Docker programs iptables/nftables directly, so published ports are reachable **even when UFW or firewalld says the port is blocked**. A `ufw deny 3000` rule does not protect a published container port.
+
+## 1. Publish nothing except the TLS proxy
+
+Bind anything that must be reachable from the host to loopback, and give everything else no `ports:` entry at all; containers on the same Compose network reach each other by service name without published ports.
+
+```yaml
+services:
+  app:
+    build: .
+    # no ports: entry; only the proxy is published
+  db:
+    image: postgres:17
+    # no ports: entry; the app reaches it at db:5432 on the internal network
+```
+
+Where a host-published port is genuinely needed for local access:
+
+```yaml
+    ports:
+      - "127.0.0.1:3000:3000"
+```
+
+## 2. Terminate TLS in one proxy container
+
+Caddy is the least configuration ([caddy.md](caddy.md)); nginx ([nginx.md](nginx.md)) and Traefik ([traefik.md](traefik.md)) work the same way. A complete pattern:
+
+```yaml
+services:
+  app:
+    build: .
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
+```
+
+`Caddyfile`:
+
+```caddyfile
+app.example.com {
+    reverse_proxy app:3000
+}
+```
+
+Caddy obtains and renews the certificate automatically ([free-certificates.md](free-certificates.md) explains the ACME requirements). Hosts without a public domain or inbound ports should use [cloudflare.md](cloudflare.md); run the `cloudflared` connector as a container and point it at `http://app:3000`.
+
+## 3. Authentication and secrets
+
+- The proxy is the natural place for a first authentication gate (basic auth per the proxy guides, or Cloudflare Access); the application still needs its own login for anything multi-user ([authentication.md](authentication.md)). The proxy is also where MFA attaches for human-facing services ([mfa.md](mfa.md)).
+- Pass secrets at runtime through environment files or Docker/Compose secrets. Never bake them into the image: `ENV API_KEY=...` in a Dockerfile ships the key to every registry the image touches, and `docker history` shows build arguments.
+- Keep `.env` in `.gitignore`, and run containers as a non-root user (`USER` in the Dockerfile) so a compromised app is not root in the container.
+- Databases in containers still need their own TLS and authentication when anything outside the Compose network connects: see [postgresql.md](postgresql.md), [mysql.md](mysql.md), [mongodb.md](mongodb.md), and [redis.md](redis.md).
+
+## 4. Verify
+
+```bash
+docker compose ps                     # only the proxy shows 0.0.0.0 port bindings
+ss -tlnp                              # host view: nothing else on public interfaces
+curl -sI http://app.example.com/      # expect a redirect to https://
+curl -s  https://app.example.com/api  # expect 401/403 without credentials
+```
+
+Test from a second machine on a different network where possible; the UFW bypass means testing the firewall from the host itself proves nothing about published ports.
+
+## Sources (checked September 2026)
+
+- Docker packet filtering and firewalls: https://docs.docker.com/engine/network/packet-filtering-firewalls/
+- Compose networking: https://docs.docker.com/compose/how-tos/networking/
+
+======================================================================
+==> kubernetes.md
+======================================================================
+
+# Kubernetes: ingress TLS and authentication
+
+The cluster equivalents of this repository's rules: nothing reaches a workload except through an ingress that terminates TLS, and no Service becomes public through a casual `type: LoadBalancer` or `NodePort`.
+
+## 1. Automatic certificates with cert-manager
+
+Install [cert-manager](https://cert-manager.io/docs/), define an ACME issuer once, and annotate ingresses:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    email: admin@example.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-account
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  tls:
+    - hosts: [app.example.com]
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: app, port: { number: 80 } } }
+```
+
+cert-manager issues into `app-tls` and renews automatically. ingress-nginx redirects HTTP to HTTPS by default when a TLS block exists (`nginx.ingress.kubernetes.io/ssl-redirect` / `force-ssl-redirect` control it explicitly).
+
+## 2. Authentication at the ingress
+
+ingress-nginx supports basic auth from a Secret, as the proxy-level gate ([authentication.md](authentication.md) still applies inside the app):
+
+```bash
+htpasswd -cB auth admin
+kubectl create secret generic app-basic-auth --from-file=auth
+```
+
+```yaml
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: app-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Restricted"
+```
+
+For MFA and SSO, put an identity layer in front per [mfa.md](mfa.md) (oauth2-proxy and Authelia both document Kubernetes deployments), or publish through [cloudflare.md](cloudflare.md).
+
+## 3. Cluster posture
+
+- Expose workloads through the ingress only; avoid `NodePort`/`LoadBalancer` Services except for the ingress controller itself.
+- Store credentials in Secrets (or an external secrets operator), not ConfigMaps or env literals in manifests committed to git ([secrets.md](secrets.md)).
+- NetworkPolicies limit which pods reach databases; the database guides' TLS and auth still apply inside the cluster.
+
+## 4. Verify
+
+```bash
+kubectl get svc -A | grep -E 'NodePort|LoadBalancer'   # only the ingress controller
+kubectl get certificate -A                              # Ready=True
+curl -sI http://app.example.com/                        # redirect to https
+curl -s  https://app.example.com/                       # 401 where basic auth is set
+```
+
+## Sources (checked September 2026)
+
+- cert-manager documentation: https://cert-manager.io/docs/
+- ingress-nginx annotations (auth-type, auth-secret, auth-realm, ssl-redirect): https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/
+
+======================================================================
+==> host.md
+======================================================================
+
+# Host baseline: SSH, firewall, updates
+
+Every guide in this repository secures a service; this one secures the machine under them. Apply it once per host before exposing anything.
+
+## 1. SSH: keys only, no root login
+
+Add your public key to `~/.ssh/authorized_keys` and confirm that key login works **before** disabling passwords. Keep the current session open while testing changes.
+
+`/etc/ssh/sshd_config` (or a file in `/etc/ssh/sshd_config.d/`):
+
+```
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+```
+
+```bash
+sudo sshd -t && sudo systemctl reload ssh    # sshd on RHEL-family systems
+```
+
+Add a second factor for SSH per [mfa.md](mfa.md): TOTP via [google-authenticator-libpam](https://github.com/google/google-authenticator-libpam) or push approval via Duo's `pam_duo`.
+
+## 2. Firewall: default deny inbound
+
+```bash
+# Debian/Ubuntu (ufw)
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+```
+
+RHEL-family systems use firewalld (`firewall-cmd --permanent --add-service=https` and so on) with the same posture. Open only the ports the TLS-terminating layer needs; databases and app servers stay unreachable from outside per their guides. Docker-published ports bypass ufw entirely; see [docker.md](docker.md) before relying on the firewall.
+
+## 3. Brute-force protection and updates
+
+- fail2ban ([github.com/fail2ban/fail2ban](https://github.com/fail2ban/fail2ban)) or CrowdSec ([crowdsec.net](https://www.crowdsec.net/)) bans repeated authentication failures against SSH and login panels.
+- Automate security patches: `unattended-upgrades` on Debian/Ubuntu, `dnf-automatic` on RHEL-family systems.
+
+## 4. Verify
+
+```bash
+ss -tlnp                          # only intended listeners, on intended addresses
+sudo ufw status verbose           # default deny incoming, minimal allow list
+ssh -o PreferredAuthentications=password user@host   # expect: Permission denied
+```
+
+Run the SSH test from a second terminal before closing your working session.
+
+## Sources (checked September 2026)
+
+- OpenSSH sshd_config manual: https://man.openbsd.org/sshd_config
+- fail2ban: https://github.com/fail2ban/fail2ban
+- CrowdSec: https://www.crowdsec.net/
+- google-authenticator-libpam: https://github.com/google/google-authenticator-libpam
+
+======================================================================
+==> cloud-firewalls.md
+======================================================================
+
+# Cloud firewalls: security groups and network rules
+
+On AWS (security groups), Google Cloud (VPC firewall rules), and Azure (network security groups), the recurring hole is one rule wide open to the world: `0.0.0.0/0` (or `::/0`) on a database, admin, or SSH port, added once to unblock a remote connection and never removed.
+
+## Rules
+
+1. **Public means 80/443 on the TLS layer, nothing else.** Only the load balancer, reverse proxy, or tunnel endpoint accepts traffic from `0.0.0.0/0`, and only on 80 (redirect) and 443.
+2. **Databases and internal services accept traffic from private sources only**: the application's security group, subnet, or VPC, never the internet. The per-database guides' TLS and auth still apply on top; the firewall is a layer, not the control.
+3. **SSH is not public.** Restrict port 22 to your addresses, or remove the inbound rule entirely and use the provider's brokered access (AWS SSM Session Manager, GCP Identity-Aware Proxy, Azure Bastion) or a tailnet ([tailscale.md](tailscale.md)). Then harden the host per [host.md](host.md).
+4. **Default deny, explicit allow.** Start from no inbound rules and add the minimum; review rules whenever a service is retired. Reference security-group IDs rather than IP ranges where the provider supports it, so app-to-database access survives IP changes without widening.
+5. **Both layers matter on VMs running Docker**: the cloud firewall and the host's rules, remembering that published container ports bypass host UFW ([docker.md](docker.md)).
+
+## Verify
+
+- Provider console or CLI: list rules allowing `0.0.0.0/0` and confirm that each one is 80/443 on the front layer, nothing else.
+- From an outside network: `nc -vz <public-ip> 5432 3306 27017 6379 22` fails on every port.
+- An external scan of the public IP (for example with nmap, against your own infrastructure only) shows only the intended ports.
+
+## Sources (checked September 2026)
+
+- AWS VPC and security groups: https://docs.aws.amazon.com/vpc/
+- Google Cloud VPC firewall rules: https://cloud.google.com/vpc/docs
+- Azure virtual network security: https://learn.microsoft.com/en-us/azure/virtual-network/
+
+======================================================================
+==> paas.md
+======================================================================
+
+# PaaS platforms: what the platform does, what stays yours
+
+On Render, Fly.io, Railway, Vercel, Heroku, and similar platforms, TLS is not your problem: the platform terminates HTTPS and manages certificates, including for custom domains. Do not bolt certbot or a reverse proxy onto a PaaS app, and do not apply this repository's server-TLS guides there. What stays yours:
+
+## 1. Authentication: entirely yours
+
+The platform authenticates nobody. Every non-public endpoint still needs login or keys per [authentication.md](authentication.md), MFA where viable per [mfa.md](mfa.md). "It is on Vercel" changes nothing about an open `/api/admin`.
+
+## 2. Secrets: use the platform's store
+
+Each platform provides environment/secret configuration. Set secrets there; never commit `.env` files ([secrets.md](secrets.md)). Rotate anything that ever appeared in the repository, build logs, or client bundles. Public frontend frameworks compile some env vars into the client (for example `NEXT_PUBLIC_`-prefixed values); only put genuinely public values in those.
+
+## 3. Enforce HTTPS and correct proxy awareness
+
+- Redirect HTTP to HTTPS where the platform offers a toggle, or in the app (checking the platform's forwarded-protocol header).
+- Behind the platform proxy, configure the framework accordingly (`trust proxy` in Express per [nodejs.md](nodejs.md), `SECURE_PROXY_SSL_HEADER` in Django per [python.md](python.md)) so secure cookies and redirects behave.
+- Bind to the port the platform injects (commonly a `PORT` variable) and nothing else; do not open extra listeners.
+
+## 4. Databases attached to PaaS apps
+
+Managed databases from these platforms come with TLS endpoints; require verified TLS in the connection string per the database guides ([postgresql.md](postgresql.md), [mysql.md](mysql.md)) and keep the credentials in the platform's secret store. Databases you run yourself elsewhere follow their own guides plus [cloud-firewalls.md](cloud-firewalls.md).
+
+## 5. Verify
+
+```bash
+curl -sI http://app.example.com/          # platform redirects to https
+curl -s  https://app.example.com/api/...  # 401/403 without credentials
+# Repository scan per secrets.md comes back clean; client bundle contains no private keys.
+```
+
+## Sources (checked September 2026)
+
+- Render: https://render.com/docs ; Fly.io: https://fly.io/docs ; Vercel: https://vercel.com/docs (each documents managed TLS and environment configuration; consult your platform's pages for the exact toggles)
+
+======================================================================
+==> postgresql.md
+======================================================================
+
+# PostgreSQL: TLS and authentication
+
+Default posture: PostgreSQL should not listen on public interfaces at all. Widen `listen_addresses` only for genuine remote clients, and then require both TLS and SCRAM authentication as below.
+
+## 1. Server TLS
+
+Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), give the key to the `postgres` user with mode `600`, then in `postgresql.conf`:
+
+```
+listen_addresses = 'localhost'            # widen deliberately, e.g. 'localhost,10.0.0.5'
+ssl = on
+ssl_cert_file = '/etc/ssl/certs/server.crt'
+ssl_key_file  = '/etc/ssl/private/server.key'
+ssl_min_protocol_version = 'TLSv1.2'      # PostgreSQL 12 and later
+password_encryption = scram-sha-256       # default from PostgreSQL 14; set explicitly on older versions
+```
+
+Reload with `SELECT pg_reload_conf();` or `systemctl reload postgresql`.
+
+## 2. Require TLS per connection in pg_hba.conf
+
+`hostssl` matches only TLS connections; plain `host` lines accept cleartext. Remote entries should all be `hostssl` with `scram-sha-256`:
+
+```
+# TYPE     DATABASE  USER  ADDRESS        METHOD
+local      all       all                  peer
+hostssl    app       app   10.0.0.0/24    scram-sha-256
+# No 'host ... 0.0.0.0/0 trust' or 'password' lines. Ever.
+```
+
+Passwords set before `password_encryption = scram-sha-256` remain MD5-hashed; re-set them (`\password app`) so SCRAM applies.
+
+For machine-to-machine links, add certificate verification on top of SCRAM: set `ssl_ca_file` in `postgresql.conf` and append `clientcert=verify-full` to the `hostssl` line (PostgreSQL 12 and later).
+
+MFA: the PostgreSQL wire protocol has no TOTP dialogue. Treat `clientcert=verify-full` as the second factor for direct connections, chain the `radius` authentication method to an MFA service (for example the Duo Authentication Proxy) where policy requires it, and put the human paths to the host (SSH, admin UIs) behind MFA per [mfa.md](mfa.md).
+
+## 3. Client side
+
+Require identity verification in the connection settings, in addition to encryption:
+
+```
+psql "host=db.example.com dbname=app user=app sslmode=verify-full sslrootcert=/path/ca.crt"
+```
+
+`sslmode=require` encrypts but does not verify the server's identity; `verify-full` does both. Application connection strings take the same parameters.
+
+## 4. Verify
+
+```bash
+psql -h db.example.com -U app -c "SELECT version();" \
+  "dbname=app sslmode=verify-full sslrootcert=/path/ca.crt"
+sudo -u postgres psql -c "SELECT ssl, count(*) FROM pg_stat_ssl JOIN pg_stat_activity USING (pid) GROUP BY ssl;"
+ss -tlnp | grep 5432       # loopback only, unless remote access is deliberate
+```
+
+A connection attempt without TLS from a remote host must fail once only `hostssl` lines cover remote addresses.
+
+## Common mistakes
+
+- `listen_addresses = '*'` plus a permissive `host all all 0.0.0.0/0 md5` line pasted from a tutorial.
+- `trust` authentication left enabled for remote addresses.
+- The superuser (`postgres`) used as the application account; create a least-privilege role instead ([authentication.md](authentication.md)).
+
+## Sources (checked September 2026)
+
+- Secure TCP/IP connections with SSL: https://www.postgresql.org/docs/current/ssl-tcp.html
+- pg_hba.conf: https://www.postgresql.org/docs/current/auth-pg-hba-conf.html
+- libpq SSL support (sslmode): https://www.postgresql.org/docs/current/libpq-ssl.html
+
+======================================================================
+==> mysql.md
+======================================================================
+
+# MySQL and MariaDB: TLS and authentication
+
+Default posture: keep the server on `127.0.0.1` (the packaged default on Debian/Ubuntu) and open it to remote clients only deliberately, with TLS required.
+
+## 1. Server TLS
+
+MySQL 8 generates a CA and server certificate in the data directory at initialization and enables TLS automatically; check with:
+
+```sql
+SHOW GLOBAL VARIABLES LIKE '%ssl%';
+```
+
+To use your own certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)) and to refuse all cleartext connections, set in `/etc/mysql/mysql.conf.d/mysqld.cnf` (or the equivalent for your packaging):
+
+```ini
+[mysqld]
+bind_address = 127.0.0.1          # widen deliberately
+require_secure_transport = ON
+tls_version = TLSv1.2,TLSv1.3
+ssl_ca   = /etc/mysql/certs/ca.pem
+ssl_cert = /etc/mysql/certs/server-cert.pem
+ssl_key  = /etc/mysql/certs/server-key.pem
+```
+
+`require_secure_transport` rejects any TCP connection that is not TLS (Unix-socket connections remain allowed). Recent MariaDB versions support the same option; verify availability for your release.
+
+## 2. Per-account requirements
+
+Require TLS (or a client certificate) at the account level as a second control:
+
+```sql
+ALTER USER 'app'@'10.0.0.%' REQUIRE SSL;
+-- or, for mutual TLS:
+ALTER USER 'batch'@'10.0.0.%' REQUIRE X509;
+```
+
+Account hygiene per [authentication.md](authentication.md): keep the default `caching_sha2_password` plugin for new accounts (MySQL 8) rather than re-enabling `mysql_native_password`, remove anonymous accounts, and give the application a least-privilege user, never `root`.
+
+MFA: MySQL 8.0.27 and later support up to 3 authentication factors per account, with factors 2 and 3 supplied by external plugins; the server-side FIDO plugin ships only in Enterprise Edition. On Community builds, treat `REQUIRE X509` client certificates as the practical second factor, and put human access paths behind MFA per [mfa.md](mfa.md).
+
+## 3. Client side
+
+Require identity verification of the server in addition to encryption:
+
+```bash
+mysql --host db.example.com --user app -p \
+  --ssl-mode=VERIFY_IDENTITY --ssl-ca=/path/ca.pem
+```
+
+`--ssl-mode=REQUIRED` encrypts without identity verification; `VERIFY_CA`/`VERIFY_IDENTITY` verify the certificate (MySQL clients; MariaDB clients use `--ssl-verify-server-cert`). Connector options in application code follow the same distinction.
+
+## 4. Verify
+
+```sql
+SHOW GLOBAL VARIABLES LIKE 'require_secure_transport';
+SELECT user, host, ssl_type FROM mysql.user;      -- REQUIRE settings per account
+\s                                                 -- in the client: the SSL line shows the cipher
+```
+
+```bash
+ss -tlnp | grep 3306        # loopback only, unless remote access is deliberate
+```
+
+## Common mistakes
+
+- Creating `'app'@'%'` with a weak password to fix a connection error, then never tightening the host mask.
+- `require_secure_transport = ON` skipped because "the network is internal"; internal networks are where lateral movement happens.
+- Shipping the client with `--ssl-mode=DISABLED` to silence certificate errors instead of installing the CA ([self-signed.md](self-signed.md)).
+
+## Sources (checked September 2026)
+
+- MySQL encrypted connections: https://dev.mysql.com/doc/refman/8.0/en/using-encrypted-connections.html
+- MySQL multifactor authentication: https://dev.mysql.com/doc/refman/8.0/en/multifactor-authentication.html
+- MariaDB TLS documentation: https://mariadb.com/kb/en/secure-connections-overview/
+
+======================================================================
+==> mongodb.md
+======================================================================
+
+# MongoDB: TLS and authorization
+
+MongoDB's history of mass data leaks comes from 2 settings: binding to all interfaces and running with authorization off. Fix both before anything else, then add TLS. Applies to MongoDB 4.2 and later (`tls` options; earlier versions used `ssl` names).
+
+## 1. Enable authorization and create the admin user
+
+In `/etc/mongod.conf`:
+
+```yaml
+net:
+  port: 27017
+  bindIp: 127.0.0.1        # widen deliberately, e.g. 127.0.0.1,10.0.0.5
+security:
+  authorization: enabled
+```
+
+Restart, then use the localhost exception to create the first administrator (connect from the server itself with `mongosh`):
+
+```javascript
+use admin
+db.createUser({
+  user: "admin",
+  pwd: passwordPrompt(),
+  roles: [ { role: "userAdminAnyDatabase", db: "admin" } ]
+})
+```
+
+Create a separate least-privilege user per application (for example `readWrite` on its own database), per [authentication.md](authentication.md). Modern MongoDB authenticates with SCRAM-SHA-256 by default.
+
+MFA: the wire protocol has no TOTP dialogue in Community edition; x.509 client-certificate authentication is the second factor for direct connections, and human paths to the host (SSH, admin UIs) go behind MFA per [mfa.md](mfa.md).
+
+## 2. Enable TLS
+
+Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), concatenate certificate and key into one PEM, and require TLS:
+
+```bash
+cat server.crt server.key > /etc/ssl/mongodb/server.pem
+chmod 600 /etc/ssl/mongodb/server.pem
+```
+
+```yaml
+net:
+  tls:
+    mode: requireTLS
+    certificateKeyFile: /etc/ssl/mongodb/server.pem
+    CAFile: /etc/ssl/mongodb/ca.crt     # needed when clients or cluster members present certificates
+```
+
+`requireTLS` rejects plain connections outright; the transitional modes (`allowTLS`, `preferTLS`) exist for rolling upgrades only.
+
+## 3. Client side
+
+```bash
+mongosh "mongodb://admin@db.example.com:27017/?authSource=admin&tls=true" \
+  --tlsCAFile /path/ca.crt
+```
+
+Driver connection strings take the same `tls=true` and CA options. Do not ship `tlsAllowInvalidCertificates`; install the CA instead ([self-signed.md](self-signed.md)).
+
+## 4. Verify
+
+```bash
+ss -tlnp | grep 27017                       # loopback only, unless remote access is deliberate
+mongosh --host db.example.com               # without credentials/TLS: refused once hardened
+mongosh "mongodb://db.example.com/?tls=true" --tlsCAFile ca.crt   # connects, then requires auth
+```
+
+From an unauthenticated session, `show dbs` must fail with an authorization error.
+
+## Common mistakes
+
+- `bindIp: 0.0.0.0` set to fix a connection problem, with `authorization` still unset; this is the classic leaked-database configuration.
+- Authorization enabled but every service sharing the `admin` account.
+- TLS on the server while the connection string still says `tls=false` because a container healthcheck was easier that way.
+
+## Sources (checked September 2026)
+
+- MongoDB security checklist: https://www.mongodb.com/docs/manual/administration/security-checklist/
+- Configure TLS/SSL for mongod: https://www.mongodb.com/docs/manual/tutorial/configure-ssl/
+- Enable access control: https://www.mongodb.com/docs/manual/tutorial/enable-authentication/
+
+======================================================================
+==> redis.md
+======================================================================
+
+# Redis: TLS and authentication
+
+Redis trusts its network by design, so the network boundary and credentials are your job. An exposed unauthenticated Redis leaks its data, and historic attack tooling has also used the CONFIG command against open instances to write files and take over hosts. Applies to Redis 6.0 and later (TLS and ACLs); the server must be built with TLS support, which mainstream distribution packages include (Redis refuses to start with TLS directives present if the build lacks it).
+
+## 1. Keep it local unless remote access is deliberate
+
+In `redis.conf`:
+
+```
+bind 127.0.0.1 -::1
+protected-mode yes
+```
+
+`protected-mode` blocks non-loopback clients when no password/ACL is set; treat it as a backstop, not as the control.
+
+## 2. Require a credential
+
+Minimum (single shared password, sent by clients with `AUTH`):
+
+```
+requirepass REPLACE_WITH_LONG_RANDOM_PASSWORD
+```
+
+Better, per-service ACL users with least privilege (Redis 6 and later):
+
+```
+user app on >REPLACE_WITH_LONG_RANDOM_PASSWORD ~app:* +@read +@write
+```
+
+That grants the `app` user access to keys matching `app:*` with read and write command categories only. Generate passwords per [authentication.md](authentication.md). Disable the `default` user (`user default off`) only after every client authenticates as a named user, or you will lock services out.
+
+MFA: Redis has no second-factor dialogue; `tls-auth-clients yes` (mutual TLS, below) is the second factor for clients, and human paths to the host go behind MFA per [mfa.md](mfa.md).
+
+## 3. Enable TLS
+
+Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), then replace the plaintext port with a TLS listener:
+
+```
+port 0                     # no plaintext listener at all
+tls-port 6379
+tls-cert-file    /etc/redis/tls/server.crt
+tls-key-file     /etc/redis/tls/server.key
+tls-ca-cert-file /etc/redis/tls/ca.crt
+tls-auth-clients no        # yes = require client certificates (mutual TLS)
+```
+
+Set `tls-auth-clients yes` for machine-to-machine deployments where clients can hold certificates; it is stronger than passwords alone.
+
+## 4. Client side
+
+```bash
+redis-cli --tls --cacert /etc/redis/tls/ca.crt -h redis.example.com -p 6379
+> AUTH app REPLACE_WITH_PASSWORD
+> PING
+```
+
+Application clients take equivalent TLS and credential options; point them at the CA rather than disabling verification.
+
+## 5. Verify
+
+```bash
+ss -tlnp | grep 6379                          # loopback only, unless remote access is deliberate
+redis-cli -h redis.example.com ping           # plaintext attempt: fails once port 0 is set
+redis-cli --tls --cacert ca.crt -h redis.example.com ping   # NOAUTH error until AUTH succeeds
+```
+
+## Common mistakes
+
+- Commenting out `bind` (which listens everywhere) while `requirepass` is still empty.
+- One `requirepass` value shared across environments and committed to the repository.
+- TLS enabled but the plaintext `port` left open alongside it; set `port 0`.
+
+## Sources (checked September 2026)
+
+- Redis documentation (security, TLS, and ACL pages): https://redis.io/docs/latest/
+- redis.conf self-documented example in the Redis source distribution: https://github.com/redis/redis
+
+======================================================================
+==> elasticsearch.md
+======================================================================
+
+# Elasticsearch and OpenSearch: keep security switched on
+
+Open Elasticsearch instances produced some of the largest data leaks on record. Modern versions ship secure; the failure mode today is deliberately switching protection off to make an error message go away.
+
+## Elasticsearch (8.0 and later)
+
+- A fresh install auto-configures security on first start: authentication is enabled, TLS is set up for HTTP and transport, and a password is generated for the `elastic` superuser. Keep all of it.
+- Never set `xpack.security.enabled: false`, and never expose a node where TLS (`xpack.security.http.ssl`) has been turned off. If a client cannot connect, fix the client's CA trust ([self-signed.md](self-signed.md)) or issue a real certificate ([free-certificates.md](free-certificates.md)); do not remove the lock.
+- Bind stays local unless deliberately widened (`network.host`); remote access goes through the same decision as any database: private network, VPN or tunnel, TLS everywhere.
+- Create least-privilege users and API keys per application instead of shipping `elastic` credentials ([authentication.md](authentication.md)).
+
+## OpenSearch
+
+- The security plugin provides authentication and TLS; never run with it disabled, including in Docker examples.
+- Recent versions require an initial admin password at install (the `OPENSEARCH_INITIAL_ADMIN_PASSWORD` environment variable for the demo configuration; verify the exact mechanism for your version). Make it long and random.
+- The demo configuration installs demo TLS certificates for evaluation; replace them with your own before any real deployment.
+
+## Verify
+
+```bash
+curl -s https://search.example.com:9200/            # 401 without credentials
+curl -sk https://localhost:9200/ -u elastic         # prompts; TLS answers, HTTP does not
+ss -tlnp | grep 9200                                # loopback/private only, unless deliberate
+```
+
+An unauthenticated `GET /` returning cluster JSON is the classic finding; so is `_cat/indices` listing your data to the world.
+
+## Sources (checked September 2026)
+
+- Elasticsearch security configuration: https://www.elastic.co/guide/en/elasticsearch/reference/current/configuring-stack-security.html
+- OpenSearch demo security configuration: https://docs.opensearch.org/latest/security/configuration/demo-configuration/
+
+======================================================================
+==> minio.md
+======================================================================
+
+# MinIO: root credentials and TLS
+
+MinIO serves S3-compatible object storage; an exposed instance with weak or well-known credentials hands over every bucket. Both the S3 API port and the web console need the same care.
+
+## 1. Set real root credentials
+
+```bash
+export MINIO_ROOT_USER="REPLACE_WITH_ADMIN_NAME"
+export MINIO_ROOT_PASSWORD="REPLACE_WITH_LONG_RANDOM_VALUE"
+```
+
+Never run with the historic `minioadmin`/`minioadmin` pair; scanners try it constantly. Root credentials are for administration only: create per-application access keys with least-privilege policies (via the console or the `mc` client) so no app holds root ([authentication.md](authentication.md)).
+
+## 2. Enable TLS
+
+MinIO serves HTTPS automatically when it finds a PEM key pair named `public.crt` and `private.key` in `${HOME}/.minio/certs` (or the directory given with `--certs-dir`):
+
+```bash
+cp fullchain.pem ${HOME}/.minio/certs/public.crt
+cp privkey.pem   ${HOME}/.minio/certs/private.key
+```
+
+Certificates per [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md); clients then use `https://` endpoints and, for self-signed, trust the CA rather than disabling verification.
+
+## 3. Exposure posture
+
+Loopback or private networks by default; public access only via the TLS endpoints above or behind a proxy/tunnel ([nginx.md](nginx.md), [cloudflare.md](cloudflare.md)). Keep the console off the public internet and give human logins MFA at the fronting layer ([mfa.md](mfa.md)). Buckets are private unless a policy says otherwise; audit anonymous/public bucket policies before exposing anything.
+
+## 4. Verify
+
+```bash
+ss -tlnp | grep 9000                                   # private unless deliberate
+curl -s https://s3.example.com:9000/                   # answers over TLS; anonymous access denied
+mc alias set mys3 https://s3.example.com:9000 <access-key> <secret>   # app key works; root key stays unused by apps
+```
+
+## Sources (checked September 2026)
+
+- MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/enterprise/aistor-object-store/installation/linux/network-encryption/
+- MinIO: https://min.io/
+
+======================================================================
+==> rabbitmq.md
+======================================================================
+
+# RabbitMQ: users, TLS listener, and the guest account
+
+RabbitMQ's default `guest`/`guest` account can only connect from localhost, which protects fresh installs exactly until someone "fixes" it. The documented recommendation is to create real users and delete `guest` or change its password.
+
+## 1. Accounts
+
+```bash
+sudo rabbitmqctl add_user 'app' 'REPLACE_WITH_LONG_RANDOM_PASSWORD'
+sudo rabbitmqctl set_permissions -p '/' 'app' '.*' '.*' '.*'   # configure, write, read; narrow per app
+sudo rabbitmqctl add_user 'ops' '...'
+sudo rabbitmqctl set_user_tags 'ops' administrator
+sudo rabbitmqctl delete_user 'guest'
+```
+
+Scope the permission regexes to what each application actually uses, per [authentication.md](authentication.md). Do not loosen the guest account's localhost restriction.
+
+## 2. TLS listener
+
+`rabbitmq.conf`:
+
+```
+listeners.ssl.default = 5671
+ssl_options.cacertfile = /etc/rabbitmq/tls/ca.pem
+ssl_options.certfile   = /etc/rabbitmq/tls/server.pem
+ssl_options.keyfile    = /etc/rabbitmq/tls/server.key
+ssl_options.verify     = verify_peer
+ssl_options.fail_if_no_peer_cert = true   # mutual TLS; set false to allow password-only clients
+
+# once every client speaks TLS:
+listeners.tcp = none
+```
+
+Certificates per [self-signed.md](self-signed.md) (internal CA fits brokers well) or [free-certificates.md](free-certificates.md). Mutual TLS doubles as the second factor for machine clients ([mfa.md](mfa.md)).
+
+## 3. Management UI
+
+The management plugin's web UI is an admin panel: keep it off public interfaces and reach it per [admin-uis.md](admin-uis.md) (SSH forward, tailnet, or Access), with its own TLS when remote.
+
+## 4. Verify
+
+```bash
+ss -tlnp | grep -E '5671|5672|15672'      # 5672 gone once listeners.tcp = none; UI private
+openssl s_client -connect mq.example.com:5671 -CAfile ca.pem </dev/null   # TLS handshake
+# Remote login attempt as guest fails: "user 'guest' can only connect via localhost"
+```
+
+## Sources (checked September 2026)
+
+- RabbitMQ TLS: https://www.rabbitmq.com/docs/ssl
+- RabbitMQ access control (guest restrictions, user commands, recommendation): https://www.rabbitmq.com/docs/access-control
+
+======================================================================
+==> mosquitto.md
+======================================================================
+
+# Mosquitto (MQTT): no anonymous clients, TLS listener
+
+MQTT brokers back IoT and agent projects, and open brokers leak live telemetry and accept injected commands. Mosquitto's defaults are sane (with listeners defined, anonymous access is off; without any listener it serves the local machine only); the job is to keep them sane while adding real listeners.
+
+## 1. Credentials per device
+
+```bash
+sudo mosquitto_passwd -c /etc/mosquitto/passwd device-01     # -c only the first time
+sudo mosquitto_passwd /etc/mosquitto/passwd device-02
+```
+
+`/etc/mosquitto/conf.d/secure.conf`:
+
+```
+per_listener_settings false
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+```
+
+One credential per device, so a leaked unit can be revoked alone; add an `acl_file` to limit each identity to its own topics.
+
+## 2. TLS listener
+
+```
+listener 8883
+cafile   /etc/mosquitto/tls/ca.pem
+certfile /etc/mosquitto/tls/server.pem
+keyfile  /etc/mosquitto/tls/server.key
+# require_certificate true      # mutual TLS: clients must present certificates
+```
+
+Port 8883 is the conventional MQTT-over-TLS port. Certificates per [self-signed.md](self-signed.md) (an internal CA suits device fleets) or [free-certificates.md](free-certificates.md). `require_certificate true` turns client certificates into the second factor for machines ([mfa.md](mfa.md)). Remove or firewall any plaintext `listener 1883` that is not strictly local.
+
+## 3. Verify
+
+```bash
+mosquitto_sub -h mq.example.com -p 8883 --cafile ca.pem -t 'test' -u device-01 -P '...'   # works
+mosquitto_sub -h mq.example.com -p 8883 --cafile ca.pem -t 'test'                          # refused (no credentials)
+ss -tlnp | grep -E '1883|8883'                                                             # no public 1883
+```
+
+## Sources (checked September 2026)
+
+- mosquitto.conf manual (allow_anonymous defaults, password_file, listener, certfile/keyfile/cafile, require_certificate): https://mosquitto.org/man/mosquitto-conf-5.html
+
+======================================================================
+==> jupyter.md
+======================================================================
+
+# Jupyter: password and TLS
+
+An exposed Jupyter server is remote code execution for whoever finds it. Jupyter Server (which also runs JupyterLab and Notebook 7) ships with token authentication on and binds to localhost; keep both properties when you change anything else. For multi-user or internet-facing use, prefer JupyterHub or access through [cloudflare.md](cloudflare.md) over exposing a single server directly.
+
+## 1. Generate the config and set a password
+
+```bash
+jupyter server --generate-config     # writes ~/.jupyter/jupyter_server_config.py
+jupyter server password              # prompts; stores the hashed password in jupyter_server_config.json
+```
+
+## 2. Enable TLS
+
+Get a certificate per [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md), then in `~/.jupyter/jupyter_server_config.py`:
+
+```python
+c.ServerApp.certfile = '/absolute/path/to/cert.pem'
+c.ServerApp.keyfile  = '/absolute/path/to/key.pem'
+```
+
+Or per invocation:
+
+```bash
+jupyter lab --certfile=/path/cert.pem --keyfile=/path/key.pem
+```
+
+Once TLS is on, connect via `https://`; the server no longer answers plain `http://` usefully.
+
+## 3. Exposure rules
+
+- Do not set `c.ServerApp.ip = '0.0.0.0'` (or `--ip 0.0.0.0`) without the password from step 1 **and** TLS from step 2 in place.
+- Never blank the token or password settings to make login prompts go away; that is exactly the configuration internet scanners look for.
+- A reverse proxy with its own auth ([nginx.md](nginx.md), [caddy.md](caddy.md)) or Cloudflare Access ([cloudflare.md](cloudflare.md)) in front of a loopback-bound Jupyter is a sound alternative to native TLS, and adds a second factor in the Access case.
+- MFA: the Jupyter password is single-factor, so the fronting options above are where the second factor comes from; multi-user deployments on JupyterHub can delegate login to an OIDC/OAuth provider that enforces MFA. Options in [mfa.md](mfa.md).
+
+## 4. Verify
+
+```bash
+curl -skI https://host:8888/           # answers over TLS
+# In a private browser window: the server asks for the password before showing any notebook.
+ss -tlnp | grep 8888                   # bound to 127.0.0.1 unless deliberately exposed
+```
+
+## Sources (checked September 2026)
+
+- Jupyter Server public server guide: https://jupyter-server.readthedocs.io/en/latest/operators/public-server.html
+
+======================================================================
+==> ollama.md
+======================================================================
+
+# Ollama: it has no built-in authentication or TLS
+
+Ollama's API binds to `127.0.0.1:11434` by default. Setting `OLLAMA_HOST=0.0.0.0` exposes the full API (model execution, pull, delete) to the network with **no authentication and no TLS**; the self-hosted server provides neither (per the Ollama FAQ as of September 2026; verify against current docs before relying on this). Thousands of Ollama instances exposed this way are indexed by internet scanners.
+
+Rules:
+
+1. Leave `OLLAMA_HOST` at its loopback default unless a protective layer is in front.
+2. Never set `OLLAMA_HOST=0.0.0.0` on a machine with a public interface. "It is just a model server" still means free compute, model tampering, and data exfiltration for anyone who finds it.
+3. Expose it only through an authenticated TLS proxy or tunnel, as below.
+
+## Option A: reverse proxy with TLS and basic auth
+
+Keep Ollama on loopback; publish only the proxy. nginx (full context in [nginx.md](nginx.md)):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name ollama.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/ollama.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ollama.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location / {
+        auth_basic           "Ollama";
+        auth_basic_user_file /etc/nginx/.htpasswd;      # htpasswd -B
+        proxy_pass http://127.0.0.1:11434;
+        proxy_set_header Host localhost:11434;
+        proxy_read_timeout 300s;        # model responses can be slow
+    }
+}
+```
+
+Caddy equivalent ([caddy.md](caddy.md)):
+
+```caddyfile
+ollama.example.com {
+    basic_auth {
+        admin $2a$14$REPLACE_WITH_HASH_FROM_caddy_hash-password
+    }
+    reverse_proxy 127.0.0.1:11434
+}
+```
+
+Clients then call `https://ollama.example.com` with the basic-auth credentials. For clients that only send bearer tokens, enforce the token at the proxy:
+
+```nginx
+    location / {
+        if ($http_authorization != "Bearer REPLACE_WITH_LONG_RANDOM_TOKEN") { return 401; }
+        proxy_pass http://127.0.0.1:11434;
+    }
+```
+
+Generate the token per [authentication.md](authentication.md) and keep it out of the repository.
+
+## Option B: Cloudflare Tunnel with Access
+
+Follow [cloudflare.md](cloudflare.md) with the tunnel route pointed at `http://localhost:11434` and an Access policy (or service token for API clients) on the hostname. The Ollama FAQ itself documents fronting the server with a tunnel; adding Access is what makes it authenticated.
+
+MFA: Ollama has no login of its own, so a second factor can only come from the fronting layer: an Access policy backed by an MFA-enforcing identity provider, or an [Authelia](https://www.authelia.com/)-protected proxy. Options in [mfa.md](mfa.md).
+
+## Verify
+
+```bash
+ss -tlnp | grep 11434                                  # 127.0.0.1 only
+curl -s http://<public-ip>:11434/api/tags              # from another machine: connection refused
+curl -s https://ollama.example.com/api/tags            # 401 without credentials
+curl -su admin https://ollama.example.com/api/tags     # model list with credentials
+```
+
+## Sources (checked September 2026)
+
+- Ollama FAQ (bind address, `OLLAMA_HOST`, proxy examples): https://docs.ollama.com/faq
+- Ollama repository: https://github.com/ollama/ollama
+
+======================================================================
+==> open-webui.md
+======================================================================
+
+# Open WebUI: signup control, TLS, and MFA
+
+Open WebUI has account-based authentication built in; the risks are open signup on an exposed instance and running it on plain HTTP. It provides no TLS of its own, so encryption comes from a fronting layer.
+
+## 1. Control who can register
+
+Environment variables (defaults per the Open WebUI reference):
+
+```
+ENABLE_SIGNUP=false          # default true; disable once your accounts exist
+DEFAULT_USER_ROLE=pending    # the default; new accounts wait for admin approval
+                             # other values: user, admin
+```
+
+With signup left on, keep `DEFAULT_USER_ROLE=pending` so a stranger who registers gets no access until approved. An admin account can also be created at startup by setting `WEBUI_ADMIN_EMAIL` together with `WEBUI_ADMIN_PASSWORD` (supply the password via the environment, not a compose file in git; see [secrets.md](secrets.md)).
+
+For SSO, the reference documents OAuth/OIDC settings plus `ENABLE_PASSWORD_AUTH=false` to turn off password login once SSO works; enforcing MFA then happens at the identity provider ([mfa.md](mfa.md)).
+
+## 2. Bind privately and add TLS in front
+
+```bash
+docker run -d -p 127.0.0.1:3000:8080 ghcr.io/open-webui/open-webui:main
+```
+
+Publish it through [caddy.md](caddy.md)/[nginx.md](nginx.md) with a certificate from [free-certificates.md](free-certificates.md), or through a tunnel with login in front ([cloudflare.md](cloudflare.md), [tailscale.md](tailscale.md)). Never expose port 8080 directly: login forms over plain HTTP send passwords in cleartext.
+
+## 3. Verify
+
+```bash
+ss -tlnp | grep 3000                      # loopback only
+curl -sI https://chat.example.com/        # serves over TLS
+# In a private browser window: login page appears; registering a new account
+# yields a pending/unapproved user, not access.
+```
+
+## Sources (checked September 2026)
+
+- Open WebUI environment configuration reference: https://docs.openwebui.com/reference/env-configuration
+- Open WebUI repository: https://github.com/open-webui/open-webui
+
+======================================================================
+==> litellm.md
+======================================================================
+
+# LiteLLM proxy: master key and virtual keys
+
+A LiteLLM proxy fronts paid model APIs, so an exposed, keyless instance spends your provider credits for whoever finds it. Authentication is built in and must be switched on before anything else.
+
+## 1. Set the master key
+
+In `config.yaml` under `general_settings: master_key`, or via the environment (preferred; see [secrets.md](secrets.md)):
+
+```bash
+export LITELLM_MASTER_KEY="sk-REPLACE_WITH_LONG_RANDOM_VALUE"   # must start with sk-
+```
+
+The master key is the root credential for the proxy; it belongs to the operator only and never to client applications.
+
+## 2. Issue virtual keys per application
+
+```bash
+curl https://llm.example.com/key/generate \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"key_alias": "app-frontend"}'
+```
+
+Each app gets its own virtual key, which can be revoked or budgeted independently; LiteLLM's docs cover per-key models, budgets, and expiry. Clients send the virtual key in the `Authorization` header (the header name is configurable via `litellm_key_header_name`).
+
+## 3. Bind privately and add TLS in front
+
+Run the proxy on loopback (or a private container network) and publish it only through a TLS layer: [caddy.md](caddy.md)/[nginx.md](nginx.md) with a certificate from [free-certificates.md](free-certificates.md), or [cloudflare.md](cloudflare.md)/[tailscale.md](tailscale.md) for no-open-port setups. Bearer keys over plain HTTP are compromised on first use. For human access to the LiteLLM admin UI, add MFA at the fronting layer ([mfa.md](mfa.md)).
+
+## 4. Verify
+
+```bash
+curl -s https://llm.example.com/v1/models                       # 401 without a key
+curl -s https://llm.example.com/v1/models -H "Authorization: Bearer <virtual-key>"   # model list
+ss -tlnp | grep 4000                                            # loopback only
+```
+
+## Sources (checked September 2026)
+
+- LiteLLM proxy virtual keys (master_key, /key/generate, header name): https://docs.litellm.ai/docs/proxy/virtual_keys
+
+======================================================================
+==> model-servers.md
+======================================================================
+
+# Model servers: llama.cpp and vLLM
+
+Self-hosted model servers follow the [ollama.md](ollama.md) pattern: they default to local use, and exposing them means someone else's prompts run on your GPU. Keep them on loopback, require an API key where the server supports one, and terminate TLS in front.
+
+## llama.cpp (llama-server)
+
+`llama-server` listens on `127.0.0.1:8080` by default; keep that bind. Require a key:
+
+```bash
+llama-server -m model.gguf --api-key "$LLAMA_API_KEY"
+# --api-key accepts a comma-separated list for multiple keys
+```
+
+Native TLS exists when the binary is built with OpenSSL (`-DLLAMA_OPENSSL=ON`): `--ssl-key-file` and `--ssl-cert-file` take PEM files ([self-signed.md](self-signed.md) or [free-certificates.md](free-certificates.md)). A reverse proxy per [nginx.md](nginx.md)/[caddy.md](caddy.md) is the alternative when your build lacks SSL support.
+
+## vLLM (OpenAI-compatible server)
+
+vLLM's server supports requiring an API key; check `vllm serve --help` on your installed version for the current option name (the docs at https://docs.vllm.ai/ document it; this guide avoids pinning the flag because vLLM's CLI moves quickly). vLLM does not terminate TLS for you in typical deployments, so front it with a TLS proxy or tunnel and keep the server itself on loopback or a private network.
+
+## The pattern, whatever the server
+
+1. Bind to `127.0.0.1` (or a private container network); confirm with `ss -tlnp`.
+2. Require a per-client API key at the server where supported, or at the proxy otherwise (bearer-token check per [ollama.md](ollama.md)); generate keys per [authentication.md](authentication.md).
+3. TLS in front: [caddy.md](caddy.md), [nginx.md](nginx.md), [cloudflare.md](cloudflare.md), or [tailscale.md](tailscale.md).
+4. Human-facing UIs on top of these servers ([open-webui.md](open-webui.md)) carry their own login and MFA ([mfa.md](mfa.md)).
+
+## Verify
+
+```bash
+ss -tlnp | grep -E '8080|8000'                          # loopback only
+curl -s https://models.example.com/v1/models            # 401 without a key
+curl -s https://models.example.com/v1/models -H "Authorization: Bearer <key>"   # succeeds
+```
+
+## Sources (checked September 2026)
+
+- llama.cpp server README (defaults, --api-key, SSL flags): https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
+- vLLM documentation: https://docs.vllm.ai/
+
+======================================================================
+==> gradio.md
+======================================================================
+
+# Gradio: launch() authentication and TLS
+
+Gradio binds to `127.0.0.1` by default. Two launch choices create exposure: `server_name="0.0.0.0"` (all interfaces) and `share=True` (a public `*.gradio.live` URL through Gradio's relay). Neither is acceptable without authentication.
+
+## 1. Require a login
+
+`launch()` takes credentials directly:
+
+```python
+import os
+demo.launch(
+    auth=(os.environ["GRADIO_USER"], os.environ["GRADIO_PASS"]),
+    auth_message="Authorized users only",
+)
+```
+
+`auth` also accepts a list of `(user, password)` tuples or a callable `f(username, password) -> bool`, which lets you check hashed credentials per [authentication.md](authentication.md). Keep the credentials in environment variables, not in the script.
+
+MFA: `auth` is single-factor. The callable form allows a TOTP step (for example, verify a [pyotp](https://github.com/pyauth/pyotp) code appended to the password); fronting the app with Cloudflare Access or an Authelia-protected proxy is the cleaner route. Options in [mfa.md](mfa.md).
+
+## 2. Enable TLS
+
+For a public deployment, prefer a reverse proxy or tunnel in front of a loopback-bound Gradio app: [caddy.md](caddy.md), [nginx.md](nginx.md), or [cloudflare.md](cloudflare.md). Gradio can also serve HTTPS itself with a certificate from [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md):
+
+```python
+demo.launch(
+    server_name="0.0.0.0",
+    server_port=8443,
+    ssl_certfile="/path/cert.pem",
+    ssl_keyfile="/path/key.pem",
+    ssl_verify=False,   # only for self-signed certificates; skips validating your own cert
+    auth=(os.environ["GRADIO_USER"], os.environ["GRADIO_PASS"]),
+)
+```
+
+`ssl_keyfile_password` exists for encrypted keys. `ssl_verify=False` here affects how the launcher checks its own certificate; it is needed for self-signed certificates and unnecessary with a CA-issued one.
+
+## 3. share=True is publication
+
+`share=True` publishes the app at a random public URL for anyone who obtains the link, with your machine executing the requests. Use it only for short demos, always combined with `auth`, and shut it down afterwards. It is not a deployment mechanism; for persistent authenticated remote access use [cloudflare.md](cloudflare.md).
+
+## 4. Verify
+
+```bash
+ss -tlnp | grep 7860                        # loopback unless deliberately exposed
+curl -sI https://gradio.example.com/        # succeeds over TLS
+# In a private browser window: the login form appears before the app.
+```
+
+## Sources (checked September 2026)
+
+- Gradio Blocks.launch() parameters (auth, auth_message, ssl_certfile, ssl_keyfile, ssl_keyfile_password, ssl_verify, server_name, share): https://www.gradio.app/docs/gradio/blocks
+
+======================================================================
+==> streamlit.md
+======================================================================
+
+# Streamlit: TLS and authentication
+
+Streamlit apps have no access control unless you add it, and `streamlit run` listens on the network by default. Decide both layers before exposing an app.
+
+## 1. TLS
+
+Preferred: keep Streamlit on loopback and terminate TLS in a reverse proxy or tunnel ([caddy.md](caddy.md), [nginx.md](nginx.md), [cloudflare.md](cloudflare.md)):
+
+```toml
+# .streamlit/config.toml
+[server]
+address = "127.0.0.1"
+```
+
+Streamlit can serve HTTPS itself via `server.sslCertFile` and `server.sslKeyFile`, but its own documentation says not to use this in production ("It has not gone through security audits or performance tests") and to prefer a reverse proxy or load balancer. Treat the built-in TLS as a development convenience only:
+
+```toml
+[server]
+sslCertFile = "/path/cert.pem"
+sslKeyFile  = "/path/key.pem"
+```
+
+## 2. Native login (OIDC)
+
+Recent Streamlit releases include `st.login()`, `st.logout()`, and `st.user` for OpenID Connect authentication against Google, Microsoft Entra ID, Okta, or any OIDC provider. Configuration lives in `.streamlit/secrets.toml`:
+
+```toml
+[auth]
+redirect_uri = "https://app.example.com/oauth2callback"
+cookie_secret = "REPLACE_WITH_LONG_RANDOM_STRING"
+client_id = "<from your identity provider>"
+client_secret = "<from your identity provider>"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+```
+
+Gate the app at the top of the script:
+
+```python
+import streamlit as st
+
+if not st.user.is_logged_in:
+    st.login()
+    st.stop()
+
+st.write(f"Hello, {st.user.name}")
+```
+
+Notes from the Streamlit docs: this is authentication only (identity, not per-resource authorization), the identity cookie lasts 30 days and that period is not configurable, and `secrets.toml` holds the client secret, so it must never be committed. Confirm that your installed Streamlit version includes these functions; they are absent from older releases.
+
+MFA: `st.login()` delegates authentication to the OIDC provider, so enforce MFA there (Google, Microsoft Entra ID, Okta, Keycloak, and authentik all support it). Without OIDC, front the app per section 3. Options in [mfa.md](mfa.md).
+
+## 3. Alternatives when OIDC is not available
+
+- Basic auth at a reverse proxy in front of a loopback-bound app ([nginx.md](nginx.md), [caddy.md](caddy.md)).
+- Cloudflare Access in front of a tunnel ([cloudflare.md](cloudflare.md)), which adds SSO or one-time-PIN login without touching the app.
+
+A password typed into a plain `st.text_input` and compared in the script is not authentication; it ships no session management, no hashing, and no rate limiting.
+
+## 4. Verify
+
+```bash
+ss -tlnp | grep 8501                     # 127.0.0.1 when behind a proxy
+curl -sI https://app.example.com/        # succeeds over TLS
+# In a private browser window: the IdP login (or proxy auth) appears before the app.
+```
+
+## Sources (checked September 2026)
+
+- config.toml reference (server.address, server.sslCertFile, server.sslKeyFile, and the production warning): https://docs.streamlit.io/develop/api-reference/configuration/config.toml
+- Authentication concepts (st.login, st.logout, st.user, [auth] keys, stated limitations): https://docs.streamlit.io/develop/concepts/connections/authentication
+
+======================================================================
+==> n8n.md
+======================================================================
+
+# n8n: binding, TLS, and MFA
+
+n8n includes user management (complete the owner setup on first run), but its network defaults deserve attention: `N8N_LISTEN_ADDRESS` defaults to `::`, which listens on **all interfaces**, on port `5678` over plain HTTP.
+
+## 1. Bind privately
+
+Behind a reverse proxy or tunnel (the recommended layout):
+
+```
+N8N_LISTEN_ADDRESS=127.0.0.1
+N8N_PORT=5678
+N8N_HOST=n8n.example.com
+```
+
+Publish only the proxy per [caddy.md](caddy.md)/[nginx.md](nginx.md) with a certificate from [free-certificates.md](free-certificates.md), or use [cloudflare.md](cloudflare.md)/[tailscale.md](tailscale.md). Webhook endpoints are meant to be reachable by external services; that is no reason for the editor UI to be.
+
+## 2. Or terminate TLS in n8n itself
+
+```
+N8N_PROTOCOL=https        # default is http
+N8N_SSL_KEY=/path/to/privkey.pem
+N8N_SSL_CERT=/path/to/fullchain.pem
+```
+
+## 3. Accounts and MFA
+
+- Finish the owner-account setup immediately after first start; an unclaimed n8n instance is open to whoever reaches it first.
+- Individual users can enable two-factor authentication on their accounts (verify availability for your version and licence).
+- Instance-wide enforcement exists under **Settings > Security** ("Enforce two-factor authentication"), or via `N8N_MFA_ENFORCED_ENABLED=true` with `N8N_SECURITY_POLICY_MANAGED_BY_ENV=true`; per the n8n docs this enforcement requires a Business or Enterprise licence on self-hosted instances, and it does not apply to SSO logins (enforce MFA at the identity provider for those; [mfa.md](mfa.md)).
+- Credentials stored in n8n (API keys for the services your workflows touch) make the instance a secrets vault; treat access to it accordingly ([secrets.md](secrets.md)).
+
+## 4. Verify
+
+```bash
+ss -tlnp | grep 5678                    # 127.0.0.1, not :: or 0.0.0.0
+curl -sI https://n8n.example.com/       # TLS, and a login page rather than the editor
+```
+
+## Sources (checked September 2026)
+
+- n8n deployment environment variables (N8N_LISTEN_ADDRESS, N8N_PROTOCOL, N8N_SSL_KEY, N8N_SSL_CERT, defaults): https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/deployment.md
+- n8n security policies (MFA enforcement, licensing, SSO exception): https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/manage-security-policies.md
+- n8n SSL setup: https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/set-up-ssl.md
+
+======================================================================
+==> code-server.md
+======================================================================
+
+# code-server: browser VS Code without giving away the machine
+
+code-server runs a terminal in the browser, so exposure equals remote code execution. Its own documentation is blunt: never expose it directly to the internet without authentication and encryption.
+
+## 1. Prefer no exposure at all
+
+The code-server docs recommend SSH port forwarding first, which needs no additional setup:
+
+```bash
+ssh -L 8080:127.0.0.1:8080 user@host    # then open http://localhost:8080 locally
+```
+
+[tailscale.md](tailscale.md) (serve, tailnet-only) and [cloudflare.md](cloudflare.md) (tunnel plus Access with MFA) are the equivalents when SSH is unavailable.
+
+## 2. If it must be reachable: config.yaml
+
+`~/.config/code-server/config.yaml`:
+
+```yaml
+bind-addr: 127.0.0.1:8080     # keep loopback behind a proxy or tunnel
+auth: password                # default; the generated password lives in this file
+cert: /path/to/fullchain.pem  # only when code-server terminates TLS itself
+cert-key: /path/to/privkey.pem
+```
+
+Password attempts are rate-limited (2 per minute plus 12 per hour). Replace the generated password with your own long random value, and treat the config file as a secret ([secrets.md](secrets.md)). For public access, the docs' supported pattern is a reverse proxy with a real certificate: [caddy.md](caddy.md) or [nginx.md](nginx.md) with [free-certificates.md](free-certificates.md), with MFA added at that layer ([mfa.md](mfa.md)) since the built-in login is a single factor.
+
+## 3. Verify
+
+```bash
+ss -tlnp | grep 8080                    # loopback only
+curl -sI https://code.example.com/      # TLS, login page, never the editor
+```
+
+An unauthenticated editor in a private browser window means whoever finds the URL owns the host.
+
+## Sources (checked September 2026)
+
+- code-server deployment guide (config.yaml keys, password auth and rate limits, exposure recommendations): https://coder.com/docs/code-server/guide
+- code-server repository: https://github.com/coder/code-server
+
+======================================================================
+==> admin-uis.md
+======================================================================
+
+# Admin panels: phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus
+
+Database and monitoring panels are the most-scanned targets on the internet, and several ship with known default credentials. One rule dominates everything tool-specific below: **an admin panel is never reachable from the public internet.** Bind it to loopback and reach it through SSH port forwarding, a VPN or tailnet ([tailscale.md](tailscale.md)), or Cloudflare Access ([cloudflare.md](cloudflare.md)); anything public sits behind a TLS proxy with its own authentication ([nginx.md](nginx.md), [caddy.md](caddy.md)) plus MFA ([mfa.md](mfa.md)).
+
+## mongo-express
+
+Ships with basic auth `admin`:`pass` by default; its own README calls this unsafe. Set your own credentials and keep it private:
+
+```
+ME_CONFIG_BASICAUTH_USERNAME=<your-admin>
+ME_CONFIG_BASICAUTH_PASSWORD=<long random value>
+```
+
+These control only the web login; MongoDB credentials go in `ME_CONFIG_MONGODB_URL` ([mongodb.md](mongodb.md) hardens the database itself).
+
+## Grafana
+
+- First sign-in uses `admin`/`admin` and prompts for a new password; set a strong one immediately and create individual accounts for everyone else.
+- Disable anonymous access if it was enabled, and prefer SSO with MFA enforced at the identity provider.
+- Native HTTPS in `grafana.ini`:
+
+```ini
+[server]
+protocol = https
+cert_file = /etc/grafana/grafana.crt
+cert_key  = /etc/grafana/grafana.key
+```
+
+## Prometheus
+
+No authentication at all by default. Give it a web configuration file and start with `--web.config.file=web.yml`:
+
+```yaml
+basic_auth_users:
+  admin: $2b$12$REPLACE_WITH_BCRYPT_HASH    # htpasswd -nB admin, hash part
+```
+
+The same file carries TLS (`tls_server_config` with `cert_file` and `key_file`; see the Prometheus TLS guide below). Validate with `promtool check web-config web.yml`. Exporters and Alertmanager need the same treatment.
+
+## phpMyAdmin and pgAdmin
+
+Neither belongs on a public vhost. Serve them only behind the proxy-level TLS and authentication of your web server guide, restrict by source IP where the proxy supports it, and keep them updated; both are perennial exploit targets. pgAdmin in server mode has its own login; treat its accounts per [authentication.md](authentication.md).
+
+## RedisInsight and similar tools
+
+Keep them on loopback or a private network and reach them through the tunnels above. When in doubt, apply the generic pattern: loopback bind, TLS proxy, proxy or SSO authentication, MFA.
+
+## Verify
+
+```bash
+ss -tlnp                                      # panels bound to 127.0.0.1 only
+curl -sI https://panel.example.com/           # 401/403 or a login redirect, never a dashboard
+```
+
+Test each panel's URL from outside your network; a dashboard that renders without a login is a finding.
+
+## Sources (checked September 2026)
+
+- mongo-express README (defaults and variables): https://github.com/mongo-express/mongo-express
+- Grafana configuration and HTTPS: https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/ and https://grafana.com/docs/grafana/latest/setup-grafana/set-up-https/
+- Prometheus basic auth and TLS guides: https://prometheus.io/docs/guides/basic-auth/ and https://prometheus.io/docs/guides/tls-encryption/
+- phpMyAdmin documentation: https://www.phpmyadmin.net/docs/ and pgAdmin documentation: https://www.pgadmin.org/docs/
+
+======================================================================
+==> cors.md
+======================================================================
+
+# CORS: allow your origins, not everyone's
+
+CORS misconfiguration does not expose a port; it lets hostile websites use your users' browsers, cookies included, against your API. AI assistants reach for `Access-Control-Allow-Origin: *` the moment a browser console shows a CORS error; that is the wrong fix for any API that authenticates.
+
+## Rules
+
+1. **List exact origins.** `Access-Control-Allow-Origin` names the site(s) allowed to call the API from a browser:
+   ```
+   Access-Control-Allow-Origin: https://app.example.com
+   ```
+2. **Never combine `*` with credentials.** Browsers refuse `Access-Control-Allow-Origin: *` together with `Access-Control-Allow-Credentials: true`; configurations that "fix" this by reflecting whatever `Origin` header arrives recreate `*` for credentialed requests, which is worse. Reflect only origins checked against an explicit allow list.
+3. **`*` is acceptable** only for genuinely public, unauthenticated, read-only resources.
+4. **CORS is not authentication.** It controls browsers, not attackers with curl; every endpoint still authenticates per [authentication.md](authentication.md).
+
+## Framework examples
+
+Express (`cors` package):
+
+```js
+const cors = require('cors');
+app.use(cors({ origin: ['https://app.example.com'], credentials: true }));
+```
+
+FastAPI:
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://app.example.com"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+```
+
+Keep the origin list in configuration per environment rather than hardcoding localhost origins into production.
+
+## Verify
+
+```bash
+curl -s -o /dev/null -D - https://api.example.com/data -H "Origin: https://evil.example" | grep -i access-control
+# expect: no Access-Control-Allow-Origin echoing the hostile origin
+curl -s -o /dev/null -D - https://api.example.com/data -H "Origin: https://app.example.com" | grep -i access-control
+# expect: your origin, and Allow-Credentials only if you use cookies
+```
+
+## Sources (checked September 2026)
+
+- MDN: Cross-Origin Resource Sharing: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+
+======================================================================
+==> headers.md
+======================================================================
+
+# Security headers for your application
+
+TLS protects the transport; these response headers protect the page. Set them at the proxy (`add_header` in [nginx.md](nginx.md), `Header` in [apache.md](apache.md), `header` in Caddy), in app middleware (helmet for Express per [nodejs.md](nodejs.md), Django's security settings per [python.md](python.md)), or in a `_headers` file on static hosts.
+
+## The set worth shipping
+
+```
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: default-src 'self'
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Frame-Options: DENY
+```
+
+Notes that keep these correct rather than decorative:
+
+- **HSTS** only after HTTPS provably works everywhere on the domain; `includeSubDomains` commits every subdomain to HTTPS. Leave the `preload` token off unless you have read what preload-list inclusion means; it is effectively irreversible.
+- **CSP** is the one that needs tailoring. Start from `default-src 'self'`, add the sources your app actually uses, and prefer nonces or hashes over `'unsafe-inline'` for scripts. Roll out with `Content-Security-Policy-Report-Only` first on an existing app so you see what would break before enforcing.
+- **frame-ancestors** in CSP supersedes `X-Frame-Options`; sending both keeps older scanners content and costs nothing.
+- Headers belong on every response, including error pages; setting them only on `200 /` is a common proxy misconfiguration (nginx `add_header` inheritance per [nginx.md](nginx.md)).
+
+## Verify
+
+```bash
+curl -sI https://example.com/ | grep -iE 'strict-transport|content-security|x-content-type|referrer-policy|permissions-policy|x-frame'
+```
+
+Then scan with https://securityheaders.com/ from outside. A CSP that enforces without console errors on every page of the app is the finish line.
+
+## Sources (checked September 2026)
+
+- MDN HTTP headers reference: https://developer.mozilla.org/en-US/docs/Web/HTTP
+- Security header scanner: https://securityheaders.com/
+
+======================================================================
+==> firebase-supabase.md
+======================================================================
+
+# Firebase and Supabase: the rules are the security
+
+These platforms handle TLS for you; the exposure works differently. Client SDKs talk to the backend using keys that ship in your frontend code and are **public by design** (the Firebase API key, the Supabase `anon` key). The only server-side gate between the internet and your data is the rules layer: Firebase security rules, or Postgres row-level security (RLS) on Supabase. AI-generated apps repeatedly ship with that layer open because "it worked in testing".
+
+## Firebase
+
+- Every Firestore, Realtime Database, and Storage instance needs explicit security rules. Never deploy the all-open rule (`allow read, write: if true;` or `".read": true, ".write": true`); it exposes the entire datastore to anyone with your public config.
+- Require authentication and scope by user:
+
+```
+// Firestore example
+match /users/{userId}/{document=**} {
+  allow read, write: if request.auth != null && request.auth.uid == userId;
+}
+```
+
+- New projects start in locked mode; keep production locked-by-default and open specific paths deliberately. Test with the Rules Playground and emulator before deploying.
+- Server-side credentials (service accounts for the Admin SDK) bypass rules entirely; they stay on servers only, handled per [secrets.md](secrets.md).
+
+## Supabase
+
+- Enable RLS on **every** table exposed through the API, then write policies; a table without RLS is readable and writable with the public `anon` key:
+
+```sql
+alter table profiles enable row level security;
+
+create policy "own rows"
+on profiles for select
+using ( auth.uid() = user_id );
+```
+
+Write separate policies per operation (`select`, `insert`, `update`, `delete`); no policy means no access once RLS is on, which is the correct starting point.
+- The `service_role` key bypasses RLS; it is a server-only secret that must never reach the client bundle or the repository.
+- Supabase Auth supports MFA on user accounts; enable it for anything sensitive ([mfa.md](mfa.md) for the general rules).
+
+## Verify
+
+- With only the public key (no signed-in user), API reads and writes against protected tables/paths fail.
+- Signed in as user A, reading user B's rows fails.
+- Search the client bundle for `service_role` and private keys; the result must be empty.
+
+## Sources (checked September 2026)
+
+- Firebase security rules: https://firebase.google.com/docs/rules
+- Supabase row level security: https://supabase.com/docs/guides/database/postgres/row-level-security
+
+======================================================================
+==> common-mistakes.md
+======================================================================
+
+# Common mistakes
+
+The recurring findings behind exposed AI-assisted projects, distilled from the guides in this repository. Each line links to the fix.
+
+1. **Binding to `0.0.0.0` to fix a connection problem** and never binding back. Loopback is the default posture; expose only through a TLS-terminating, authenticated layer. ([README](README.md))
+2. **Publishing Docker ports and trusting UFW.** Published container ports bypass UFW's rules entirely; `ufw deny 3000` does not protect `-p 3000:3000`. ([docker.md](docker.md))
+3. **Default credentials left in place**: mongo-express `admin`/`pass`, Grafana `admin`/`admin`, RabbitMQ `guest`, MinIO `minioadmin`. Scanners try these first. ([admin-uis.md](admin-uis.md), [rabbitmq.md](rabbitmq.md), [minio.md](minio.md))
+4. **`OLLAMA_HOST=0.0.0.0`** on a machine with a public interface: the full model API with no authentication and no TLS. ([ollama.md](ollama.md))
+5. **Disabling TLS verification in clients** (`verify=False`, `rejectUnauthorized: false`, `curl -k`, `NODE_TLS_REJECT_UNAUTHORIZED=0`) instead of distributing trust for a self-signed certificate. ([self-signed.md](self-signed.md))
+6. **Secrets committed to the repository**, baked into images, or printed to logs, then "deleted" instead of rotated. ([secrets.md](secrets.md))
+7. **Auth on the home page but not the API.** `/` redirects to a login while `/api/...` serves data unauthenticated. Test the API paths. ([authentication.md](authentication.md))
+8. **Plain HTTP still serving next to HTTPS** instead of redirecting, leaving credentials to cross in cleartext on the forgotten port. (Every server guide's redirect step.)
+9. **Quick tunnels left running**: `trycloudflare.com` URLs and Gradio `share=True` links are unauthenticated publication, not deployment. ([cloudflare.md](cloudflare.md), [gradio.md](gradio.md))
+10. **Security features switched off to silence errors**: `xpack.security.enabled: false`, MongoDB without `authorization: enabled`, Redis with an empty `requirepass`. The error was the protection. ([elasticsearch.md](elasticsearch.md), [mongodb.md](mongodb.md), [redis.md](redis.md))
+11. **`Access-Control-Allow-Origin: *` on endpoints that use cookies or keys**, or reflecting whatever Origin arrives. ([cors.md](cors.md))
+12. **Database ports open to `0.0.0.0/0` in cloud firewalls** because a remote client needed access once. ([cloud-firewalls.md](cloud-firewalls.md))
+13. **Firebase or Supabase rules left open** (`allow read, write: if true;`, RLS disabled) because the client key "worked": the key is public by design, the rules are the security. ([firebase-supabase.md](firebase-supabase.md))
+14. **Single-factor logins on human-facing services** when the stack or a fronting layer supports MFA. ([mfa.md](mfa.md))
+
+Run the [README verification checklist](README.md#verification-checklist) after any fix; several of these only surface when tested from outside the host.
