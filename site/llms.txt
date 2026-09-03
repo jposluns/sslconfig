@@ -1,0 +1,51 @@
+# sslconfig.ai
+
+> TLS, strong authentication, and MFA setup guides for AI development assistants. Start with the README for the decision guide, the full index, and the verification checklist, then fetch the guide matching the stack. All content is dedicated to the public domain (CC0 1.0).
+
+## Start here
+
+- [README](https://raw.githubusercontent.com/jposluns/sslconfig/main/README.md): baseline rules for AI assistants, decision guide, index, verification checklist
+
+## Certificates and access
+
+- [free-certificates](https://raw.githubusercontent.com/jposluns/sslconfig/main/free-certificates.md): free publicly trusted certificates via ACME (Let's Encrypt, ZeroSSL), automated renewal
+- [self-signed](https://raw.githubusercontent.com/jposluns/sslconfig/main/self-signed.md): OpenSSL and mkcert certificates, distributing trust to clients
+- [cloudflare](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloudflare.md): Cloudflare Tunnel and Zero Trust Access, no open inbound ports
+
+## Authentication
+
+- [authentication](https://raw.githubusercontent.com/jposluns/sslconfig/main/authentication.md): password storage, sessions, API keys, rate limiting, secrets
+- [mfa](https://raw.githubusercontent.com/jposluns/sslconfig/main/mfa.md): MFA options: identity layers with QR-code TOTP enrolment, app libraries, SSH modules, Duo
+
+## Web servers and proxies
+
+- [apache](https://raw.githubusercontent.com/jposluns/sslconfig/main/apache.md): Apache HTTP Server TLS, redirect, HSTS, basic auth, client certificates
+- [nginx](https://raw.githubusercontent.com/jposluns/sslconfig/main/nginx.md): nginx TLS, redirect, HSTS, basic auth, reverse proxy
+- [lighttpd](https://raw.githubusercontent.com/jposluns/sslconfig/main/lighttpd.md): lighttpd TLS via mod_openssl, redirect, basic auth
+- [caddy](https://raw.githubusercontent.com/jposluns/sslconfig/main/caddy.md): Caddy automatic HTTPS, internal CA, basic auth
+- [haproxy](https://raw.githubusercontent.com/jposluns/sslconfig/main/haproxy.md): HAProxy TLS termination, redirect, HSTS, basic auth
+- [traefik](https://raw.githubusercontent.com/jposluns/sslconfig/main/traefik.md): Traefik ACME resolvers, HTTPS redirection, basicAuth middleware
+
+## Runtimes and containers
+
+- [nodejs](https://raw.githubusercontent.com/jposluns/sslconfig/main/nodejs.md): Node.js and Express HTTPS, security headers, sessions, password hashing
+- [python](https://raw.githubusercontent.com/jposluns/sslconfig/main/python.md): Flask, FastAPI/Uvicorn, Gunicorn, and Django TLS options and secure settings
+- [docker](https://raw.githubusercontent.com/jposluns/sslconfig/main/docker.md): safe port publishing, the UFW bypass problem, TLS termination
+
+## Databases
+
+- [postgresql](https://raw.githubusercontent.com/jposluns/sslconfig/main/postgresql.md): server TLS, SCRAM authentication, pg_hba rules, verified clients
+- [mysql](https://raw.githubusercontent.com/jposluns/sslconfig/main/mysql.md): required TLS transport, per-user TLS, modern auth plugins
+- [mongodb](https://raw.githubusercontent.com/jposluns/sslconfig/main/mongodb.md): requireTLS, authorization, admin user creation, bind address
+- [redis](https://raw.githubusercontent.com/jposluns/sslconfig/main/redis.md): TLS listener, ACLs, requirepass, bind and protected mode
+
+## AI and data tools
+
+- [jupyter](https://raw.githubusercontent.com/jposluns/sslconfig/main/jupyter.md): hashed password and TLS for Jupyter Server, Lab, and Notebook
+- [ollama](https://raw.githubusercontent.com/jposluns/sslconfig/main/ollama.md): Ollama has no built-in auth or TLS; protect it with a proxy or tunnel
+- [gradio](https://raw.githubusercontent.com/jposluns/sslconfig/main/gradio.md): launch() auth and TLS parameters, share link risks
+- [streamlit](https://raw.githubusercontent.com/jposluns/sslconfig/main/streamlit.md): TLS options, native OIDC login, reverse proxy deployment
+
+## Optional
+
+- [Repository](https://github.com/jposluns/sslconfig): source for all guides and this site
