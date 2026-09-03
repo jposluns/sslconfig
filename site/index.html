@@ -38,7 +38,20 @@
     h2 { font-size: 1.2rem; margin-top: 2.2rem; }
     h3 { font-size: 1rem; margin-top: 1.4rem; margin-bottom: .3rem; }
     code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
-    pre { padding: .8rem 1rem; overflow-x: auto; border: 1px solid #8884; border-radius: 6px; }
+    pre {
+      padding: .8rem 1rem; border: 1px solid #8884; border-radius: 6px;
+      white-space: pre-wrap; overflow-wrap: anywhere;
+    }
+    .copywrap { position: relative; }
+    .copywrap pre { padding-right: 4.6rem; }
+    .copy-btn {
+      position: absolute; top: .5rem; right: .5rem;
+      font: 600 .8rem/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: .38rem .7rem; border-radius: 6px;
+      border: 1px solid #8886; background: Canvas; color: CanvasText;
+      cursor: pointer;
+    }
+    .copy-btn:hover { border-color: #888; }
     ol li, ul li { margin: .35rem 0; }
     ul { margin-top: .2rem; }
     footer { margin-top: 3rem; font-size: .85rem; opacity: .7; }
@@ -56,7 +69,7 @@
       <h1>sslconfig.ai</h1>
     </div>
     <p class="tagline">TLS, strong authentication, and MFA instructions for AI development assistants.</p>
-    <p class="hero-note">Public domain (CC0) &middot; no scripts &middot; no cookies &middot; no tracking</p>
+    <p class="hero-note">Public domain (CC0) &middot; no cookies &middot; no tracking &middot; no external requests</p>
     <p class="hero-links">More from <a href="https://linkedin.com/in/jposluns">Jeff Posluns</a>: <a href="https://grclibrary.ai">GRC Library</a> &middot; <a href="https://aiqt.ai">AIQT Guardrails</a> &middot; <a href="https://cleanlanguage.ai">Clean Language</a> &middot; <a href="https://vendorreplies.ai">Vendor Replies</a> &middot; <a href="https://github.com/jposluns">GitHub Projects</a></p>
   </div>
 </header>
@@ -132,14 +145,29 @@
 
   <h2>If you are a human</h2>
   <p>Paste this into your AI assistant's instructions:</p>
-  <pre>Before exposing any part of this project, fetch and follow the guides at
-https://github.com/jposluns/sslconfig (see https://sslconfig.ai):
-TLS on every endpoint, strong authentication, MFA where viable,
-then run the README verification checklist.</pre>
+  <div class="copywrap">
+    <pre id="paste-text">Before exposing any part of this project, fetch and follow the security guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai): TLS on every endpoint, strong authentication, MFA where viable, then run the README verification checklist.</pre>
+    <button class="copy-btn" id="copy-btn" type="button" hidden>Copy</button>
+  </div>
 
   <footer>
-    <p>Source and guides: <a href="https://github.com/jposluns/sslconfig">github.com/jposluns/sslconfig</a>. This page is static: no scripts, no cookies, no tracking. All content is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>.</p>
+    <p>Source and guides: <a href="https://github.com/jposluns/sslconfig">github.com/jposluns/sslconfig</a>. This page loads no external resources, sets no cookies, and tracks nothing; its only script powers the copy button. All content is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>.</p>
   </footer>
 </main>
+<!-- Changing this script requires recomputing the sha256 hash in _headers (Content-Security-Policy script-src). -->
+<script>
+(function () {
+  var btn = document.getElementById('copy-btn');
+  var src = document.getElementById('paste-text');
+  if (!btn || !src || !navigator.clipboard) { return; }
+  btn.hidden = false;
+  btn.addEventListener('click', function () {
+    navigator.clipboard.writeText(src.textContent.trim()).then(function () {
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+    });
+  });
+})();
+</script>
 </body>
 </html>
