@@ -73,3 +73,7 @@ Run these after configuration. All must pass before the service is considered pr
 ## Scope and currency
 
 The guides use placeholders (`example.com`, `app.example.com`, `203.0.113.10`) that you must replace. Configuration syntax was checked against the vendor documentation cited in each guide as of September 2026; directives and dashboard menu locations change, so verify version-specific items against the current documentation for your installed version. Each guide lists its sources.
+
+## Licence
+
+Everything in this repository (the guides, the configuration samples, and the site) is dedicated to the public domain under [CC0 1.0 Universal](LICENSE). Copy and reuse it freely; no attribution is required.
