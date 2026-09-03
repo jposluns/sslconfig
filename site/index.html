@@ -13,7 +13,8 @@
   <meta property="og:description" content="TLS, strong authentication, and MFA setup guides for AI development assistants.">
   <meta name="twitter:card" content="summary">
   <style>
-    :root { color-scheme: light dark; }
+    :root { color-scheme: light dark; --accent: #17715a; --pad: clamp(1.25rem, 4vw, 3rem); }
+    @media (prefers-color-scheme: dark) { :root { --accent: #4fb08c; } }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -23,19 +24,45 @@
     .hero {
       background: linear-gradient(135deg, #0a2a4a 0%, #0d4f63 55%, #106b52 100%);
       color: #fff;
-      padding: 1.9rem 1.25rem 1.7rem;
+      padding: 1.9rem var(--pad) 1.7rem;
       border-bottom: 1px solid rgba(255, 255, 255, .15);
     }
-    .hero-inner { max-width: 44rem; margin: 0 auto; }
     .hero-brand { display: flex; align-items: center; gap: .65rem; margin-bottom: .3rem; }
     .hero svg { display: block; opacity: .9; flex: none; }
     .hero h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; letter-spacing: -.01em; }
     .hero .tagline { margin: 0 0 .9rem; font-size: 1.05rem; color: rgba(255, 255, 255, .85); }
     .hero-links { margin: 0; font-size: .85rem; color: rgba(255, 255, 255, .7); }
     .hero-links a { color: rgba(255, 255, 255, .92); }
-    main { max-width: 44rem; margin: 0 auto; padding: 1.6rem 1.25rem 4rem; }
+    .shell {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      grid-template-areas: "sidenav main";
+      gap: clamp(1.5rem, 3vw, 3rem);
+      align-items: start;
+      padding: 0 var(--pad);
+    }
+    .sidenav { grid-area: sidenav; position: sticky; top: 1.25rem; }
+    .sidenav-inner {
+      border: 1px solid #8884; border-left: 3px solid var(--accent); border-radius: 8px;
+      background: #88888812;
+      padding: 1rem 1.1rem; margin: 1.6rem 0;
+      display: flex; flex-direction: column; gap: .05rem;
+      max-height: calc(100vh - 2.5rem); overflow-y: auto;
+    }
+    .sidenav-h {
+      font: 600 .66rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--accent); margin: .9rem 0 .35rem;
+    }
+    .sidenav-h:first-child { margin-top: 0; }
+    .sidenav-inner a {
+      font: .8rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: CanvasText; opacity: .78; text-decoration: none;
+      padding: .18rem 0; word-break: break-word;
+    }
+    .sidenav-inner a:hover { opacity: 1; color: var(--accent); }
+    main { grid-area: main; min-width: 0; padding: 1.6rem 0 4rem; }
     h2 { font-size: 1.2rem; margin-top: 2.2rem; }
-    h3 { font-size: 1rem; margin-top: 1.4rem; margin-bottom: .3rem; }
     code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
     pre {
       padding: .8rem 1rem; border: 1px solid #8884; border-radius: 6px;
@@ -52,34 +79,111 @@
     }
     .copy-btn:hover { border-color: #888; }
     ol li, ul li { margin: .35rem 0; }
-    ul { margin-top: .2rem; }
     footer { margin-top: 3rem; font-size: .85rem; opacity: .7; }
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; grid-template-areas: "main" "sidenav"; }
+      .sidenav { position: static; }
+      .sidenav-inner { max-height: none; }
+    }
   </style>
 </head>
 <body>
 <header class="hero">
-  <div class="hero-inner">
-    <div class="hero-brand">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="4" y="10.5" width="16" height="9.5" rx="2.2"/>
-        <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
-        <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/>
-      </svg>
-      <h1>sslconfig.ai</h1>
-    </div>
-    <p class="tagline">TLS, strong authentication, and MFA instructions for AI development assistants.</p>
-    <p class="hero-links">More from <a href="https://linkedin.com/in/jposluns">Jeff Posluns</a>: <a href="https://grclibrary.ai">GRC Library</a> &middot; <a href="https://aiqt.ai">AIQT Guardrails</a> &middot; <a href="https://cleanlanguage.ai">Clean Language</a> &middot; <a href="https://vendorreplies.ai">Vendor Replies</a> &middot; <a href="https://github.com/jposluns">GitHub Projects</a></p>
+  <div class="hero-brand">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="10.5" width="16" height="9.5" rx="2.2"/>
+      <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+      <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/>
+    </svg>
+    <h1>sslconfig.ai</h1>
   </div>
+  <p class="tagline">TLS, strong authentication, and MFA instructions for AI development assistants.</p>
+  <p class="hero-links">More from <a href="https://linkedin.com/in/jposluns">Jeff Posluns</a>: <a href="https://grclibrary.ai">GRC Library</a> &middot; <a href="https://aiqt.ai">AIQT Guardrails</a> &middot; <a href="https://cleanlanguage.ai">Clean Language</a> &middot; <a href="https://vendorreplies.ai">Vendor Replies</a> &middot; <a href="https://github.com/jposluns">GitHub Projects</a></p>
 </header>
-<main>
-  <p>This site exists as a simple pointer for the AI assistants working on your projects, to ensure that they follow simple security rules: encrypt access with TLS, require strong authentication, and add multi-factor authentication where viable. Many projects ship with services listening on plain HTTP with no login at all; the guides below fix that for the most common stacks.</p>
 
-  <h2>Why this site exists</h2>
-  <p>Jeff Posluns kept reviewing AI-assisted projects that shipped without basic security details: services on plain HTTP, no authentication, no MFA. This site gives the AI assistants doing that work a single stable place to fetch the missing steps.</p>
+<div class="shell">
+<nav class="sidenav" aria-label="Guides and page contents">
+  <div class="sidenav-inner">
+    <p class="sidenav-h">On this page</p>
+    <a href="#why">Why this site exists</a>
+    <a href="#ai">For AI assistants</a>
+    <a href="#human">For humans</a>
+
+    <p class="sidenav-h">Certificates and access</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/free-certificates.md">free-certificates</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/self-signed.md">self-signed</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/cloudflare.md">cloudflare</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/tailscale.md">tailscale</a>
+
+    <p class="sidenav-h">Authentication and secrets</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/authentication.md">authentication</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/mfa.md">mfa</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/secrets.md">secrets</a>
+
+    <p class="sidenav-h">Web servers and proxies</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/apache.md">apache</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/nginx.md">nginx</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/lighttpd.md">lighttpd</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/caddy.md">caddy</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/haproxy.md">haproxy</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/traefik.md">traefik</a>
+
+    <p class="sidenav-h">Runtimes and clusters</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/nodejs.md">nodejs</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/python.md">python</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/docker.md">docker</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/kubernetes.md">kubernetes</a>
+
+    <p class="sidenav-h">Hosts and platforms</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/host.md">host</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/cloud-firewalls.md">cloud-firewalls</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/paas.md">paas</a>
+
+    <p class="sidenav-h">Data and messaging</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/postgresql.md">postgresql</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/mysql.md">mysql</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/mongodb.md">mongodb</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/redis.md">redis</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/elasticsearch.md">elasticsearch</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/minio.md">minio</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/rabbitmq.md">rabbitmq</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/mosquitto.md">mosquitto</a>
+
+    <p class="sidenav-h">AI, data, and dev tools</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/jupyter.md">jupyter</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/ollama.md">ollama</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/open-webui.md">open-webui</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/litellm.md">litellm</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/model-servers.md">model-servers</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/gradio.md">gradio</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/streamlit.md">streamlit</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/n8n.md">n8n</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/code-server.md">code-server</a>
+
+    <p class="sidenav-h">Web app controls</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/cors.md">cors</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/headers.md">headers</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/firebase-supabase.md">firebase-supabase</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/admin-uis.md">admin-uis</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/common-mistakes.md">common-mistakes</a>
+
+    <p class="sidenav-h">Reference</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/README.md">README (start here)</a>
+    <a href="https://sslconfig.ai/llms.txt">llms.txt</a>
+    <a href="https://sslconfig.ai/llms-full.txt">llms-full.txt</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/CONTRIBUTING.md">contributing</a>
+  </div>
+</nav>
+
+<main>
+  <p>This site exists as a simple pointer for the AI assistants working on your projects, to ensure that they follow simple security rules: encrypt access with TLS, require strong authentication, and add multi-factor authentication where viable. Many projects ship with services listening on plain HTTP with no login at all; the guides in the menu fix that for the most common stacks.</p>
+
+  <h2 id="why">Why this site exists</h2>
+  <p>Jeff kept reviewing AI-assisted projects that shipped without basic security details: services on plain HTTP, no authentication, no MFA. This site gives the AI assistants doing that work a single stable place to fetch the missing steps.</p>
   <p>For security beyond these basics: the <a href="https://aiqt.ai">AIQT</a> standard holds an AI assistant to accuracy, integrity, and verification while it works, and the <a href="https://github.com/jposluns/grc_library">grc_library</a> repository (<a href="https://grclibrary.ai">grclibrary.ai</a>) supports deeper governance, risk, and compliance work: point your AI development assistant at it and ask it to validate gaps against the services that apply to your project.</p>
   <p>Scope: deployment exposure (TLS, authentication, MFA, secrets, and network exposure). Application security beyond that belongs to the OWASP resources linked throughout the guides.</p>
 
-  <h2>If you are an AI development assistant</h2>
+  <h2 id="ai">If you are an AI development assistant</h2>
   <p>Apply these rules to every service you configure, generate, or review:</p>
   <ol>
     <li>Treat every service as internet-reachable unless confirmed otherwise. Bind to <code>127.0.0.1</code> by default and expose services only through a TLS-terminating layer that requires authentication.</li>
@@ -94,85 +198,9 @@
   <pre>https://raw.githubusercontent.com/jposluns/sslconfig/main/&lt;guide&gt;.md</pre>
   <p>Start with <code>README.md</code>: it holds the decision guide, the full index, and the verification checklist. The machine-readable index is at <a href="https://sslconfig.ai/llms.txt">/llms.txt</a>, and every guide concatenated into a single file is at <a href="https://sslconfig.ai/llms-full.txt">/llms-full.txt</a>.</p>
 
-  <h2 id="guides">Guides</h2>
-
-  <h3>Certificates and access</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/free-certificates.md">free-certificates.md</a>: free publicly trusted certificates via ACME, with automated renewal</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/self-signed.md">self-signed.md</a>: OpenSSL and mkcert certificates, and distributing trust to clients</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/cloudflare.md">cloudflare.md</a>: Cloudflare Tunnel and Zero Trust Access, no open inbound ports</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/tailscale.md">tailscale.md</a>: serve (tailnet-only) and funnel (public) with automatic TLS</li>
-  </ul>
-
-  <h3>Authentication and secrets</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/authentication.md">authentication.md</a>: password storage, sessions, API keys, rate limiting</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/mfa.md">mfa.md</a>: multi-factor authentication options: identity layers, TOTP libraries with QR enrolment, Duo</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/secrets.md">secrets.md</a>: keeping keys out of repositories, scanning, rotation after a leak</li>
-  </ul>
-
-  <h3>Web servers and proxies</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/apache.md">apache.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/nginx.md">nginx.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/lighttpd.md">lighttpd.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/caddy.md">caddy.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/haproxy.md">haproxy.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/traefik.md">traefik.md</a></li>
-  </ul>
-
-  <h3>Runtimes, containers, and clusters</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/nodejs.md">nodejs.md</a>: Node.js and Express</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/python.md">python.md</a>: Flask, FastAPI/Uvicorn, Gunicorn, Django</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/docker.md">docker.md</a>: safe port publishing and TLS termination</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/kubernetes.md">kubernetes.md</a>: cert-manager, ingress TLS, ingress auth</li>
-  </ul>
-
-  <h3>Hosts and platforms</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/host.md">host.md</a>: SSH hardening, firewall baseline, updates</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/cloud-firewalls.md">cloud-firewalls.md</a>: security groups and VPC rules</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/paas.md">paas.md</a>: Render, Fly.io, Vercel, and similar</li>
-  </ul>
-
-  <h3>Databases, storage, and messaging</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/postgresql.md">postgresql.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/mysql.md">mysql.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/mongodb.md">mongodb.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/redis.md">redis.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/elasticsearch.md">elasticsearch.md</a>: Elasticsearch and OpenSearch</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/minio.md">minio.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/rabbitmq.md">rabbitmq.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/mosquitto.md">mosquitto.md</a>: MQTT</li>
-  </ul>
-
-  <h3>AI, data, and dev tools</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/jupyter.md">jupyter.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/ollama.md">ollama.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/open-webui.md">open-webui.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/litellm.md">litellm.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/model-servers.md">model-servers.md</a>: llama.cpp and vLLM</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/gradio.md">gradio.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/streamlit.md">streamlit.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/n8n.md">n8n.md</a></li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/code-server.md">code-server.md</a></li>
-  </ul>
-
-  <h3>Web app controls and reference</h3>
-  <ul>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/cors.md">cors.md</a>: allow your origins, not everyone's</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/headers.md">headers.md</a>: HSTS, CSP, and companions</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/firebase-supabase.md">firebase-supabase.md</a>: security rules and row-level security</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/admin-uis.md">admin-uis.md</a>: phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus</li>
-    <li><a href="https://github.com/jposluns/sslconfig/blob/main/common-mistakes.md">common-mistakes.md</a>: the recurring findings, each linked to its fix</li>
-  </ul>
-
   <p>If a tool, service, or other addition belongs on this list, let Jeff know however you are able to reach him, and he will be happy to add it.</p>
 
-  <h2>If you are a human</h2>
+  <h2 id="human">If you are a human</h2>
   <p>Paste this into your AI assistant's instructions:</p>
   <div class="copywrap">
     <pre id="paste-text">Before exposing any part of this project, fetch and follow the security guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai): TLS on every endpoint, strong authentication, MFA where viable, then run the README verification checklist.</pre>
@@ -186,9 +214,11 @@
   </div>
 
   <footer>
-    <p>Source and guides: <a href="https://github.com/jposluns/sslconfig">github.com/jposluns/sslconfig</a>. This page loads no external resources, sets no cookies, and tracks nothing; its only script powers the copy button. All content is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>.</p>
+    <p>Source and guides: <a href="https://github.com/jposluns/sslconfig">github.com/jposluns/sslconfig</a>. This page loads no external resources, sets no cookies, and tracks nothing; its only script powers the copy buttons. All content is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>.</p>
   </footer>
 </main>
+</div>
+
 <!-- Changing this script requires recomputing the sha256 hash in _headers (Content-Security-Policy script-src). -->
 <script>
 (function () {
