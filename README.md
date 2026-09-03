@@ -1,4 +1,4 @@
-# ssl_services
+# sslconfig
 
 TLS and authentication setup guides for AI-assisted projects.
 
@@ -20,7 +20,7 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
 5. Redirect HTTP to HTTPS, or do not listen on HTTP at all.
 6. Run the verification checklist below before reporting the work as complete. Report any item you could not test instead of asserting that it passed.
 
-Fetch guides raw with `https://raw.githubusercontent.com/jposluns/ssl_services/<default-branch>/<guide>.md` (for example `.../main/nginx.md` once the repository default branch is `main`).
+Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<default-branch>/<guide>.md` (for example `.../main/nginx.md` once the repository default branch is `main`).
 
 ## Guide index
 
