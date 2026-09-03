@@ -7,15 +7,35 @@
   <meta name="description" content="TLS, strong authentication, and MFA setup guides for AI development assistants: free certificates, self-signed certificates, Cloudflare Zero Trust, and per-tool hardening.">
   <style>
     :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
     body {
-      margin: 0 auto; max-width: 44rem; padding: 2rem 1.25rem 4rem;
+      margin: 0;
       font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       background: Canvas; color: CanvasText;
     }
-    h1 { font-size: 1.7rem; margin-bottom: .25rem; }
+    .hero {
+      background: linear-gradient(135deg, #0a2a4a 0%, #0d4f63 55%, #106b52 100%);
+      color: #fff;
+      padding: 3.25rem 1.25rem 3rem;
+      border-bottom: 1px solid rgba(255, 255, 255, .15);
+    }
+    .hero-inner { max-width: 44rem; margin: 0 auto; }
+    .hero svg { display: block; margin-bottom: 1rem; opacity: .9; }
+    .hero h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 .5rem; letter-spacing: -.01em; }
+    .hero .tagline { margin: 0 0 1.6rem; font-size: 1.1rem; color: rgba(255, 255, 255, .85); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-bottom: 1.4rem; }
+    .btn {
+      display: inline-block; padding: .55rem 1.1rem; border-radius: 8px;
+      font-weight: 600; text-decoration: none; font-size: .95rem;
+    }
+    .btn-primary { background: #fff; color: #0a2a4a; }
+    .btn-primary:hover { background: #e8eef4; }
+    .btn-secondary { border: 1px solid rgba(255, 255, 255, .55); color: #fff; }
+    .btn-secondary:hover { border-color: #fff; background: rgba(255, 255, 255, .08); }
+    .hero-note { margin: 0; font-size: .85rem; color: rgba(255, 255, 255, .7); }
+    main { max-width: 44rem; margin: 0 auto; padding: 1.6rem 1.25rem 4rem; }
     h2 { font-size: 1.2rem; margin-top: 2.2rem; }
     h3 { font-size: 1rem; margin-top: 1.4rem; margin-bottom: .3rem; }
-    .tagline { opacity: .75; margin-top: 0; }
     code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
     pre { padding: .8rem 1rem; overflow-x: auto; border: 1px solid #8884; border-radius: 6px; }
     ol li, ul li { margin: .35rem 0; }
@@ -24,10 +44,23 @@
   </style>
 </head>
 <body>
+<header class="hero">
+  <div class="hero-inner">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="10.5" width="16" height="9.5" rx="2.2"/>
+      <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+      <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/>
+    </svg>
+    <h1>sslconfig.ai</h1>
+    <p class="tagline">TLS, strong authentication, and MFA instructions for AI development assistants.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#guides">Browse the guides</a>
+      <a class="btn btn-secondary" href="https://github.com/jposluns/sslconfig">GitHub</a>
+    </div>
+    <p class="hero-note">Public domain (CC0) &middot; no scripts &middot; no cookies &middot; no tracking</p>
+  </div>
+</header>
 <main>
-  <h1>sslconfig.ai</h1>
-  <p class="tagline">TLS, strong authentication, and MFA instructions for AI development assistants.</p>
-
   <p>This site exists as a simple pointer for the AI assistants working on your projects, to ensure that they follow simple security rules: encrypt access with TLS, require strong authentication, and add multi-factor authentication where viable. Many projects ship with services listening on plain HTTP with no login at all; the guides below fix that for the most common stacks.</p>
 
   <h2>If you are an AI development assistant</h2>
@@ -45,7 +78,7 @@
   <pre>https://raw.githubusercontent.com/jposluns/sslconfig/main/&lt;guide&gt;.md</pre>
   <p>Start with <code>README.md</code>: it holds the decision guide, the full index, and the verification checklist.</p>
 
-  <h2>Guides</h2>
+  <h2 id="guides">Guides</h2>
 
   <h3>Certificates and access</h3>
   <ul>
