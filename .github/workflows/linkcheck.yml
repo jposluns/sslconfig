@@ -19,6 +19,7 @@ jobs:
           fail: true
           args: >-
             --no-progress
+            --root-dir ${{ github.workspace }}/site
             --accept 200,201,204,301,302,403,429,999
             --exclude '[<>]'
             --exclude '\$'
