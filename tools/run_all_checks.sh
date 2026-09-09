@@ -19,7 +19,7 @@ bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
 # rather than a service, and so is deliberately absent from llms-full.txt and llms.txt.
 not_a_guide() {
   case "$1" in
-    CONTRIBUTING.md|CLAUDE.md|AGENTS.md) return 0 ;;
+    CONTRIBUTING.md|CLAUDE.md|AGENTS.md|CHANGELOG.md) return 0 ;;
     *) return 1 ;;
   esac
 }
