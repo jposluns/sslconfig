@@ -15,11 +15,11 @@ fail=0
 ok()  { printf '  ok    %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
 
-# Root-level Markdown that documents the repository rather than a service, and
-# so is deliberately absent from llms-full.txt and llms.txt.
+# Root-level Markdown that documents the repository or governs the assistants working in it,
+# rather than a service, and so is deliberately absent from llms-full.txt and llms.txt.
 not_a_guide() {
   case "$1" in
-    CONTRIBUTING.md) return 0 ;;
+    CONTRIBUTING.md|CLAUDE.md|AGENTS.md) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -106,6 +106,25 @@ if hits=$(grep -rnIE "$secret_re" --exclude-dir=.git . 2>/dev/null) && [ -n "$hi
 else
   ok "no private keys or provider tokens found"
 fi
+
+echo "== AIQT baseline =="
+# The vendored gates derive the repo root from their own location, so they operate on this tree.
+# AIQT_SITE_HOST retargets the upstream helper, which hardcodes aiqt.ai; see .aiqt/PIN.
+export AIQT_SITE_HOST=sslconfig.ai
+for gate in check_site check_no_dashes check_newtab; do
+  if out=$(python3 "tools/${gate}.py" 2>&1); then
+    ok "${gate}"
+  else
+    bad "${gate}"
+    printf '%s\n' "$out" | sed 's/^/          /'
+  fi
+done
+if cmp -s CLAUDE.md AGENTS.md; then
+  ok "CLAUDE.md and AGENTS.md are identical"
+else
+  bad "CLAUDE.md and AGENTS.md have diverged; they are one adapter in two files"
+fi
+python3 tools/gen_aiqt_settings.py --check || fail=1
 
 echo
 if [ "$fail" = 0 ]; then
