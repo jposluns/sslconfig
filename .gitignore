@@ -1,0 +1,3 @@
+# Python bytecode from the vendored AIQT gates
+__pycache__/
+*.py[cod]

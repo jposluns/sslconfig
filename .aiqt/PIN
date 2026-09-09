@@ -1,0 +1,29 @@
+# AIQT Guardrails vendor pin
+#
+# Upstream:  https://github.com/jposluns/guardrails
+# Ref:       main
+# Commit:    8ab5b9ae37cdf4f8bcdb0a73934cb5a58b2aea87
+# Version:   1.0.0 (.aiqt/manifest.toml release-version)
+# Vendored:  2026-09-09
+#
+# Vendored byte-identical from upstream at the commit above:
+#   .aiqt/hooks/hooks.json            <- plugin/aiqt-guardrails-hooks/hooks/hooks.json
+#   .aiqt/hooks/scripts/aiqt_hooks.py <- plugin/aiqt-guardrails-hooks/hooks/scripts/aiqt_hooks.py
+#   tools/_walk.py                    <- tools/_walk.py
+#   tools/_standards.py               <- tools/_standards.py
+#   tools/_gen_common.py              <- tools/_gen_common.py   (LOCAL PATCH, see below)
+#   tools/check_site.py               <- tools/check_site.py
+#   tools/check_no_dashes.py          <- tools/check_no_dashes.py
+#   tools/check_newtab.py             <- tools/check_newtab.py
+#
+# LOCAL PATCHES to re-apply on upgrade:
+#   tools/_gen_common.py  is_external_url() reads the site host from the AIQT_SITE_HOST
+#     environment variable, defaulting to the upstream "aiqt.ai". This repo sets
+#     AIQT_SITE_HOST=sslconfig.ai in tools/run_all_checks.sh. Worth proposing upstream so the
+#     helper becomes site-agnostic and this patch can be dropped.
+#
+# Generated from the vendored files, do not hand-edit:
+#   .claude/settings.json  <- python3 tools/gen_aiqt_settings.py
+#
+# To upgrade: re-copy the vendored paths at the new ref, bump Commit/Version/Vendored above,
+# re-apply the local patches, re-run tools/gen_aiqt_settings.py, then run tools/run_all_checks.sh.

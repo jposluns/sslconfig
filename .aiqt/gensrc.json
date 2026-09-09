@@ -1,0 +1,12 @@
+{
+  "generated": [
+    {
+      "kind": "file",
+      "regenerate": "bash scripts/build-llms-full.sh",
+      "sources": [
+        "README.md"
+      ],
+      "target": "site/llms-full.txt"
+    }
+  ]
+}
