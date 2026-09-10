@@ -32,7 +32,7 @@ PermitRootLogin no
 PubkeyAuthentication yes
 ```
 
-`AuthenticationMethods` with a comma-separated list requires every method in it, so a key alone is no longer enough. `PasswordAuthentication no` stays: the code prompt is keyboard-interactive, not password. Older sshd_config files spell the first option `ChallengeResponseAuthentication`; set that one to `yes` where it is the one present.
+`AuthenticationMethods` with a comma-separated list requires every method in it, so a key alone is no longer enough. `PasswordAuthentication no` stays: the code prompt is keyboard-interactive, not password. Older sshd_config files spell `KbdInteractiveAuthentication` as `ChallengeResponseAuthentication`; set that one to `yes` where it is the one present.
 
 ## 2. Firewall: default deny inbound
 

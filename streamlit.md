@@ -44,14 +44,18 @@ if not st.user.is_logged_in:
     st.login()
     st.stop()
 
-if not str(st.user.email).lower().endswith("@" + ALLOWED_DOMAIN):
+if st.user.get("hd") != ALLOWED_DOMAIN:
     st.error("This account is not authorised for this app.")
+    st.stop()
+
+if not st.user.get("email_verified"):
+    st.error("This account's email is not verified.")
     st.stop()
 
 st.write(f"Hello, {st.user.name}")
 ```
 
-Streamlit copies the ID token claims onto `st.user`, readable as `st.user.email` or `st.user["email"]`; `email` is present under the default scope `openid profile email`. The check above uses the email domain because the Streamlit pages do not document Google's `hd` (hosted domain) claim on `st.user`; an email-domain check is weaker than a verified `hd` claim, so prefer an explicit allowlist of addresses where the user set is small. Allowlist rules and claim checks are in [oidc-integration.md](oidc-integration.md).
+Streamlit copies the ID token claims onto `st.user`, readable via `st.user.get(...)` or `st.user["..."]`. The `hd` (hosted domain) claim is the trusted Workspace-domain check (matching [oidc-integration.md](oidc-integration.md)): Google sets it only for Workspace and Cloud-organization accounts, and it is absent for consumer gmail.com accounts. For a small fixed user set, an explicit allowlist of addresses is the alternative. Allowlist rules and claim checks are in [oidc-integration.md](oidc-integration.md).
 
 Notes from the Streamlit docs: this is authentication only (identity, not per-resource authorization), the identity cookie lasts 30 days and that period is not configurable, and `secrets.toml` holds the client secret, so it must never be committed. Confirm that your installed Streamlit version includes these functions; they are absent from older releases.
 

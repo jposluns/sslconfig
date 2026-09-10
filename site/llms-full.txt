@@ -206,7 +206,7 @@ sudo certbot renew --deploy-hook "systemctl reload nginx"
 
 Set the deploy hook once with `certonly`/`renew`, or drop a script into `/etc/letsencrypt/renewal-hooks/deploy/`. A certificate that issues once and then expires in production is the most common ACME failure; the dry run belongs in your deployment checklist.
 
-Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day short-lived certificates are available now to every subscriber; the default `classic` profile moves to 64-day certificates on 2027-02-10 and to 45-day certificates on 2028-02-16; and industry rules cap publicly trusted certificates at 47 days from 2029-03-15. Any renewal step that involves a person will fail at those lifetimes, so the automation below is the only viable path. Let's Encrypt also switched off its OCSP service on 2025-08-06 and publishes revocation only through CRLs, so do not add OCSP stapling directives for Let's Encrypt certificates.
+Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day short-lived certificates are available now to every subscriber; the default `classic` profile moves to 64-day certificates on 2027-02-10 and to 45-day certificates on 2028-02-16; and industry rules cap publicly trusted certificates at 47 days from 2029-03-15. Any renewal step that involves a person will fail at those lifetimes, so the automation above is the only viable path. Let's Encrypt also switched off its OCSP service on 2025-08-06 and publishes revocation only through CRLs, so do not add OCSP stapling directives for Let's Encrypt certificates.
 
 ## Rate limits
 
@@ -821,7 +821,7 @@ Negative tests matter more than the happy path:
 - Google OpenID Connect (discovery URL, `hd`, `sub` versus `email`, token validation): https://developers.google.com/identity/openid-connect/openid-connect
 - Google Workspace: deploy 2-Step Verification: https://knowledge.workspace.google.com/admin/security/deploy-2-step-verification
 - Microsoft identity platform: register an application: https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app ; OpenID Connect (discovery, `{tenant}` values, redirect URI, sign-out): https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc
-- Microsoft identity platform: ID token claims reference (`tid`, `iss`, `oid`, `sub`, `email`): https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference ; optional claims reference (`amr`, `mfa` value): https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference ; optional claims reference (`amr` values): https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference
+- Microsoft identity platform: ID token claims reference (`tid`, `iss`, `oid`, `sub`, `email`): https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference ; optional claims reference (`amr`, `mfa` value): https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference
 - Microsoft Entra Conditional Access: require MFA for all users: https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-all-users-mfa-strength
 - GitHub OAuth apps: authorizing: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps ; creating: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app ; scopes: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
 - GitHub REST: organization members: https://docs.github.com/en/rest/orgs/members ; team members: https://docs.github.com/en/rest/teams/members
@@ -1317,7 +1317,7 @@ curl -sI https://example.com/       # expect 401 without credentials once auth i
 - lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
 - lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth
 - lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
-- lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/1/wiki/docs_configurationoptions
+- lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions
 
 ======================================================================
 ==> caddy.md
@@ -1868,7 +1868,7 @@ app.example.com {
 }
 ```
 
-Caddy obtains and renews the certificate automatically ([free-certificates.md](free-certificates.md) explains the ACME requirements). Hosts without a public domain or inbound ports should use [cloudflare.md](cloudflare.md); run the `cloudflared` connector as a container and point it at `http://app:3000`.
+Caddy obtains and renews the certificate automatically ([free-certificates.md](free-certificates.md) explains the ACME requirements). Hosts with no inbound ports but a domain you can put on Cloudflare should use [cloudflare.md](cloudflare.md); run the `cloudflared` connector as a container and point it at `http://app:3000`. Hosts with no domain at all should use [tailscale.md](tailscale.md), or [self-signed.md](self-signed.md) for internal use.
 
 ## 3. Authentication and secrets
 
@@ -2124,6 +2124,7 @@ Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, an
 // app/api/notes/route.ts
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
+// isAllowed and loadNotes are your app's own functions
 export const GET = auth(async function GET(req) {
   if (!req.auth) return NextResponse.json({ message: "Not authenticated" }, { status: 401 })  // no automatic 401
   if (!isAllowed(req.auth.user)) return NextResponse.json({ message: "Forbidden" }, { status: 403 })  // your allowlist
@@ -2690,7 +2691,7 @@ PermitRootLogin no
 PubkeyAuthentication yes
 ```
 
-`AuthenticationMethods` with a comma-separated list requires every method in it, so a key alone is no longer enough. `PasswordAuthentication no` stays: the code prompt is keyboard-interactive, not password. Older sshd_config files spell the first option `ChallengeResponseAuthentication`; set that one to `yes` where it is the one present.
+`AuthenticationMethods` with a comma-separated list requires every method in it, so a key alone is no longer enough. `PasswordAuthentication no` stays: the code prompt is keyboard-interactive, not password. Older sshd_config files spell `KbdInteractiveAuthentication` as `ChallengeResponseAuthentication`; set that one to `yes` where it is the one present.
 
 ## 2. Firewall: default deny inbound
 
@@ -3202,7 +3203,7 @@ Loopback or private networks by default; public access only via the TLS endpoint
 ```bash
 ss -tlnp | grep 9000                                   # private unless deliberate
 curl -s https://s3.example.com:9000/                   # answers over TLS; anonymous access denied
-mc alias set mys3 https://s3.example.com:9000 <access-key> <secret>   # app key works; root key stays unused by apps
+mc alias set mys3 https://s3.example.com:9000 REPLACE_WITH_ACCESS_KEY REPLACE_WITH_SECRET_KEY   # app key works; root key stays unused by apps
 ```
 
 ## Sources (checked September 2026)
@@ -3241,7 +3242,8 @@ ssl_options.cacertfile = /etc/rabbitmq/tls/ca.pem
 ssl_options.certfile   = /etc/rabbitmq/tls/server.pem
 ssl_options.keyfile    = /etc/rabbitmq/tls/server.key
 ssl_options.verify     = verify_peer
-ssl_options.fail_if_no_peer_cert = true   # mutual TLS; set false to allow password-only clients
+# mutual TLS; set false to allow password-only clients
+ssl_options.fail_if_no_peer_cert = true
 
 # once every client speaks TLS:
 listeners.tcp = none
@@ -3298,7 +3300,8 @@ listener 8883
 cafile   /etc/mosquitto/tls/ca.pem
 certfile /etc/mosquitto/tls/server.pem
 keyfile  /etc/mosquitto/tls/server.key
-# require_certificate true      # mutual TLS: clients must present certificates
+# mutual TLS: clients must present certificates
+# require_certificate true
 ```
 
 Port 8883 is the conventional MQTT-over-TLS port. Certificates per [self-signed.md](self-signed.md) (an internal CA suits device fleets) or [free-certificates.md](free-certificates.md). `require_certificate true` makes a client certificate a possession factor for the connecting device, stronger than a password alone but not MFA for a person ([mfa.md](mfa.md)). Remove or firewall any plaintext `listener 1883` that is not strictly local.
@@ -4013,7 +4016,7 @@ vLLM's server supports requiring an API key; check `vllm serve --help` on your i
 Lifecycle note, as of September 2026: the TGI repository is in maintenance mode and was archived on 2026-03-21 (read-only). Hugging Face recommends vLLM, SGLang, or local engines such as llama.cpp going forward. A server that no longer receives fixes belongs behind the same controls as any other, and on a migration list.
 
 ```bash
-text-generation-launcher --model-id <model> --hostname 127.0.0.1 --port 3000
+text-generation-launcher --model-id REPLACE_WITH_MODEL_ID --hostname 127.0.0.1 --port 3000
 ```
 
 The launcher reference lists `--api-key` (env `API_KEY`) without describing it. The router source shows what it does: when set, every inference request must carry a matching `Authorization: Bearer <key>` header or receives 401, while the health, info, and metrics routes stay unauthenticated. Treat it as a second layer and enforce the bearer check at the proxy too (pattern in [ollama.md](ollama.md)). The launcher has no TLS option, so front TGI per [nginx.md](nginx.md)/[caddy.md](caddy.md). The Prometheus listener (`--prometheus-port`, default 9000) is unauthenticated as well; keep it private.
@@ -4023,7 +4026,7 @@ The launcher reference lists `--api-key` (env `API_KEY`) without describing it. 
 `python -m sglang.launch_server` listens on `127.0.0.1:30000` by default (`--host`, `--port`); keep that bind. `--api-key` sets the key the OpenAI-compatible endpoints require, and `--admin-api-key` separately protects administrative endpoints (weight updates, cache flush, `/server_info`), which then require `Authorization: Bearer <admin key>`:
 
 ```bash
-python -m sglang.launch_server --model-path <model> --api-key "$SGLANG_API_KEY" --admin-api-key "$SGLANG_ADMIN_KEY"
+python -m sglang.launch_server --model-path REPLACE_WITH_MODEL_PATH --api-key "$SGLANG_API_KEY" --admin-api-key "$SGLANG_ADMIN_KEY"
 ```
 
 Native TLS exists: `--ssl-keyfile` and `--ssl-certfile` take PEM files ([self-signed.md](self-signed.md) or [free-certificates.md](free-certificates.md)), `--ssl-ca-certs` names a CA bundle, and `--enable-ssl-refresh` hot-reloads renewed certificates. A reverse proxy remains the simpler choice when you already run one.
@@ -4182,14 +4185,18 @@ if not st.user.is_logged_in:
     st.login()
     st.stop()
 
-if not str(st.user.email).lower().endswith("@" + ALLOWED_DOMAIN):
+if st.user.get("hd") != ALLOWED_DOMAIN:
     st.error("This account is not authorised for this app.")
+    st.stop()
+
+if not st.user.get("email_verified"):
+    st.error("This account's email is not verified.")
     st.stop()
 
 st.write(f"Hello, {st.user.name}")
 ```
 
-Streamlit copies the ID token claims onto `st.user`, readable as `st.user.email` or `st.user["email"]`; `email` is present under the default scope `openid profile email`. The check above uses the email domain because the Streamlit pages do not document Google's `hd` (hosted domain) claim on `st.user`; an email-domain check is weaker than a verified `hd` claim, so prefer an explicit allowlist of addresses where the user set is small. Allowlist rules and claim checks are in [oidc-integration.md](oidc-integration.md).
+Streamlit copies the ID token claims onto `st.user`, readable via `st.user.get(...)` or `st.user["..."]`. The `hd` (hosted domain) claim is the trusted Workspace-domain check (matching [oidc-integration.md](oidc-integration.md)): Google sets it only for Workspace and Cloud-organization accounts, and it is absent for consumer gmail.com accounts. For a small fixed user set, an explicit allowlist of addresses is the alternative. Allowlist rules and claim checks are in [oidc-integration.md](oidc-integration.md).
 
 Notes from the Streamlit docs: this is authentication only (identity, not per-resource authorization), the identity cookie lasts 30 days and that period is not configurable, and `secrets.toml` holds the client secret, so it must never be committed. Confirm that your installed Streamlit version includes these functions; they are absent from older releases.
 
@@ -4548,7 +4555,7 @@ Ray's own security page is blunt: if you expose the Ray Dashboard, Ray Jobs, or 
 ray start --head --dashboard-host 127.0.0.1 --dashboard-port 8265
 ```
 
-Never pass `--dashboard-host 0.0.0.0` (or `::`) on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback only (`-p 127.0.0.1:8265:8265`, which Docker's port-publishing docs say only the Docker host can reach), while inside the container the dashboard must listen on the container's own interface (`--dashboard-host 0.0.0.0` there, private to the Compose network and the host), because a dashboard bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md).
+Never pass `--dashboard-host 0.0.0.0` (or `::`) on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback only (`-p 127.0.0.1:8265:8265`, which Docker's port-publishing docs say only the Docker host can reach, assuming a normal bridge-network NAT setup and a Docker version at or after 28.0.0; earlier releases could let hosts on the same layer-2 network reach a loopback-published port), while inside the container the dashboard must listen on the container's own interface (`--dashboard-host 0.0.0.0` there, private to the Compose network and the host), because a dashboard bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md).
 
 Reach the dashboard and the Jobs API through a channel that already authenticates you:
 
@@ -4638,7 +4645,7 @@ The defaults are already loopback:
 mlflow server --host 127.0.0.1 --port 5000
 ```
 
-The CLI help for `--host` says it plainly: "This is NOT a security setting". Do not switch to `--host 0.0.0.0` on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback (`-p 127.0.0.1:5000:5000`, which Docker's port-publishing docs say only the Docker host can reach), while inside the container the server must listen on the container's own interface (`--host 0.0.0.0` there, private to the Compose network and the host), because a process bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md). If the server must listen beyond loopback for a proxy on another host, set `--allowed-hosts mlflow.example.com` (the default allows localhost and private ranges only) and `--cors-allowed-origins https://mlflow.example.com`, and never use `--disable-security-middleware` outside a test.
+The CLI help for `--host` says it plainly: "This is NOT a security setting". Do not switch to `--host 0.0.0.0` on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback (`-p 127.0.0.1:5000:5000`, which Docker's port-publishing docs say only the Docker host can reach, assuming a normal bridge-network NAT setup and a Docker version at or after 28.0.0; earlier releases could let hosts on the same layer-2 network reach a loopback-published port), while inside the container the server must listen on the container's own interface (`--host 0.0.0.0` there, private to the Compose network and the host), because a process bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md). If the server must listen beyond loopback for a proxy on another host, set `--allowed-hosts mlflow.example.com` (the default allows localhost and private ranges only) and `--cors-allowed-origins https://mlflow.example.com`, and never use `--disable-security-middleware` outside a test.
 
 ## 2. TLS from a fronting proxy
 
@@ -4733,7 +4740,7 @@ ports:
   - "127.0.0.1:3080:3080"    # LibreChat (PORT defaults to 3080)
 ```
 
-Dify is different: its Compose file publishes nginx on `EXPOSE_NGINX_PORT=80` and `EXPOSE_NGINX_SSL_PORT=443` from `docker/.env`, plus the plugin daemon's `EXPOSE_PLUGIN_DEBUGGING_PORT=5003` (optional vector store profiles publish more). Do not hide a published port with the host firewall: Docker's NAT rules divert the traffic before it reaches the chains UFW uses, so a UFW deny on a published port does nothing ([docker.md](docker.md)). Leave the backend services unpublished on the Compose network, bind anything you must reach locally to loopback (`EXPOSE_PLUGIN_DEBUGGING_PORT=127.0.0.1:5003` yields the mapping `127.0.0.1:5003:5003`), and make Dify's nginx the only service with a public port: either as the TLS edge (section 2) or on loopback (`EXPOSE_NGINX_PORT=127.0.0.1:8080`) behind your own proxy.
+Dify is different: its Compose file publishes nginx on `EXPOSE_NGINX_PORT=80` and `EXPOSE_NGINX_SSL_PORT=443` from `docker/.env`, plus the plugin daemon's `EXPOSE_PLUGIN_DEBUGGING_PORT=5003` (optional vector store profiles publish more). Do not hide a published port with the host firewall: Docker's NAT rules divert the traffic before it reaches the chains UFW uses, so a UFW deny on a published port does nothing ([docker.md](docker.md)). The plugin daemon's debugging port is only needed for remote plugin debugging, so leave it unpublished: do not enable the debugging feature, or remove that port mapping in a Compose override. Leave the backend services unpublished on the Compose network, and make Dify's nginx the only service with a public port: either as the TLS edge (section 2) or on loopback (`EXPOSE_NGINX_PORT=127.0.0.1:8080`) behind your own proxy.
 
 ## 2. TLS
 

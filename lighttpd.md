@@ -84,4 +84,4 @@ curl -sI https://example.com/       # expect 401 without credentials once auth i
 - lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
 - lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth
 - lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
-- lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/1/wiki/docs_configurationoptions
+- lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions

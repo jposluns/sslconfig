@@ -58,7 +58,7 @@ app.example.com {
 }
 ```
 
-Caddy obtains and renews the certificate automatically ([free-certificates.md](free-certificates.md) explains the ACME requirements). Hosts without a public domain or inbound ports should use [cloudflare.md](cloudflare.md); run the `cloudflared` connector as a container and point it at `http://app:3000`.
+Caddy obtains and renews the certificate automatically ([free-certificates.md](free-certificates.md) explains the ACME requirements). Hosts with no inbound ports but a domain you can put on Cloudflare should use [cloudflare.md](cloudflare.md); run the `cloudflared` connector as a container and point it at `http://app:3000`. Hosts with no domain at all should use [tailscale.md](tailscale.md), or [self-signed.md](self-signed.md) for internal use.
 
 ## 3. Authentication and secrets
 

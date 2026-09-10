@@ -24,7 +24,8 @@ ssl_options.cacertfile = /etc/rabbitmq/tls/ca.pem
 ssl_options.certfile   = /etc/rabbitmq/tls/server.pem
 ssl_options.keyfile    = /etc/rabbitmq/tls/server.key
 ssl_options.verify     = verify_peer
-ssl_options.fail_if_no_peer_cert = true   # mutual TLS; set false to allow password-only clients
+# mutual TLS; set false to allow password-only clients
+ssl_options.fail_if_no_peer_cert = true
 
 # once every client speaks TLS:
 listeners.tcp = none

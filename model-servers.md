@@ -24,7 +24,7 @@ vLLM's server supports requiring an API key; check `vllm serve --help` on your i
 Lifecycle note, as of September 2026: the TGI repository is in maintenance mode and was archived on 2026-03-21 (read-only). Hugging Face recommends vLLM, SGLang, or local engines such as llama.cpp going forward. A server that no longer receives fixes belongs behind the same controls as any other, and on a migration list.
 
 ```bash
-text-generation-launcher --model-id <model> --hostname 127.0.0.1 --port 3000
+text-generation-launcher --model-id REPLACE_WITH_MODEL_ID --hostname 127.0.0.1 --port 3000
 ```
 
 The launcher reference lists `--api-key` (env `API_KEY`) without describing it. The router source shows what it does: when set, every inference request must carry a matching `Authorization: Bearer <key>` header or receives 401, while the health, info, and metrics routes stay unauthenticated. Treat it as a second layer and enforce the bearer check at the proxy too (pattern in [ollama.md](ollama.md)). The launcher has no TLS option, so front TGI per [nginx.md](nginx.md)/[caddy.md](caddy.md). The Prometheus listener (`--prometheus-port`, default 9000) is unauthenticated as well; keep it private.
@@ -34,7 +34,7 @@ The launcher reference lists `--api-key` (env `API_KEY`) without describing it. 
 `python -m sglang.launch_server` listens on `127.0.0.1:30000` by default (`--host`, `--port`); keep that bind. `--api-key` sets the key the OpenAI-compatible endpoints require, and `--admin-api-key` separately protects administrative endpoints (weight updates, cache flush, `/server_info`), which then require `Authorization: Bearer <admin key>`:
 
 ```bash
-python -m sglang.launch_server --model-path <model> --api-key "$SGLANG_API_KEY" --admin-api-key "$SGLANG_ADMIN_KEY"
+python -m sglang.launch_server --model-path REPLACE_WITH_MODEL_PATH --api-key "$SGLANG_API_KEY" --admin-api-key "$SGLANG_ADMIN_KEY"
 ```
 
 Native TLS exists: `--ssl-keyfile` and `--ssl-certfile` take PEM files ([self-signed.md](self-signed.md) or [free-certificates.md](free-certificates.md)), `--ssl-ca-certs` names a CA bundle, and `--enable-ssl-refresh` hot-reloads renewed certificates. A reverse proxy remains the simpler choice when you already run one.

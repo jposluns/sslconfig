@@ -41,13 +41,26 @@ cp "$orig" site/llms-full.txt
 
 echo "== every guide is wired into the site =="
 wired=1
+# Strip HTML comments across the whole file (re.S, not a line-at-a-time sed) so a menu link or
+# README row commented out across multiple lines does not count as wired.
+menu_html=$(python3 - <<'PY'
+import re
+html = open("site/index.html", encoding="utf-8").read()
+print(re.sub(r"<!--.*?-->", "", html, flags=re.S))
+PY
+)
+readme_stripped=$(python3 - <<'PY'
+import re
+text = open("README.md", encoding="utf-8").read()
+print(re.sub(r"<!--.*?-->", "", text, flags=re.S))
+PY
+)
 for f in *.md; do
   not_a_guide "$f" && continue
   grep -qF " $f" scripts/build-llms-full.sh || { bad "$f is not listed in scripts/build-llms-full.sh"; wired=0; }
   grep -qF "main/$f" site/llms.txt || { bad "$f is not linked from site/llms.txt"; wired=0; }
-  [ "$f" = README.md ] || grep -qE "^\| \[$f\]\($f\) \|" README.md || { bad "$f is not indexed in README.md"; wired=0; }
-  # Strip single-line HTML comments first so a commented-out menu entry does not count as wired.
-  sed -E 's/<!--([^-]|-[^-]|--[^>])*-->//g' site/index.html | grep -qE "<a href=\"https://github.com/jposluns/sslconfig/blob/main/$f\"" \
+  [ "$f" = README.md ] || grep -qE "^\| \[$f\]\($f\) \|" <<< "$readme_stripped" || { bad "$f is not indexed in README.md"; wired=0; }
+  grep -qE "<a href=\"https://github.com/jposluns/sslconfig/blob/main/$f\"" <<< "$menu_html" \
     || { bad "$f is not linked from the site/index.html menu"; wired=0; }
 done
 [ "$wired" = 1 ] && ok "every guide is listed in the build script, linked from llms.txt, indexed in README.md, and in the site menu"
@@ -56,9 +69,29 @@ echo "== local links resolve =="
 # Heading slugs of a Markdown file, using the GitHub transformation: lowercase, drop everything but
 # letters, digits, spaces and hyphens, then spaces to hyphens.
 heading_slugs() {
-  sed -n 's/^#\{1,\}[[:space:]]\{1,\}//p' "$1" \
-    | tr '[:upper:]' '[:lower:]' \
-    | sed 's/[^a-z0-9 -]//g; s/ /-/g'
+  # Strip HTML comments and fenced code blocks first so a "# heading-looking" line inside a
+  # ```code``` fence (or a commented-out heading) is never mistaken for a real Markdown heading.
+  python3 - "$1" <<'PY'
+import re, sys
+
+text = open(sys.argv[1], encoding="utf-8").read()
+text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+
+in_fence = False
+for line in text.splitlines():
+    if line.strip().startswith("```"):
+        in_fence = not in_fence
+        continue
+    if in_fence:
+        continue
+    m = re.match(r"#{1,}[ \t]+(.*)$", line)
+    if not m:
+        continue
+    slug = m.group(1).lower()
+    slug = re.sub(r"[^a-z0-9 -]", "", slug)
+    slug = slug.replace(" ", "-")
+    print(slug)
+PY
 }
 links=1
 while IFS= read -r target; do
@@ -119,7 +152,14 @@ echo "== site copy buttons =="
 if missing_copy=$(python3 - <<'PY'
 import re, sys
 html = open("site/index.html", encoding="utf-8").read()
-pre_ids = set(re.findall(r'<pre\b[^>]*\bid="([^"]+)"', html))
+# Strip HTML comments first so a <pre id="..."> inside a comment cannot satisfy the check.
+html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+pre_ids = set()
+for attrs in re.findall(r'<pre\b([^>]*)>', html):
+    # Require a preceding boundary so this matches a real id="..." attribute, not data-id="...".
+    m = re.search(r'(?:^|\s)id="([^"]+)"', attrs)
+    if m:
+        pre_ids.add(m.group(1))
 missing = [c for c in re.findall(r'\bdata-copy="([^"]+)"', html) if c not in pre_ids]
 for c in missing:
     print(c)
@@ -149,24 +189,82 @@ fi
 
 echo "== site CSP script hash =="
 # The CSP in site/_headers pins the inline script by sha256. Recompute it from site/index.html so an
-# edited script cannot ship with a stale hash (the browser would then refuse to run it).
-script_hashes=$(python3 - <<'PY'
-import base64, hashlib, re
+# edited script cannot ship with a stale hash (the browser would then refuse to run it). Only the
+# script-src directive of the header block that applies to / (or /*) counts, and only a real inline
+# <script> (no src= attribute) is hashed.
+csp_ok=1
+while IFS= read -r line; do
+  case "$line" in
+    NO_SCRIPT) bad "no inline <script> found in site/index.html"; csp_ok=0 ;;
+    NO_BLOCK) bad "site/_headers has no path block for / or /*"; csp_ok=0 ;;
+    NO_CSP) bad "the applicable site/_headers block has no Content-Security-Policy header line"; csp_ok=0 ;;
+    NO_SCRIPT_SRC) bad "the Content-Security-Policy in site/_headers has no script-src directive"; csp_ok=0 ;;
+    MISSING:*) bad "the script-src directive in site/_headers lacks the hash of an inline script in site/index.html (sha256-${line#MISSING:})"; csp_ok=0 ;;
+  esac
+done < <(python3 - <<'PY'
+import re, base64, hashlib
+
 html = open("site/index.html", encoding="utf-8").read()
-for body in re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, re.S):
-    print(base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode())
+html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+
+hashes = []
+for attrs, body in re.findall(r"<script(\s[^>]*)?>(.*?)</script>", html, re.S):
+    if attrs and re.search(r"\bsrc\s*=", attrs):
+        continue
+    hashes.append(base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode())
+
+if not hashes:
+    print("NO_SCRIPT")
+else:
+    headers_text = open("site/_headers", encoding="utf-8").read()
+    blocks = {}
+    path = None
+    lines = []
+    for raw in headers_text.splitlines():
+        if not raw.strip():
+            continue
+        if not raw[0].isspace():
+            if path is not None:
+                blocks[path] = lines
+            path = raw.strip()
+            lines = []
+        else:
+            lines.append(raw.strip())
+    if path is not None:
+        blocks[path] = lines
+
+    block = blocks.get("/*")
+    if block is None:
+        block = blocks.get("/")
+
+    if block is None:
+        print("NO_BLOCK")
+    else:
+        csp_value = None
+        for line in block:
+            m = re.match(r"content-security-policy:\s*(.*)$", line, re.I)
+            if m:
+                csp_value = m.group(1)
+                break
+        if csp_value is None:
+            print("NO_CSP")
+        else:
+            script_src = None
+            for directive in csp_value.split(";"):
+                directive = directive.strip()
+                if re.match(r"script-src\b", directive, re.I):
+                    script_src = directive
+                    break
+            if script_src is None:
+                print("NO_SCRIPT_SRC")
+            else:
+                tokens = script_src.split()[1:]
+                for h in hashes:
+                    if "'sha256-" + h + "'" not in tokens:
+                        print("MISSING:" + h)
 PY
 )
-csp_ok=1
-[ -n "$script_hashes" ] || { bad "no inline <script> found in site/index.html"; csp_ok=0; }
-# Only the effective header line counts: a hash left in a comment or another header proves nothing.
-csp_lines=$(sed 's/^[[:space:]]*//' site/_headers | grep -v '^#' | grep -i '^Content-Security-Policy:')
-[ -n "$csp_lines" ] || { bad "site/_headers has no Content-Security-Policy header line"; csp_ok=0; }
-for h in $script_hashes; do
-  printf '%s\n' "$csp_lines" | grep -qF "sha256-$h" \
-    || { bad "the Content-Security-Policy line in site/_headers lacks the hash of an inline script in site/index.html (sha256-$h)"; csp_ok=0; }
-done
-[ "$csp_ok" = 1 ] && ok "every inline script hash in site/index.html is pinned in site/_headers"
+[ "$csp_ok" = 1 ] && ok "every inline script hash in site/index.html is pinned in the site/_headers script-src directive"
 
 echo "== AIQT baseline =="
 # The vendored gates derive the repo root from their own location, so they operate on this tree.

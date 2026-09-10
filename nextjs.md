@@ -96,6 +96,7 @@ Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, an
 // app/api/notes/route.ts
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
+// isAllowed and loadNotes are your app's own functions
 export const GET = auth(async function GET(req) {
   if (!req.auth) return NextResponse.json({ message: "Not authenticated" }, { status: 401 })  // no automatic 401
   if (!isAllowed(req.auth.user)) return NextResponse.json({ message: "Forbidden" }, { status: 403 })  // your allowlist

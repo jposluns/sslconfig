@@ -26,7 +26,8 @@ listener 8883
 cafile   /etc/mosquitto/tls/ca.pem
 certfile /etc/mosquitto/tls/server.pem
 keyfile  /etc/mosquitto/tls/server.key
-# require_certificate true      # mutual TLS: clients must present certificates
+# mutual TLS: clients must present certificates
+# require_certificate true
 ```
 
 Port 8883 is the conventional MQTT-over-TLS port. Certificates per [self-signed.md](self-signed.md) (an internal CA suits device fleets) or [free-certificates.md](free-certificates.md). `require_certificate true` makes a client certificate a possession factor for the connecting device, stronger than a password alone but not MFA for a person ([mfa.md](mfa.md)). Remove or firewall any plaintext `listener 1883` that is not strictly local.
