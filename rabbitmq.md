@@ -24,13 +24,14 @@ ssl_options.cacertfile = /etc/rabbitmq/tls/ca.pem
 ssl_options.certfile   = /etc/rabbitmq/tls/server.pem
 ssl_options.keyfile    = /etc/rabbitmq/tls/server.key
 ssl_options.verify     = verify_peer
-ssl_options.fail_if_no_peer_cert = true   # mutual TLS; set false to allow password-only clients
+# mutual TLS; set false to allow password-only clients
+ssl_options.fail_if_no_peer_cert = true
 
 # once every client speaks TLS:
 listeners.tcp = none
 ```
 
-Certificates per [self-signed.md](self-signed.md) (internal CA fits brokers well) or [free-certificates.md](free-certificates.md). Mutual TLS doubles as the second factor for machine clients ([mfa.md](mfa.md)).
+Certificates per [self-signed.md](self-signed.md) (internal CA fits brokers well) or [free-certificates.md](free-certificates.md). Mutual TLS gives a machine client a possession factor, a certificate held by the connecting host, stronger than a password alone but not MFA for a person ([mfa.md](mfa.md)).
 
 ## 3. Management UI
 

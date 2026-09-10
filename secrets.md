@@ -33,7 +33,7 @@ gitleaks git . && echo clean
 grep -rn "sk-\|AKIA\|-----BEGIN" --include="*.py" --include="*.js" --include="*.ts" --include="*.env" . | grep -v node_modules   # crude but fast
 ```
 
-Both must come back empty on every push.
+On every push, gitleaks must exit 0 with no findings (the `&& echo clean` then prints `clean`), and the grep must print nothing.
 
 ## Sources (checked September 2026)
 

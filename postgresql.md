@@ -15,7 +15,7 @@ ssl_min_protocol_version = 'TLSv1.2'      # PostgreSQL 12 and later
 password_encryption = scram-sha-256       # default from PostgreSQL 14; set explicitly on older versions
 ```
 
-Reload with `SELECT pg_reload_conf();` or `systemctl reload postgresql`.
+The `ssl*` and `password_encryption` settings apply on reload (`SELECT pg_reload_conf();` or `systemctl reload postgresql`); `listen_addresses` can only be set at server start, so a change to it needs `systemctl restart postgresql`, then `ss -tlnp | grep 5432` to confirm the bind.
 
 ## 2. Require TLS per connection in pg_hba.conf
 
@@ -32,7 +32,7 @@ Passwords set before `password_encryption = scram-sha-256` remain MD5-hashed; re
 
 For machine-to-machine links, add certificate verification on top of SCRAM: set `ssl_ca_file` in `postgresql.conf` and append `clientcert=verify-full` to the `hostssl` line (PostgreSQL 12 and later).
 
-MFA: the PostgreSQL wire protocol has no TOTP dialogue. Treat `clientcert=verify-full` as the second factor for direct connections, chain the `radius` authentication method to an MFA service (for example the Duo Authentication Proxy) where policy requires it, and put the human paths to the host (SSH, admin UIs) behind MFA per [mfa.md](mfa.md).
+MFA: the PostgreSQL wire protocol has no TOTP dialogue. For direct connections `clientcert=verify-full` adds a possession factor held by the connecting machine, stronger than a password alone but not MFA for a person; chain the `radius` authentication method to an MFA service (for example the Duo Authentication Proxy) where policy requires it, and put the human paths to the host (SSH, admin UIs) behind MFA per [mfa.md](mfa.md).
 
 ## 3. Client side
 
@@ -66,3 +66,4 @@ A connection attempt without TLS from a remote host must fail once only `hostssl
 - Secure TCP/IP connections with SSL: https://www.postgresql.org/docs/current/ssl-tcp.html
 - pg_hba.conf: https://www.postgresql.org/docs/current/auth-pg-hba-conf.html
 - libpq SSL support (sslmode): https://www.postgresql.org/docs/current/libpq-ssl.html
+- Connections and authentication (`listen_addresses` "can only be set at server start"): https://www.postgresql.org/docs/current/runtime-config-connection.html

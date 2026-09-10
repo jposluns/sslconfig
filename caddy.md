@@ -57,11 +57,13 @@ app.example.com {
 To protect only part of a site, wrap the directive in a matcher:
 
 ```caddyfile
-    @admin path /admin/*
+    @admin path /admin /admin/*
     basic_auth @admin {
         admin $2a$14$REPLACE_WITH_HASH
     }
 ```
+
+Path matches are exact, and `/admin/*` alone does not match `/admin` itself, so list both forms; multiple paths in one matcher are OR'ed.
 
 `basic_auth` is single-factor. For human-facing sites, add MFA with the `forward_auth` directive (Caddy 2.5.1 and later) pointed at an [Authelia](https://www.authelia.com/) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
@@ -71,6 +73,8 @@ To protect only part of a site, wrap the directive in a matcher:
 caddy validate --config /etc/caddy/Caddyfile
 curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
+curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin     # 401 with the @admin matcher
+curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin/x   # 401 as well
 ```
 
 ## Common mistakes
@@ -84,3 +88,4 @@ curl -sI https://app.example.com/    # expect 401 without credentials once auth 
 - Automatic HTTPS: https://caddyserver.com/docs/automatic-https
 - basic_auth directive: https://caddyserver.com/docs/caddyfile/directives/basic_auth
 - tls directive: https://caddyserver.com/docs/caddyfile/directives/tls
+- Request matchers (path, wildcards, multiple paths): https://caddyserver.com/docs/caddyfile/matchers

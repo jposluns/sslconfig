@@ -31,9 +31,11 @@ ssl.openssl.ssl-conf-cmd = ( "MinProtocol" => "TLSv1.2" )
 
 ## 2. Redirect HTTP to HTTPS
 
-`mod_redirect` is built in. Per the lighttpd wiki:
+`mod_redirect` must be loaded: only `mod_indexfile`, `mod_dirlisting`, and `mod_staticfile` load without being listed in `server.modules`. Per the lighttpd wiki:
 
 ```
+server.modules += ( "mod_redirect" )
+
 $HTTP["scheme"] == "http" {
     url.redirect = ("" => "https://${url.authority}${url.path}${qsa}")
     url.redirect-code = 308        # explicit on versions before 1.4.75
@@ -82,3 +84,4 @@ curl -sI https://example.com/       # expect 401 without credentials once auth i
 - lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
 - lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth
 - lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
+- lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions

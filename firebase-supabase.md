@@ -31,7 +31,14 @@ using ( auth.uid() = user_id );
 
 Write separate policies per operation (`select`, `insert`, `update`, `delete`); no policy means no access once RLS is on, which is the correct starting point.
 - The `service_role` key bypasses RLS; it is a server-only secret that must never reach the client bundle or the repository.
-- Supabase Auth supports MFA on user accounts; enable it for anything sensitive ([mfa.md](mfa.md) for the general rules).
+- Supabase Auth supports MFA (TOTP on every plan). Enrolment alone changes nothing: enforce it in your policies by requiring the `aal2` assurance level, so a session that has not completed the second factor cannot read protected rows ([mfa.md](mfa.md) for the general rules):
+
+```sql
+create policy "mfa required"
+on profiles as restrictive
+to authenticated
+using ((select auth.jwt()->>'aal') = 'aal2');
+```
 
 ## Verify
 
@@ -43,3 +50,4 @@ Write separate policies per operation (`select`, `insert`, `update`, `delete`); 
 
 - Firebase security rules: https://firebase.google.com/docs/rules
 - Supabase row level security: https://supabase.com/docs/guides/database/postgres/row-level-security
+- Supabase multi-factor authentication (aal1, aal2, enforcement policy): https://supabase.com/docs/guides/auth/auth-mfa

@@ -8,7 +8,7 @@ Flask's built-in server (development only; it is not a production server, TLS or
 
 ```python
 app.run(host="127.0.0.1", port=8443, ssl_context=("cert.pem", "key.pem"))
-# ssl_context="adhoc" generates a throwaway self-signed cert; requires pyOpenSSL
+# ssl_context="adhoc" generates a throwaway self-signed cert; requires the cryptography package
 ```
 
 Gunicorn (Flask/Django/WSGI in production):
@@ -64,7 +64,7 @@ import secrets
 token = secrets.token_urlsafe(32)
 ```
 
-- FastAPI's security utilities (`fastapi.security`) implement OAuth2/OIDC flows and API-key headers; use them rather than parsing `Authorization` by hand.
+- FastAPI's `fastapi.security` classes (`HTTPBearer`, `APIKeyHeader`, `OAuth2AuthorizationCodeBearer`, and so on) extract the credential from the request and declare the OpenAPI security scheme; they validate nothing, and `OpenIdConnect` is documented as a stub that does not implement the scheme or use the discovery URL. Use them to extract the token, then validate it (signature, issuer, audience, expiry) with an OIDC library such as Authlib, and authorise per [oidc-integration.md](oidc-integration.md).
 - Rate-limit login routes (for example with a proxy-level limit or a library such as slowapi for ASGI apps).
 - MFA: add TOTP with [pyotp](https://github.com/pyauth/pyotp) plus the [qrcode](https://pypi.org/project/qrcode/) package for enrolment QR codes; [django-otp](https://pypi.org/project/django-otp/) integrates this into Django. Requirements and options in [mfa.md](mfa.md).
 
@@ -91,3 +91,5 @@ ss -tlnp | grep -E 'gunicorn|uvicorn|python'   # behind a proxy: 127.0.0.1 only
 - Uvicorn settings reference: https://github.com/encode/uvicorn/blob/master/docs/settings.md
 - Django deployment checklist: https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 - argon2-cffi: https://argon2-cffi.readthedocs.io/
+- Werkzeug serving (`ssl_context="adhoc"` requires cryptography): https://werkzeug.palletsprojects.com/en/stable/serving/
+- FastAPI security reference: https://fastapi.tiangolo.com/reference/security/ ; `OpenIdConnect` source (stub warning): https://github.com/fastapi/fastapi/blob/master/fastapi/security/open_id_connect_url.py

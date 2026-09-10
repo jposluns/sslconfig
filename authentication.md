@@ -22,14 +22,22 @@ TLS without authentication leaves a service open to the whole internet over an e
 8. **Harden sessions.** Set cookies `Secure`, `HttpOnly`, and `SameSite` (`Lax` or `Strict`), sign them with a strong random secret, and expire them. Invalidate sessions on password change.
 9. **Rate-limit authentication endpoints** and lock or delay after repeated failures. Log authentication successes and failures with source address and account, and keep the logs long enough to investigate an incident. fail2ban is a low-effort control for SSH and login panels on Linux hosts.
 10. **Least privilege everywhere.** Separate admin from daily-use accounts, and give database and OS service accounts only the rights the application uses.
+11. **Federated login is authentication, not authorisation.** After Google, Microsoft, GitHub, or any provider returns an identity, check it against an allowlist (tenant, hosted domain from the verified token claim, organisation or group membership, or explicit users) before granting access. Any Google account is not "staff", and Microsoft's multi-tenant `common` endpoint admits every Microsoft account unless the app validates the issuer and tenant. [oidc-integration.md](oidc-integration.md) has the checks; [identity-providers.md](identity-providers.md) has the providers.
+12. **OIDC and OAuth hygiene.** Authorization code flow with PKCE; exact-match redirect URIs; `state` and `nonce` verified; ID tokens validated for signature (keys from the provider's JWKS, algorithm pinned, never `none`), issuer, audience, and expiry; short-lived access tokens with refresh-token rotation; tokens never in URLs. Prefer a server-side session in an `HttpOnly` cookie to tokens in browser storage. Link accounts by issuer plus subject, never by email alone.
+13. **Enforce MFA where access is granted, not only where it is enrolled.** A user who enrolled a second factor but can still act with a password-only session is not protected. Require the factor in provider policy or in the app, and test it.
+14. **Protect the control plane.** MFA on the Git host, the cloud account, the DNS registrar, the deployment platform, the secret manager, and the identity provider's administrator account. A takeover there bypasses every control inside the app.
+15. **Authenticate every transport.** WebSockets, server-sent events, GraphQL, gRPC, webhooks (verify the sender's signature and reject replays), inference endpoints, and management APIs each need their own check. A login on the HTML pages protects none of them. Machine credentials follow [machine-auth.md](machine-auth.md).
 
 ## Quick checks
 
 - Unauthenticated `curl` against a protected path returns `401`, `403`, or a login redirect, never data.
 - `git log -p | grep -iE 'password|secret|api[_-]?key'` over a new repository comes back empty (a scanner does this better; use one).
 - The user store contains no account named `admin`, `test`, or `demo` with a known or empty password.
+- Negative tests pass: a missing, expired, wrong-issuer, wrong-audience, or wrong-tenant token is rejected; user A cannot read user B's resources; the origin is unreachable except through its fronting layer.
 
 ## Sources (checked September 2026)
 
 - OWASP Authentication Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
 - OWASP Password Storage Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+- OAuth 2.0 Security Best Current Practice (RFC 9700): https://www.rfc-editor.org/rfc/rfc9700.html
+- OpenID Connect Core 1.0: https://openid.net/specs/openid-connect-core-1_0.html

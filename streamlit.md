@@ -33,17 +33,29 @@ client_secret = "<from your identity provider>"
 server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
 ```
 
-Gate the app at the top of the script:
+Gate the app at the top of the script, then authorise. `st.login()` on its own accepts any account the provider will authenticate (with Google, any Google account), so check who logged in before showing anything:
 
 ```python
 import streamlit as st
+
+ALLOWED_DOMAIN = "example.com"
 
 if not st.user.is_logged_in:
     st.login()
     st.stop()
 
+if st.user.get("hd") != ALLOWED_DOMAIN:
+    st.error("This account is not authorised for this app.")
+    st.stop()
+
+if not st.user.get("email_verified"):
+    st.error("This account's email is not verified.")
+    st.stop()
+
 st.write(f"Hello, {st.user.name}")
 ```
+
+Streamlit copies the ID token claims onto `st.user`, readable via `st.user.get(...)` or `st.user["..."]`. The `hd` (hosted domain) claim is the trusted Workspace-domain check (matching [oidc-integration.md](oidc-integration.md)): Google sets it only for Workspace and Cloud-organization accounts, and it is absent for consumer gmail.com accounts. For a small fixed user set, an explicit allowlist of addresses is the alternative. Allowlist rules and claim checks are in [oidc-integration.md](oidc-integration.md).
 
 Notes from the Streamlit docs: this is authentication only (identity, not per-resource authorization), the identity cookie lasts 30 days and that period is not configurable, and `secrets.toml` holds the client secret, so it must never be committed. Confirm that your installed Streamlit version includes these functions; they are absent from older releases.
 
@@ -67,4 +79,5 @@ curl -sI https://app.example.com/        # succeeds over TLS
 ## Sources (checked September 2026)
 
 - config.toml reference (server.address, server.sslCertFile, server.sslKeyFile, and the production warning): https://docs.streamlit.io/develop/api-reference/configuration/config.toml
-- Authentication concepts (st.login, st.logout, st.user, [auth] keys, stated limitations): https://docs.streamlit.io/develop/concepts/connections/authentication
+- Authentication concepts (st.login, st.logout, st.user, [auth] keys, default scope, stated limitations): https://docs.streamlit.io/develop/concepts/connections/authentication
+- st.user API reference (claims copied from the ID token, `st.user.email`): https://docs.streamlit.io/develop/api-reference/user/st.user

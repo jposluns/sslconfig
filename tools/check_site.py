@@ -32,7 +32,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _walk import walk_files  # noqa: E402  fail-closed tree walk (os.walk, not rglob)
 
 EN, EM = "–", "—"
-SITE_HOSTS = {"aiqt.ai", "www.aiqt.ai"}
+# The site host comes from AIQT_SITE_HOST (default aiqt.ai) so a consuming site's absolute self-links
+# classify as internal and are resolved instead of skipped as external. LOCAL PATCH, see .aiqt/PIN.
+_SITE_HOST = os.environ.get("AIQT_SITE_HOST", "aiqt.ai").lower()
+SITE_HOSTS = {_SITE_HOST, "www." + _SITE_HOST}
 
 # Tags that never take an end tag; never pushed on the open-tag stack.
 VOID_ELEMENTS = {

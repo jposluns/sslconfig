@@ -13,7 +13,7 @@ On AWS (security groups), Google Cloud (VPC firewall rules), and Azure (network 
 ## Verify
 
 - Provider console or CLI: list rules allowing `0.0.0.0/0` and confirm that each one is 80/443 on the front layer, nothing else.
-- From an outside network: `nc -vz <public-ip> 5432 3306 27017 6379 22` fails on every port.
+- From an outside network: `for p in 22 3306 5432 6379 27017; do nc -vz -w 3 203.0.113.10 "$p"; done   # every line must fail to connect`. Each port must report a refused or timed-out connection; a usage error from `nc` (some netcat variants take one port or a range per invocation) is not a passing result.
 - An external scan of the public IP (for example with nmap, against your own infrastructure only) shows only the intended ports.
 
 ## Sources (checked September 2026)

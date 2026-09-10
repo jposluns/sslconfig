@@ -18,7 +18,11 @@
 
 - [authentication](https://raw.githubusercontent.com/jposluns/sslconfig/main/authentication.md): password storage, sessions, API keys, rate limiting
 - [mfa](https://raw.githubusercontent.com/jposluns/sslconfig/main/mfa.md): MFA options: identity layers with QR-code TOTP enrolment, app libraries, SSH modules, Duo
+- [identity-providers](https://raw.githubusercontent.com/jposluns/sslconfig/main/identity-providers.md): hosted identity and MFA: Entra ID, Google, Okta, Auth0, Cognito, Clerk, WorkOS, Supabase Auth, Duo; free tiers and who each fits
+- [oidc-integration](https://raw.githubusercontent.com/jposluns/sslconfig/main/oidc-integration.md): OIDC login wiring for Google, Microsoft Entra, GitHub, and Okta: PKCE, redirect URIs, token validation, allowlist check
+- [cloud-identity-proxies](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloud-identity-proxies.md): login in front of the app with no code change: AWS ALB, Google IAP, Azure App Service, Cloudflare Access, ngrok, Vercel
 - [secrets](https://raw.githubusercontent.com/jposluns/sslconfig/main/secrets.md): keeping keys out of repositories, scanning, rotation after a leak
+- [machine-auth](https://raw.githubusercontent.com/jposluns/sslconfig/main/machine-auth.md): machine identity: API keys, client credentials, mutual TLS, workload identity federation, secret managers
 
 ## Web servers and proxies
 
@@ -33,8 +37,14 @@
 
 - [nodejs](https://raw.githubusercontent.com/jposluns/sslconfig/main/nodejs.md): Node.js and Express
 - [python](https://raw.githubusercontent.com/jposluns/sslconfig/main/python.md): Flask, FastAPI/Uvicorn, Gunicorn, Django
+- [nextjs](https://raw.githubusercontent.com/jposluns/sslconfig/main/nextjs.md): Next.js: sessions, Route Handlers, Server Actions, Auth.js and Better Auth, Vercel
+- [go](https://raw.githubusercontent.com/jposluns/sslconfig/main/go.md): Go net/http: TLS, proxy layout, bcrypt, cookies
+- [dotnet](https://raw.githubusercontent.com/jposluns/sslconfig/main/dotnet.md): ASP.NET Core and Kestrel: HTTPS, HSTS, forwarded headers, Identity
+- [java](https://raw.githubusercontent.com/jposluns/sslconfig/main/java.md): Spring Boot: server.ssl, forwarded headers, Spring Security
+- [php](https://raw.githubusercontent.com/jposluns/sslconfig/main/php.md): PHP and Laravel: password_hash, session cookies, trusted proxies, forced HTTPS
+- [ruby](https://raw.githubusercontent.com/jposluns/sslconfig/main/ruby.md): Rails and Puma: force_ssl, trusted proxies, has_secure_password, credentials
 - [docker](https://raw.githubusercontent.com/jposluns/sslconfig/main/docker.md): safe port publishing, the UFW bypass problem
-- [kubernetes](https://raw.githubusercontent.com/jposluns/sslconfig/main/kubernetes.md): cert-manager, ingress TLS, ingress auth
+- [kubernetes](https://raw.githubusercontent.com/jposluns/sslconfig/main/kubernetes.md): Gateway API, cert-manager, entry-point auth; ingress-nginx retired
 
 ## Hosts and platforms
 
@@ -52,6 +62,11 @@
 - [minio](https://raw.githubusercontent.com/jposluns/sslconfig/main/minio.md)
 - [rabbitmq](https://raw.githubusercontent.com/jposluns/sslconfig/main/rabbitmq.md)
 - [mosquitto](https://raw.githubusercontent.com/jposluns/sslconfig/main/mosquitto.md): MQTT
+- [kafka](https://raw.githubusercontent.com/jposluns/sslconfig/main/kafka.md): SASL_SSL listeners, SCRAM credentials, ACLs
+- [clickhouse](https://raw.githubusercontent.com/jposluns/sslconfig/main/clickhouse.md): user passwords, secure ports, network restrictions
+- [neo4j](https://raw.githubusercontent.com/jposluns/sslconfig/main/neo4j.md): initial password, Bolt and HTTPS TLS, auth stays on
+- [memcached](https://raw.githubusercontent.com/jposluns/sslconfig/main/memcached.md): no auth by default; loopback, SASL and TLS where built in
+- [object-storage](https://raw.githubusercontent.com/jposluns/sslconfig/main/object-storage.md): S3, R2, GCS, Azure Blob, Supabase Storage: private by default, scoped credentials, signed URLs
 
 ## AI, data, and dev tools
 
@@ -59,7 +74,12 @@
 - [ollama](https://raw.githubusercontent.com/jposluns/sslconfig/main/ollama.md): no built-in auth or TLS; protect with a proxy or tunnel
 - [open-webui](https://raw.githubusercontent.com/jposluns/sslconfig/main/open-webui.md): signup control and fronting TLS
 - [litellm](https://raw.githubusercontent.com/jposluns/sslconfig/main/litellm.md): master key and virtual keys
-- [model-servers](https://raw.githubusercontent.com/jposluns/sslconfig/main/model-servers.md): llama.cpp and vLLM
+- [model-servers](https://raw.githubusercontent.com/jposluns/sslconfig/main/model-servers.md): llama.cpp, vLLM, TGI, SGLang, Triton, LM Studio
+- [vector-databases](https://raw.githubusercontent.com/jposluns/sslconfig/main/vector-databases.md): Qdrant, Weaviate, Milvus, Chroma, pgvector: API keys, TLS, what has no native auth
+- [mcp-servers](https://raw.githubusercontent.com/jposluns/sslconfig/main/mcp-servers.md): stdio versus Streamable HTTP, loopback, Origin checks, OAuth 2.1 or a fronting layer
+- [ray](https://raw.githubusercontent.com/jposluns/sslconfig/main/ray.md): dashboard, Jobs, and Client ports execute code; isolate, token auth, SSH forward
+- [mlflow](https://raw.githubusercontent.com/jposluns/sslconfig/main/mlflow.md): no auth by default; basic-auth app, TLS in front
+- [agent-builders](https://raw.githubusercontent.com/jposluns/sslconfig/main/agent-builders.md): Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS
 - [gradio](https://raw.githubusercontent.com/jposluns/sslconfig/main/gradio.md)
 - [streamlit](https://raw.githubusercontent.com/jposluns/sslconfig/main/streamlit.md)
 - [n8n](https://raw.githubusercontent.com/jposluns/sslconfig/main/n8n.md)
@@ -71,6 +91,7 @@
 - [headers](https://raw.githubusercontent.com/jposluns/sslconfig/main/headers.md): HSTS, CSP, and companions
 - [firebase-supabase](https://raw.githubusercontent.com/jposluns/sslconfig/main/firebase-supabase.md): security rules and row-level security
 - [admin-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/admin-uis.md): phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus
+- [devops-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/devops-uis.md): Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public
 
 ## Optional
 

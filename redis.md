@@ -29,19 +29,21 @@ user app on >REPLACE_WITH_LONG_RANDOM_PASSWORD ~app:* +@read +@write
 
 That grants the `app` user access to keys matching `app:*` with read and write command categories only. Generate passwords per [authentication.md](authentication.md). Disable the `default` user (`user default off`) only after every client authenticates as a named user, or you will lock services out.
 
-MFA: Redis has no second-factor dialogue; `tls-auth-clients yes` (mutual TLS, below) is the second factor for clients, and human paths to the host go behind MFA per [mfa.md](mfa.md).
+MFA: Redis has no second-factor dialogue. For machine clients, `tls-auth-clients yes` (mutual TLS, below) adds a possession factor (a certificate) alongside the password; that is stronger than a password alone but it is not MFA for a person. Human paths to the host go behind MFA per [mfa.md](mfa.md).
 
 ## 3. Enable TLS
 
 Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), then replace the plaintext port with a TLS listener:
 
 ```
-port 0                     # no plaintext listener at all
+# no plaintext listener at all
+port 0
 tls-port 6379
 tls-cert-file    /etc/redis/tls/server.crt
 tls-key-file     /etc/redis/tls/server.key
 tls-ca-cert-file /etc/redis/tls/ca.crt
-tls-auth-clients no        # yes = require client certificates (mutual TLS)
+# yes = require client certificates (mutual TLS)
+tls-auth-clients no
 ```
 
 Set `tls-auth-clients yes` for machine-to-machine deployments where clients can hold certificates; it is stronger than passwords alone.
@@ -51,10 +53,10 @@ Set `tls-auth-clients yes` for machine-to-machine deployments where clients can 
 ```bash
 redis-cli --tls --cacert /etc/redis/tls/ca.crt -h redis.example.com -p 6379
 > AUTH app REPLACE_WITH_PASSWORD
-> PING
+> GET app:probe
 ```
 
-Application clients take equivalent TLS and credential options; point them at the CA rather than disabling verification.
+`GET app:probe` is allowed by `~app:* +@read` (a `(nil)` reply is a success); `PING` sits in the `@connection` and `@fast` categories, which the ACL above does not grant, so it fails for `app`. Application clients take equivalent TLS and credential options; point them at the CA rather than disabling verification.
 
 ## 5. Verify
 
@@ -74,3 +76,5 @@ redis-cli --tls --cacert ca.crt -h redis.example.com ping   # NOAUTH error until
 
 - Redis documentation (security, TLS, and ACL pages): https://redis.io/docs/latest/
 - redis.conf self-documented example in the Redis source distribution: https://github.com/redis/redis
+- Redis configuration (directive format `keyword argument1 argument2 ... argumentN`): https://redis.io/docs/latest/operate/oss_and_stack/management/config/
+- PING command reference (ACL categories `@fast`, `@connection`): https://redis.io/docs/latest/commands/ping/
