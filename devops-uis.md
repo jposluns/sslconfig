@@ -32,7 +32,7 @@ The admin UI is on port `81`; the proxy itself is on `80`/`443`. Port `81` is ne
 - As of September 2026 the Kubernetes documentation marks the Dashboard deprecated and unmaintained (the repository was archived in January 2026) and points new installs to Headlamp; the pattern below applies to any cluster UI.
 - Do not expose it with a LoadBalancer or Ingress. Reach it from the operator's machine with `kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443` and open `https://localhost:8443`; the UI is then reachable only from that machine.
 - Login is by bearer token of a ServiceAccount with a minimal RBAC role; the tutorial's sample user is cluster-admin and is for demonstration only. On the older 2.x releases, `--enable-skip-login` and `--enable-insecure-login` both default to `false`; never turn them on.
-- MFA is the cluster's identity provider (OIDC to the API server, [kubernetes.md](kubernetes.md)), not the dashboard.
+- A ServiceAccount token is a machine credential, so configuring OIDC on the API server puts no MFA on this login. Human MFA comes from the access path (a port-forward over SSH from a machine that already required it, a tailnet per [tailscale.md](tailscale.md), or Cloudflare Access per [cloudflare.md](cloudflare.md)) or from a UI that performs an identity-provider login itself; see [mfa.md](mfa.md).
 
 ## Jenkins
 
@@ -46,7 +46,7 @@ The admin UI is on port `81`; the proxy itself is on `80`/`443`. Port `81` is ne
 
 - It listens on `HTTP_ADDR = 0.0.0.0`, `HTTP_PORT = 3000` by default; set `HTTP_ADDR = 127.0.0.1` behind a proxy, or `PROTOCOL = https` with `CERT_FILE` and `KEY_FILE` to terminate TLS itself.
 - In `[service]`, `DISABLE_REGISTRATION = true` (default `false`) and, for a private forge, `REQUIRE_SIGNIN_VIEW = true` (default `false`).
-- Users enrol TOTP or a WebAuthn key under Settings > Security; `TWO_FACTOR_AUTH = enforced` in `[security]` requires it. With MFA on, Git over HTTP uses an access token instead of the password, and tokens bypass MFA, so scope them and revoke unused ones ([machine-auth.md](machine-auth.md)).
+- Users enrol TOTP or a WebAuthn key under Settings > Security; `TWO_FACTOR_AUTH = enforced` in `[security]` (Gitea 1.24 and later) requires it. With MFA on, Git over HTTP uses an access token instead of the password, and tokens bypass MFA, so scope them and revoke unused ones ([machine-auth.md](machine-auth.md)).
 
 ## Uptime Kuma
 

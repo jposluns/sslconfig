@@ -30,7 +30,7 @@ ssl_options.fail_if_no_peer_cert = true   # mutual TLS; set false to allow passw
 listeners.tcp = none
 ```
 
-Certificates per [self-signed.md](self-signed.md) (internal CA fits brokers well) or [free-certificates.md](free-certificates.md). Mutual TLS doubles as the second factor for machine clients ([mfa.md](mfa.md)).
+Certificates per [self-signed.md](self-signed.md) (internal CA fits brokers well) or [free-certificates.md](free-certificates.md). Mutual TLS gives a machine client a possession factor, a certificate held by the connecting host, stronger than a password alone but not MFA for a person ([mfa.md](mfa.md)).
 
 ## 3. Management UI
 

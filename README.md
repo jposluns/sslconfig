@@ -13,7 +13,8 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
 1. Treat every service as internet-reachable unless you have confirmed otherwise. Bind services to `127.0.0.1` by default and expose them only through a TLS-terminating layer that requires authentication.
 2. Choose the certificate path before writing configuration:
    - Public DNS name and reachable ports 80/443: use [free-certificates.md](free-certificates.md).
-   - No public domain, no inbound ports, or a NATed or residential host: use [cloudflare.md](cloudflare.md) (Cloudflare Tunnel plus Zero Trust Access).
+   - No inbound ports (NAT, residential) but a domain you can put on Cloudflare: use [cloudflare.md](cloudflare.md) (Cloudflare Tunnel plus Zero Trust Access; the tunnel needs a Cloudflare-managed domain).
+   - No domain at all: use [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
    - Internal or development use only: use [self-signed.md](self-signed.md).
 3. Apply the guide that matches the stack (index below). If the stack has no guide, place it behind a reverse proxy configured per [nginx.md](nginx.md) or [caddy.md](caddy.md) and keep the application itself on loopback.
 4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md).
@@ -95,7 +96,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 
 - Public web app with its own domain: [free-certificates.md](free-certificates.md), then the guide for your web server or proxy, then [authentication.md](authentication.md).
 - Team login or customer accounts: [identity-providers.md](identity-providers.md) to choose the provider, [oidc-integration.md](oidc-integration.md) to wire it into the app, or [cloud-identity-proxies.md](cloud-identity-proxies.md) to put login in front of the app without code changes.
-- App on a home server, behind NAT, or without a domain you control at the DNS level: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. [tailscale.md](tailscale.md) is the tailnet-based alternative.
+- App on a home server or behind NAT, with a domain you can put on Cloudflare: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. With no domain at all: [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
 - Internal tool, staging, or local development: [self-signed.md](self-signed.md), with authentication still enabled.
 - Databases and model servers (PostgreSQL, MySQL, MongoDB, Redis, Ollama): keep them off public interfaces entirely where possible; the per-tool guides cover TLS and authentication for the cases where network exposure is unavoidable.
 
@@ -104,7 +105,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 Run these after configuration. All must pass before the service is considered protected.
 
 1. No plaintext listener on a public interface: `ss -tlnp` (Linux) shows nothing bound to `0.0.0.0` or a public address on a plain HTTP port, except a listener whose only job is to redirect to HTTPS.
-2. Redirect works: `curl -sI http://example.com/` returns `301` or `308` with a `Location: https://...` header.
+2. Redirect works: `curl -sI http://example.com/` returns `301` or `308` (the preferred permanent redirects), or `302`/`307` where a framework issues them, always with a `Location: https://...` header.
 3. TLS works: `curl -sI https://example.com/` succeeds without `-k`.
 4. Old protocols are refused: `openssl s_client -connect example.com:443 -tls1_1` fails to negotiate (TLS 1.2 is the minimum everywhere in these guides).
 5. Authentication is enforced: an unauthenticated request to any non-public path returns `401`, `403`, or a login redirect, never data. Test the API paths as well as the home page.

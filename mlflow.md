@@ -10,7 +10,7 @@ The defaults are already loopback:
 mlflow server --host 127.0.0.1 --port 5000
 ```
 
-The CLI help for `--host` says it plainly: "This is NOT a security setting". Do not switch to `--host 0.0.0.0` on a machine with a public interface. In Docker, publish to loopback (`-p 127.0.0.1:5000:5000`) rather than binding wide inside the container. If the server must listen beyond loopback for a proxy on another host, set `--allowed-hosts mlflow.example.com` (the default allows localhost and private ranges only) and `--cors-allowed-origins https://mlflow.example.com`, and never use `--disable-security-middleware` outside a test.
+The CLI help for `--host` says it plainly: "This is NOT a security setting". Do not switch to `--host 0.0.0.0` on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback (`-p 127.0.0.1:5000:5000`, which Docker's port-publishing docs say only the Docker host can reach), while inside the container the server must listen on the container's own interface (`--host 0.0.0.0` there, private to the Compose network and the host), because a process bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md). If the server must listen beyond loopback for a proxy on another host, set `--allowed-hosts mlflow.example.com` (the default allows localhost and private ranges only) and `--cors-allowed-origins https://mlflow.example.com`, and never use `--disable-security-middleware` outside a test.
 
 ## 2. TLS from a fronting proxy
 
@@ -31,7 +31,8 @@ The first start creates an admin user named `admin` with password `password1234`
 ```ini
 # /etc/mlflow/basic_auth.ini
 [mlflow]
-default_permission = NO_PERMISSIONS          # default is READ on every resource
+# default is READ on every resource
+default_permission = NO_PERMISSIONS
 database_uri = postgresql://mlflow_auth:REPLACE_WITH_LONG_RANDOM_VALUE@127.0.0.1:5432/mlflow_auth
 admin_username = admin
 admin_password = REPLACE_WITH_LONG_RANDOM_VALUE
@@ -58,9 +59,13 @@ With `--serve-artifacts` (the default) and `--artifacts-destination s3://bucket`
 ```bash
 ss -tlnp | grep 5000                                                   # 127.0.0.1 only
 curl -sI --max-time 5 http://203.0.113.10:5000/                        # from another machine: connection refused
-curl -s -o /dev/null -w '%{http_code}\n' https://mlflow.example.com/api/2.0/mlflow/experiments/search   # 401
-curl -s -u admin https://mlflow.example.com/api/2.0/mlflow/experiments/search                            # JSON with credentials
-curl -s -u admin:password1234 https://mlflow.example.com/api/2.0/mlflow/experiments/search               # must be 401: default password gone
+# experiments/search is a POST endpoint, so each check posts a minimal body
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"max_results":1}' \
+  https://mlflow.example.com/api/2.0/mlflow/experiments/search                         # 401: no credentials
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"max_results":1}' \
+  -u admin https://mlflow.example.com/api/2.0/mlflow/experiments/search                # 200 with the new admin password
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"max_results":1}' \
+  -u admin:password1234 https://mlflow.example.com/api/2.0/mlflow/experiments/search   # must be 401: default password gone
 ```
 
 An authenticated user without permission on a resource gets `403`; a missing or wrong credential gets `401`.
@@ -78,3 +83,5 @@ An authenticated user without permission on a resource gets `403`; a missing or 
 - MLflow authentication REST API (`2.0/mlflow/users/update-password` request fields): https://mlflow.org/docs/latest/api_reference/auth/rest-api.html
 - `mlflow server` CLI reference (`--host` default 127.0.0.1, `--port` 5000, `--app-name`, `--allowed-hosts`, `--cors-allowed-origins`, `--serve-artifacts`): https://mlflow.org/docs/latest/api_reference/cli.html
 - MLflow tracking server (default address, reverse proxy or VPN for TLS and auth, `MLFLOW_TRACKING_TOKEN`, `MLFLOW_TRACKING_INSECURE_TLS`, artifact proxying): https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server
+- MLflow REST API, Search Experiments (`POST 2.0/mlflow/experiments/search`): https://mlflow.org/docs/latest/api_reference/rest-api.html
+- Docker, port publishing (loopback publishing): https://docs.docker.com/engine/network/port-publishing/

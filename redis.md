@@ -36,12 +36,14 @@ MFA: Redis has no second-factor dialogue. For machine clients, `tls-auth-clients
 Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), then replace the plaintext port with a TLS listener:
 
 ```
-port 0                     # no plaintext listener at all
+# no plaintext listener at all
+port 0
 tls-port 6379
 tls-cert-file    /etc/redis/tls/server.crt
 tls-key-file     /etc/redis/tls/server.key
 tls-ca-cert-file /etc/redis/tls/ca.crt
-tls-auth-clients no        # yes = require client certificates (mutual TLS)
+# yes = require client certificates (mutual TLS)
+tls-auth-clients no
 ```
 
 Set `tls-auth-clients yes` for machine-to-machine deployments where clients can hold certificates; it is stronger than passwords alone.
@@ -51,7 +53,7 @@ Set `tls-auth-clients yes` for machine-to-machine deployments where clients can 
 ```bash
 redis-cli --tls --cacert /etc/redis/tls/ca.crt -h redis.example.com -p 6379
 > AUTH app REPLACE_WITH_PASSWORD
-> PING
+> GET app:probe          # allowed by ~app:* +@read; PING is @connection, which the ACL above does not grant
 ```
 
 Application clients take equivalent TLS and credential options; point them at the CA rather than disabling verification.

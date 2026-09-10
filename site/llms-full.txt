@@ -22,7 +22,8 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
 1. Treat every service as internet-reachable unless you have confirmed otherwise. Bind services to `127.0.0.1` by default and expose them only through a TLS-terminating layer that requires authentication.
 2. Choose the certificate path before writing configuration:
    - Public DNS name and reachable ports 80/443: use [free-certificates.md](free-certificates.md).
-   - No public domain, no inbound ports, or a NATed or residential host: use [cloudflare.md](cloudflare.md) (Cloudflare Tunnel plus Zero Trust Access).
+   - No inbound ports (NAT, residential) but a domain you can put on Cloudflare: use [cloudflare.md](cloudflare.md) (Cloudflare Tunnel plus Zero Trust Access; the tunnel needs a Cloudflare-managed domain).
+   - No domain at all: use [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
    - Internal or development use only: use [self-signed.md](self-signed.md).
 3. Apply the guide that matches the stack (index below). If the stack has no guide, place it behind a reverse proxy configured per [nginx.md](nginx.md) or [caddy.md](caddy.md) and keep the application itself on loopback.
 4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md).
@@ -104,7 +105,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 
 - Public web app with its own domain: [free-certificates.md](free-certificates.md), then the guide for your web server or proxy, then [authentication.md](authentication.md).
 - Team login or customer accounts: [identity-providers.md](identity-providers.md) to choose the provider, [oidc-integration.md](oidc-integration.md) to wire it into the app, or [cloud-identity-proxies.md](cloud-identity-proxies.md) to put login in front of the app without code changes.
-- App on a home server, behind NAT, or without a domain you control at the DNS level: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. [tailscale.md](tailscale.md) is the tailnet-based alternative.
+- App on a home server or behind NAT, with a domain you can put on Cloudflare: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. With no domain at all: [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
 - Internal tool, staging, or local development: [self-signed.md](self-signed.md), with authentication still enabled.
 - Databases and model servers (PostgreSQL, MySQL, MongoDB, Redis, Ollama): keep them off public interfaces entirely where possible; the per-tool guides cover TLS and authentication for the cases where network exposure is unavoidable.
 
@@ -113,7 +114,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 Run these after configuration. All must pass before the service is considered protected.
 
 1. No plaintext listener on a public interface: `ss -tlnp` (Linux) shows nothing bound to `0.0.0.0` or a public address on a plain HTTP port, except a listener whose only job is to redirect to HTTPS.
-2. Redirect works: `curl -sI http://example.com/` returns `301` or `308` with a `Location: https://...` header.
+2. Redirect works: `curl -sI http://example.com/` returns `301` or `308` (the preferred permanent redirects), or `302`/`307` where a framework issues them, always with a `Location: https://...` header.
 3. TLS works: `curl -sI https://example.com/` succeeds without `-k`.
 4. Old protocols are refused: `openssl s_client -connect example.com:443 -tls1_1` fails to negotiate (TLS 1.2 is the minimum everywhere in these guides).
 5. Authentication is enforced: an unauthenticated request to any non-public path returns `401`, `403`, or a login redirect, never data. Test the API paths as well as the home page.
@@ -198,14 +199,14 @@ Certificates land in stable paths that server configuration should reference dir
 
 Let's Encrypt certificates are valid for 90 days at the time of writing, so renewal must be automated. Package and snap installs of certbot register a systemd timer or cron job that runs `certbot renew` for you. Confirm that it works and reload the server after each renewal:
 
-Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day short-lived certificates are available now to every subscriber; the default `classic` profile moves to 64-day certificates on 2027-02-10 and to 45-day certificates on 2028-02-16; and industry rules cap publicly trusted certificates at 47 days from 2029-03-15. Any renewal step that involves a person will fail at those lifetimes, so the automation below is the only viable path. Let's Encrypt also switched off its OCSP service on 2025-08-06 and publishes revocation only through CRLs, so do not add OCSP stapling directives for Let's Encrypt certificates.
-
 ```bash
 sudo certbot renew --dry-run
 sudo certbot renew --deploy-hook "systemctl reload nginx"
 ```
 
 Set the deploy hook once with `certonly`/`renew`, or drop a script into `/etc/letsencrypt/renewal-hooks/deploy/`. A certificate that issues once and then expires in production is the most common ACME failure; the dry run belongs in your deployment checklist.
+
+Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day short-lived certificates are available now to every subscriber; the default `classic` profile moves to 64-day certificates on 2027-02-10 and to 45-day certificates on 2028-02-16; and industry rules cap publicly trusted certificates at 47 days from 2029-03-15. Any renewal step that involves a person will fail at those lifetimes, so the automation below is the only viable path. Let's Encrypt also switched off its OCSP service on 2025-08-06 and publishes revocation only through CRLs, so do not add OCSP stapling directives for Let's Encrypt certificates.
 
 ## Rate limits
 
@@ -320,8 +321,10 @@ Do not ship `curl -k`, `verify=False`, `rejectUnauthorized: false`, or `NODE_TLS
 
 ```bash
 openssl x509 -in server.crt -noout -subject -dates -ext subjectAltName
-openssl s_client -connect app.internal:443 -CAfile server.crt </dev/null
+openssl s_client -connect app.internal:443 -servername app.internal -verify_hostname app.internal -verify_return_error -CAfile server.crt </dev/null
 ```
+
+A pass prints `Verification: OK`, `Verified peername: app.internal`, and `Verify return code: 0 (ok)`, and the command exits 0. Without `-verify_hostname` the check ignores the name, and without `-verify_return_error` `s_client` reports a failure yet still completes the handshake and exits 0; with both, a name mismatch or an untrusted chain closes the connection and exits non-zero (`Verify return code: 62 (hostname mismatch)` for the wrong name).
 
 ## Limits to plan around
 
@@ -329,7 +332,7 @@ Self-signed certificates have no revocation and no third-party accountability, a
 
 ## Sources (checked September 2026)
 
-- OpenSSL documentation: https://www.openssl.org/docs/
+- OpenSSL documentation: https://www.openssl.org/docs/ ; `openssl s_client` (`-servername`, `-verify_return_error`): https://docs.openssl.org/master/man1/openssl-s_client/ ; verification options (`-verify_hostname`): https://docs.openssl.org/master/man1/openssl-verification-options/
 - mkcert: https://github.com/FiloSottile/mkcert
 
 ======================================================================
@@ -525,11 +528,11 @@ Passwords fail through phishing, reuse, and credential stuffing; a second factor
 1. Give every human-facing login on an exposed service a second factor where viable.
 2. Prefer, in this order:
    1. Platform-native MFA, or OIDC/SSO login with MFA enforced at the identity provider.
-   2. An identity-aware layer in front of the app (Cloudflare Access, or a self-hosted portal below), which adds MFA without changing the app.
+   2. An identity-aware layer in front of the app (Cloudflare Access, or a self-hosted portal below), which adds MFA without changing the app, but only when the layer's own policy, or the identity provider it delegates to, requires a second factor.
    3. App-level TOTP through a library (below).
    4. A hosted MFA service such as Duo.
 3. Prefer phishing-resistant factors (WebAuthn/passkeys) over TOTP where the platform offers them, and TOTP over emailed or SMS codes.
-4. When implementing TOTP yourself, the required pieces are: a random per-user secret; an `otpauth://` provisioning URI rendered as a QR code for the user's authenticator app; verification of 1 valid code before the factor activates; single-use recovery codes (stored hashed); rate limiting on code attempts; and TOTP secrets encrypted at rest and excluded from the repository (they cannot be hashed, since the server must read them to verify codes).
+4. When implementing TOTP yourself, the required pieces are: a random per-user secret; an `otpauth://` provisioning URI rendered as a QR code for the user's authenticator app; verification of 1 valid code before the factor activates; single-use recovery codes (stored hashed); rate limiting on code attempts; rejection of a code that has already been accepted for its time step (RFC 6238 forbids accepting a code twice); and TOTP secrets encrypted at rest and excluded from the repository (they cannot be hashed, since the server must read them to verify codes).
 5. Give administrators a phishing-resistant factor (a passkey or a FIDO2 hardware key) wherever the platform offers one. TOTP is the floor; SMS is not acceptable for administrator accounts.
 6. Enrolment is not enforcement. After users enrol, require the factor at the point of access (provider policy such as Conditional Access, Supabase `aal2` in policies, or the app's own check) and test that a password-only session is refused.
 
@@ -555,9 +558,9 @@ Each generates and verifies RFC 6238 codes and pairs with a QR library so users 
 
 ## Hosted MFA
 
-- **Hosted identity providers** (Microsoft Entra ID, Google Workspace, Auth0, Amazon Cognito, Clerk, Supabase Auth, and others) enforce MFA for every app that signs in through them. Which tiers include MFA, and which do not, is in [identity-providers.md](identity-providers.md); wiring is in [oidc-integration.md](oidc-integration.md).
+- **Hosted identity providers** (Microsoft Entra ID, Google Workspace, Auth0, Amazon Cognito, Clerk, Supabase Auth, and others) can enforce MFA for every app that signs in through them, but only when a tenant policy requires the factor; enrolment or a default policy alone adds nothing. Which tiers include MFA, and which do not, is in [identity-providers.md](identity-providers.md); wiring is in [oidc-integration.md](oidc-integration.md).
 - **Duo**: the Duo Free edition covers up to 10 users with MFA and the Duo Mobile authenticator app (per https://duo.com/editions-and-pricing as of September 2026; verify current terms). Its Authentication Proxy speaks RADIUS and LDAP, which retrofits MFA onto VPNs and onto services with RADIUS support.
-- **Cloudflare Access** ([cloudflare.md](cloudflare.md)): the emailed one-time PIN proves control of a mailbox only; for sensitive apps connect an identity provider and enforce MFA there, which Access then inherits.
+- **Cloudflare Access** ([cloudflare.md](cloudflare.md)): the emailed one-time PIN proves control of a mailbox only; for sensitive apps connect an identity provider and enforce MFA there; Access inherits MFA only when that provider's policy requires it for the login.
 
 Enforcing MFA once at a central identity provider is easier to operate and audit than separate factors per app; prefer it when more than 1 service is involved.
 
@@ -574,6 +577,7 @@ Machine protocols (database wire protocols, model-server APIs) have no interacti
 - A login with only the password fails once a second factor is enrolled.
 - Recovery codes are single-use, and their hashes rather than their values are stored.
 - Repeated wrong codes hit a rate limit or lockout.
+- Submitting the same valid TOTP code a second time within its time step is refused.
 - No TOTP secret or recovery code appears in the repository or its history.
 
 ## Standards and sources (checked September 2026)
@@ -623,7 +627,7 @@ gitleaks git . && echo clean
 grep -rn "sk-\|AKIA\|-----BEGIN" --include="*.py" --include="*.js" --include="*.ts" --include="*.env" . | grep -v node_modules   # crude but fast
 ```
 
-Both must come back empty on every push.
+On every push, gitleaks must exit 0 with no findings (the `&& echo clean` then prints `clean`), and the grep must print nothing.
 
 ## Sources (checked September 2026)
 
@@ -676,7 +680,7 @@ A login proves who the person is. **It does not decide whether they may use your
 ## 4. Developer identity
 
 - **GitHub OAuth**: an OAuth app gives login for any GitHub user; restrict to members of your organisation or team in the app (or with oauth2-proxy, which has a GitHub provider with org and team restrictions). GitHub Actions OIDC is a different mechanism for workloads, covered in [machine-auth.md](machine-auth.md).
-- **AWS IAM Identity Center**: the free workforce directory for your own AWS console and CLI access, and an OIDC source for Application Load Balancer authentication.
+- **AWS IAM Identity Center**: the free workforce directory for your team's own AWS console and CLI access. It is not a general OIDC provider for Application Load Balancer authentication; for app login on AWS pair the ALB with Cognito or an OIDC provider from section 3 ([cloud-identity-proxies.md](cloud-identity-proxies.md)).
 
 ## 5. Self-hosted identity providers
 
@@ -686,7 +690,7 @@ Keycloak, authentik, Zitadel, Ory, and Authelia ([mfa.md](mfa.md)) give you OIDC
 
 - **Duo**: the Duo Free edition covers up to 10 users with MFA and the Duo Mobile app. Its Authentication Proxy speaks RADIUS and LDAP, which retrofits MFA onto VPNs and services with RADIUS support.
 - **Provider-native authenticators**: Microsoft Authenticator (Entra), Okta Verify (Okta), Google prompts (Google). Any RFC 6238 authenticator app works where a provider offers TOTP.
-- **Hardware keys and passkeys**: YubiKey and other FIDO2 keys, and platform passkeys, are the phishing-resistant factor. Every provider in sections 2 and 3 supports WebAuthn at some tier; require it for administrators ([mfa.md](mfa.md)).
+- **Hardware keys and passkeys**: YubiKey and other FIDO2 keys, and platform passkeys, are the phishing-resistant factor. Most of the providers above document passkey or WebAuthn support; check the tier before relying on it, and require it for administrators ([mfa.md](mfa.md)).
 
 ## 7. Poor fits for a small project
 
@@ -713,7 +717,8 @@ Zscaler Private Access, HashiCorp Boundary, Ping Identity, OneLogin, and Okta as
 - Supabase pricing: https://supabase.com/pricing
 - Duo editions and pricing: https://duo.com/editions-and-pricing
 - GitHub OAuth apps: https://docs.github.com/en/apps/oauth-apps
-- AWS IAM Identity Center: https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html
+- AWS IAM Identity Center: https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html ; its OIDC service (AWS CLI and native clients): https://docs.aws.amazon.com/singlesignon/latest/OIDCAPIReference/Welcome.html
+- Application Load Balancer user authentication (OIDC-compliant IdP or Cognito user pool): https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html
 
 ======================================================================
 ==> oidc-integration.md
@@ -743,7 +748,7 @@ The provider proves who the person is. Whether they may use your app is your che
 
 - **Google**: the `hd` claim in the ID token must equal your Workspace domain (`example.com`). The `hd` request parameter only optimises the account picker; Google's documentation says not to rely on it for access control and to validate the returned `hd` claim. Treat a missing `hd` claim as a rejection.
 - **Microsoft Entra**: the `tid` claim must be your tenant ID and `iss` must be `https://login.microsoftonline.com/<tenant-id>/v2.0`. Register the app as **Single tenant only** when only your organisation signs in. The `organizations` authority accepts any Entra tenant and `common` also accepts personal accounts; the issuer then varies per tenant, so an app on those authorities that does not check `tid` (or the GUID in `iss`) admits every Microsoft account. Microsoft documents `email` and `preferred_username` as mutable and unfit for authorisation; key the local account on `oid` or `sub` plus `tid`.
-- **GitHub**: GitHub OAuth apps speak OAuth 2.0, not OpenID Connect; there is no discovery document and no ID token. After the token exchange call `GET https://api.github.com/user` for the identity, then check `GET /user/memberships/orgs/<org>` (200 with `"state": "active"` means a member; 404 means not affiliated) or a team with `GET /orgs/<org>/teams/<team_slug>/memberships/<username>` (200 or 404). Both need the `read:org` scope. Key the local account on the numeric `id` from `/user`, not the `login`.
+- **GitHub**: GitHub OAuth apps speak OAuth 2.0, not OpenID Connect; there is no discovery document and no ID token. After the token exchange call `GET https://api.github.com/user` for the identity, then check `GET /user/memberships/orgs/<org>` (200 with `"state": "active"` means a member; 404 means not affiliated) or a team with `GET /orgs/<org>/teams/<team_slug>/memberships/<username>` (200 with `"state": "active"`; the REST reference documents `pending` for an unaccepted invitation, and 404 means no membership). Both need the `read:org` scope. Key the local account on the numeric `id` from `/user`, not the `login`.
 - **Okta**: add a `groups` claim to the ID token (org authorization server: **Applications > Applications >** your app **> Sign On**, edit the OpenID Connect ID Token section, filter **Matches regex** `.*`; the client must also request the `groups` scope) and require membership of a named group. The claim holds at most 100 groups and the request fails beyond that; use a narrower filter in large orgs.
 
 The default for an identity that passes none of these is to reject and log it, never to create a pending account an admin later forgets to review.
@@ -754,7 +759,7 @@ The client secret is a secret: environment variable or secret manager, never a r
 
 - **Google**: Google Cloud console **Clients** page (`https://console.developers.google.com/auth/clients`); create an OAuth client and add the redirect URI. The match is exact, including scheme, case, and trailing slash. Discovery: `https://accounts.google.com/.well-known/openid-configuration`; `iss` is `https://accounts.google.com` or `accounts.google.com`.
 - **Microsoft Entra**: Microsoft Entra admin center, **Entra ID > App registrations > New registration**; under **Supported account types** choose **Single tenant only** unless you are building for other organisations. Then **Authentication > Add a platform > Web** and add the redirect URI. Record the Application (client) ID and create a client secret. Discovery: `https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration` with `<tenant>` your directory (tenant) ID; `common` or `organizations` only together with the `tid` check above.
-- **GitHub**: profile picture **> Settings > Developer settings > OAuth apps > New OAuth App**; set the Authorization callback URL. Authorize at `https://github.com/login/oauth/authorize` with `client_id`, `redirect_uri`, `scope=read:user read:org`, and `state`; exchange at `https://github.com/login/oauth/access_token` with `client_id`, `client_secret`, `code`, and the same `redirect_uri`. Always send `redirect_uri`; when it is absent GitHub uses the first registered callback.
+- **GitHub**: profile picture **> Settings > Developer settings > OAuth apps > New OAuth App**; set the Authorization callback URL. Authorize at `https://github.com/login/oauth/authorize` with `client_id`, `redirect_uri`, `scope=read:user read:org`, `state`, and PKCE (`code_challenge` with `code_challenge_method=S256`; GitHub does not accept `plain`); exchange at `https://github.com/login/oauth/access_token` with `client_id`, `client_secret`, `code`, the `code_verifier` that produced the challenge, and the same `redirect_uri`. Always send `redirect_uri`; when it is absent GitHub uses the first registered callback. Apps that had a single callback URL before August 3, 2026 keep wildcard matching for it, which accepts any subdirectory path on the same host; disable wildcard matching in the app settings so the callback must match exactly.
 - **Okta**: Admin Console, **Applications and Resources > Applications > Create App Integration**, sign-in method **OIDC - OpenID Connect**, type **Web Application**; set the sign-in and sign-out redirect URIs and the assignment (Okta's guide allows everyone in the org; narrow it to a group). Client ID and secret are on the **General** tab under Client Credentials. Discovery: `https://<org>.okta.com/.well-known/openid-configuration` for the org authorization server, `https://<org>.okta.com/oauth2/<authorizationServerId>/.well-known/openid-configuration` for a custom one; `iss` equals that prefix.
 
 ## 4. Libraries
@@ -771,7 +776,7 @@ Use a maintained library; do not hand-parse JWTs. The snippets are from each lib
   // callback:
   let tokens = await client.authorizationCodeGrant(config, currentUrl, { pkceCodeVerifier: code_verifier, expectedState: state })
   ```
-- **Node, [Auth.js](https://authjs.dev/)** (`npm install next-auth@beta` for Next.js; SvelteKit and Express integrations exist): providers `next-auth/providers/google`, `github`, `okta`, and `microsoft-entra-id`, configured through `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for Okta and Entra `AUTH_<PROVIDER>_ISSUER`; callbacks land on `/api/auth/callback/<provider>`. Sessions are an encrypted JWT, or a database session ID, in an `HttpOnly` cookie. Set `AUTH_MICROSOFT_ENTRA_ID_ISSUER` to your tenant's `/v2.0` issuer: the documented default is `common`. Put the section 2 check in the `signIn` callback.
+- **Node, [Auth.js](https://authjs.dev/)** (`npm install next-auth@beta` for Next.js; SvelteKit and Express integrations exist): providers `next-auth/providers/google`, `github`, `okta`, and `microsoft-entra-id`, configured through `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for Okta and Entra `AUTH_<PROVIDER>_ISSUER`; callbacks land on `/api/auth/callback/<provider>`. Sessions are an encrypted JWT, or a database session ID, in an `HttpOnly` cookie. With the JWT strategy, sign-out destroys the cookie but the token itself stays valid until `exp` unless your server keeps a blocklist (Auth.js documents this limitation); use database sessions where immediate invalidation matters. Set `AUTH_MICROSOFT_ENTRA_ID_ISSUER` to your tenant's `/v2.0` issuer: the documented default is `common`. Put the section 2 check in the `signIn` callback.
 - **Python, [Authlib](https://docs.authlib.org/)** (`pip install Authlib`; Flask, Django, Starlette, FastAPI):
   ```python
   oauth.register('google', client_id='YOUR_CLIENT_ID', client_secret='YOUR_CLIENT_SECRET',
@@ -792,7 +797,7 @@ Use a maintained library; do not hand-parse JWTs. The snippets are from each lib
 
 Your app does not run the second factor; the provider does, under its policy: Conditional Access in Entra (**Entra ID > Conditional Access > Policies**, grant **Require authentication strength**; a P1 feature per [identity-providers.md](identity-providers.md)), 2-Step Verification in the Google Admin console (**Security > Authentication > 2-step verification**, Enforcement **On**), and authentication policies plus the global session policy in Okta. Ordering and options in [mfa.md](mfa.md).
 
-An app can additionally refuse a session whose ID token shows no second factor, where the provider documents the claim. Okta's `amr` array carries values such as `pwd`, `mfa`, `otp`, and `hwk`. Entra includes `amr` in v2.0 tokens only when requested as an optional claim, and emits `mfa` only after MFA completed. For Google, enforce 2SV in Workspace; no ID token MFA claim was verified for this guide. GitHub OAuth has no ID token, so MFA is whatever the organisation requires of its members.
+An app can additionally refuse a session whose ID token shows no second factor, where the provider documents the claim. Okta's `amr` array carries values such as `pwd`, `mfa`, `otp`, and `hwk`. For Entra, check the ID token claims reference and the optional claims reference for the `amr` claim and its `mfa` value before relying on it. For Google, enforce 2SV in Workspace; no ID token MFA claim was verified for this guide. GitHub OAuth has no ID token, so MFA is whatever the organisation requires of its members.
 
 ## Verify
 
@@ -807,7 +812,7 @@ Negative tests matter more than the happy path:
 - Edit `redirect_uri` in the authorization URL (add a path segment or change the host): the provider shows an error and never redirects.
 - Change `state` on the callback URL: your app rejects the callback.
 - Replay a captured ID token after `exp`, or one issued to a different client ID at the same provider: your callback rejects it.
-- Log out, then reload a protected page: it redirects to login, and the old session cookie no longer works.
+- Log out, then reload a protected page: it redirects to login. With database sessions the old session cookie no longer works; with JWT sessions it works until `exp`, so use database sessions or a revocation check where immediate invalidation matters.
 
 ## Sources (checked September 2026)
 
@@ -816,14 +821,14 @@ Negative tests matter more than the happy path:
 - Google OpenID Connect (discovery URL, `hd`, `sub` versus `email`, token validation): https://developers.google.com/identity/openid-connect/openid-connect
 - Google Workspace: deploy 2-Step Verification: https://knowledge.workspace.google.com/admin/security/deploy-2-step-verification
 - Microsoft identity platform: register an application: https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app ; OpenID Connect (discovery, `{tenant}` values, redirect URI, sign-out): https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc
-- Microsoft identity platform: ID token claims reference (`tid`, `iss`, `oid`, `sub`, `email`): https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference ; optional claims reference (`amr` values): https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference
+- Microsoft identity platform: ID token claims reference (`tid`, `iss`, `oid`, `sub`, `email`): https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference ; optional claims reference (`amr`, `mfa` value): https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference ; optional claims reference (`amr` values): https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference
 - Microsoft Entra Conditional Access: require MFA for all users: https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-all-users-mfa-strength
 - GitHub OAuth apps: authorizing: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps ; creating: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app ; scopes: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
 - GitHub REST: organization members: https://docs.github.com/en/rest/orgs/members ; team members: https://docs.github.com/en/rest/teams/members
 - Okta: OAuth 2.0 and OpenID Connect overview: https://developer.okta.com/docs/concepts/oauth-openid/ ; OIDC API reference (discovery, issuer, `amr`, `groups`): https://developer.okta.com/docs/reference/api/oidc/
 - Okta: add a groups claim: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/ ; sign users in to your web application: https://developer.okta.com/docs/guides/sign-into-web-app-redirect/-/main/ ; policies concept: https://developer.okta.com/docs/concepts/policies/
 - openid-client: https://github.com/panva/openid-client
-- Auth.js (installation, providers, session strategies): https://authjs.dev/
+- Auth.js (installation, providers): https://authjs.dev/ ; session strategies (a JWT cannot be expired early without a blocklist): https://authjs.dev/concepts/session-strategies
 - Authlib Flask client: https://docs.authlib.org/en/stable/oauth2/client/web/flask.html
 - go-oidc: https://pkg.go.dev/github.com/coreos/go-oidc/v3/oidc
 
@@ -964,7 +969,7 @@ For service-to-service calls to an identity provider or an API that supports it,
 
 ## 3. Mutual TLS
 
-A client certificate from your own internal CA ([self-signed.md](self-signed.md)) is a possession factor for a machine: the private key never crosses the wire, and a replaced client key cuts off one client, not all of them. It is not human MFA, and [mfa.md](mfa.md) still applies to every human path that reaches the host. The service guides already carry the server-side directives: `ssl_verify_client on` in [nginx.md](nginx.md), `SSLVerifyClient require` in [apache.md](apache.md), `clientcert=verify-full` in [postgresql.md](postgresql.md), `REQUIRE X509` in [mysql.md](mysql.md), `tls-auth-clients yes` in [redis.md](redis.md), `ssl_options.fail_if_no_peer_cert = true` in [rabbitmq.md](rabbitmq.md), and `require_certificate true` in [mosquitto.md](mosquitto.md). Issue one certificate per client, keep the CA key off the servers it signs for, and set short lifetimes so a lost key expires rather than lingers.
+A client certificate from your own internal CA ([self-signed.md](self-signed.md)) is a possession factor for a machine: the private key never crosses the wire, and a replaced client key cuts off one client, not all of them. Replacing a key does not by itself reject the old certificate: revoke it (a CRL or OCSP the server checks), remove it from an explicit allowlist, or let it expire, and test that the old credential is refused (RFC 5280 covers revocation). It is not human MFA, and [mfa.md](mfa.md) still applies to every human path that reaches the host. The service guides already carry the server-side directives: `ssl_verify_client on` in [nginx.md](nginx.md), `SSLVerifyClient require` in [apache.md](apache.md), `clientcert=verify-full` in [postgresql.md](postgresql.md), `REQUIRE X509` in [mysql.md](mysql.md), `tls-auth-clients yes` in [redis.md](redis.md), `ssl_options.fail_if_no_peer_cert = true` in [rabbitmq.md](rabbitmq.md), and `require_certificate true` in [mosquitto.md](mosquitto.md). Issue one certificate per client, keep the CA key off the servers it signs for, and set short lifetimes so a lost key expires rather than lingers.
 
 ## 4. Workload identity federation: no long-lived cloud keys in CI
 
@@ -1022,6 +1027,7 @@ API keys, client secrets, and client-certificate keys that cannot be federated a
 - Microsoft Entra: workload identity federation: https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation ; creating the trust on an app (subject formats, audience, exact match): https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-create-trust
 - Azure: authenticate from GitHub Actions by OpenID Connect (`azure/login`): https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect
 - SPIFFE and SPIRE: https://spiffe.io/ and https://spiffe.io/docs/latest/spire-about/
+- RFC 5280 (certificate revocation): https://www.rfc-editor.org/rfc/rfc5280
 - Secret manager vendor pages: linked inline in section 5.
 
 ======================================================================
@@ -1258,9 +1264,11 @@ ssl.openssl.ssl-conf-cmd = ( "MinProtocol" => "TLSv1.2" )
 
 ## 2. Redirect HTTP to HTTPS
 
-`mod_redirect` is built in. Per the lighttpd wiki:
+`mod_redirect` must be loaded: only `mod_indexfile`, `mod_dirlisting`, and `mod_staticfile` load without being listed in `server.modules`. Per the lighttpd wiki:
 
 ```
+server.modules += ( "mod_redirect" )
+
 $HTTP["scheme"] == "http" {
     url.redirect = ("" => "https://${url.authority}${url.path}${qsa}")
     url.redirect-code = 308        # explicit on versions before 1.4.75
@@ -1309,6 +1317,7 @@ curl -sI https://example.com/       # expect 401 without credentials once auth i
 - lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
 - lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth
 - lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
+- lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/1/wiki/docs_configurationoptions
 
 ======================================================================
 ==> caddy.md
@@ -1373,11 +1382,13 @@ app.example.com {
 To protect only part of a site, wrap the directive in a matcher:
 
 ```caddyfile
-    @admin path /admin/*
+    @admin path /admin /admin/*
     basic_auth @admin {
         admin $2a$14$REPLACE_WITH_HASH
     }
 ```
+
+Path matches are exact, and `/admin/*` alone does not match `/admin` itself, so list both forms; multiple paths in one matcher are OR'ed.
 
 `basic_auth` is single-factor. For human-facing sites, add MFA with the `forward_auth` directive (Caddy 2.5.1 and later) pointed at an [Authelia](https://www.authelia.com/) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
@@ -1387,6 +1398,8 @@ To protect only part of a site, wrap the directive in a matcher:
 caddy validate --config /etc/caddy/Caddyfile
 curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
+curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin     # 401 with the @admin matcher
+curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin/x   # 401 as well
 ```
 
 ## Common mistakes
@@ -1400,6 +1413,7 @@ curl -sI https://app.example.com/    # expect 401 without credentials once auth 
 - Automatic HTTPS: https://caddyserver.com/docs/automatic-https
 - basic_auth directive: https://caddyserver.com/docs/caddyfile/directives/basic_auth
 - tls directive: https://caddyserver.com/docs/caddyfile/directives/tls
+- Request matchers (path, wildcards, multiple paths): https://caddyserver.com/docs/caddyfile/matchers
 
 ======================================================================
 ==> haproxy.md
@@ -1651,9 +1665,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET,      // long random value from the environment
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: true, httpOnly: true, sameSite: 'lax' },
+  // store: a production session store (see below); the default MemoryStore is for development only
+  cookie: { secure: true, httpOnly: true, sameSite: 'lax', maxAge: 8 * 60 * 60 * 1000 },   // milliseconds
 }));
 ```
+
+Express says the default `MemoryStore` is not designed for production (it leaks memory and does not scale past one process): pass `store:` a production store such as [connect-redis](https://www.npmjs.com/package/connect-redis) or [connect-pg-simple](https://www.npmjs.com/package/connect-pg-simple), and set `cookie.maxAge` so sessions expire, since no maximum age is set by default.
 
 Rate-limit the login route (express-rate-limit v7):
 
@@ -1684,6 +1701,7 @@ ss -tlnp | grep node                 # behind a proxy: bound to 127.0.0.1 only
 
 - Node.js HTTPS module: https://nodejs.org/api/https.html
 - Express behind proxies: https://expressjs.com/en/guide/behind-proxies.html
+- express-session (MemoryStore warning, cookie.maxAge, compatible stores): https://expressjs.com/en/resources/middleware/session/
 - helmet: https://helmetjs.github.io/
 
 ======================================================================
@@ -1700,7 +1718,7 @@ Flask's built-in server (development only; it is not a production server, TLS or
 
 ```python
 app.run(host="127.0.0.1", port=8443, ssl_context=("cert.pem", "key.pem"))
-# ssl_context="adhoc" generates a throwaway self-signed cert; requires pyOpenSSL
+# ssl_context="adhoc" generates a throwaway self-signed cert; requires the cryptography package
 ```
 
 Gunicorn (Flask/Django/WSGI in production):
@@ -1756,7 +1774,7 @@ import secrets
 token = secrets.token_urlsafe(32)
 ```
 
-- FastAPI's security utilities (`fastapi.security`) implement OAuth2/OIDC flows and API-key headers; use them rather than parsing `Authorization` by hand.
+- FastAPI's `fastapi.security` classes (`HTTPBearer`, `APIKeyHeader`, `OAuth2AuthorizationCodeBearer`, and so on) extract the credential from the request and declare the OpenAPI security scheme; they validate nothing, and `OpenIdConnect` is documented as a stub that does not implement the scheme or use the discovery URL. Use them to extract the token, then validate it (signature, issuer, audience, expiry) with an OIDC library such as Authlib, and authorise per [oidc-integration.md](oidc-integration.md).
 - Rate-limit login routes (for example with a proxy-level limit or a library such as slowapi for ASGI apps).
 - MFA: add TOTP with [pyotp](https://github.com/pyauth/pyotp) plus the [qrcode](https://pypi.org/project/qrcode/) package for enrolment QR codes; [django-otp](https://pypi.org/project/django-otp/) integrates this into Django. Requirements and options in [mfa.md](mfa.md).
 
@@ -1783,6 +1801,8 @@ ss -tlnp | grep -E 'gunicorn|uvicorn|python'   # behind a proxy: 127.0.0.1 only
 - Uvicorn settings reference: https://github.com/encode/uvicorn/blob/master/docs/settings.md
 - Django deployment checklist: https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 - argon2-cffi: https://argon2-cffi.readthedocs.io/
+- Werkzeug serving (`ssl_context="adhoc"` requires cryptography): https://werkzeug.palletsprojects.com/en/stable/serving/
+- FastAPI security reference: https://fastapi.tiangolo.com/reference/security/ ; `OpenIdConnect` source (stub warning): https://github.com/fastapi/fastapi/blob/master/fastapi/security/open_id_connect_url.py
 
 ======================================================================
 ==> docker.md
@@ -1885,7 +1905,22 @@ The cluster equivalents of this repository's rules: nothing reaches a workload e
 
 ## 1. Gateway API with a maintained implementation
 
-Gateway API is a set of CRDs, not part of core Kubernetes; a controller you install implements them. This guide uses [Envoy Gateway](https://gateway.envoyproxy.io/): `helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.9.1 -n envoy-gateway-system --create-namespace` (version current at the time of writing; the default chart also installs the Gateway API CRDs), whose quickstart applies a `GatewayClass` named `eg` with `controllerName: gateway.envoyproxy.io/gatewayclass-controller`. Traefik's Gateway API provider (`providers.kubernetesGateway`) and Cilium (`gatewayAPI.enabled=true`, requires kube-proxy replacement) are maintained alternatives, linked in Sources. The `Gateway` is the entry point; keep its HTTP listener only for redirects and ACME challenges:
+Gateway API is a set of CRDs, not part of core Kubernetes; a controller you install implements them. This guide uses [Envoy Gateway](https://gateway.envoyproxy.io/): `helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.9.1 -n envoy-gateway-system --create-namespace` (version current at the time of writing; the default chart also installs the Gateway API CRDs). The chart does not create a `GatewayClass`; the quickstart applies one separately, and the `Gateway` below refers to it by name, so apply it first and confirm that the controller accepted it:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+```
+
+```bash
+kubectl get gatewayclass eg -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}'   # True
+```
+
+Traefik's Gateway API provider (`providers.kubernetesGateway`) and Cilium (`gatewayAPI.enabled=true`, requires kube-proxy replacement) are maintained alternatives, linked in Sources. The `Gateway` is the entry point; keep its HTTP listener only for redirects and ACME challenges:
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -1958,7 +1993,7 @@ spec:
   basicAuth: { users: { name: app-basic-auth } }
 ```
 
-For SSO, the same `SecurityPolicy` takes an `oidc` block (`provider.issuer`, `clientID`, a `clientSecret` Secret, `redirectURL`) so Envoy Gateway sends users to an OpenID Connect provider; enforce MFA at that provider ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)). The portable alternative for any Gateway implementation is oauth2-proxy or Authelia deployed in the cluster as the route's backend in front of the app, per [mfa.md](mfa.md), or publishing through [cloudflare.md](cloudflare.md).
+For SSO, the same `SecurityPolicy` takes an `oidc` block (`provider.issuer`, `clientID`, a `clientSecret` Secret, `redirectURL`) so Envoy Gateway sends users to an OpenID Connect provider; enforce MFA at that provider ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)). The portable alternative for any Gateway implementation is oauth2-proxy deployed in the cluster as the route's backend in front of the app, per [mfa.md](mfa.md). Authelia does not proxy traffic; the proxy calls its authorization endpoint, so it needs an implementation with external authorization. On Envoy Gateway the same `SecurityPolicy` takes an `extAuth.http` block whose `backendRefs` point at the Authelia Service and whose `path` is `/api/authz/ext-authz/`, per Authelia's Envoy Gateway page. Publishing through [cloudflare.md](cloudflare.md) is the other option.
 
 ## 4. Cluster posture
 
@@ -1973,7 +2008,7 @@ kubectl get svc -A | grep -E 'NodePort|LoadBalancer'                 # only the 
 kubectl get gateway/eg -o jsonpath='{.status.addresses[0].value}'   # the public address; DNS points here
 kubectl get certificate -A                                           # Ready=True
 curl -sI http://app.example.com/                                     # 301 to https://app.example.com/
-curl -s  https://app.example.com/                                    # 401 where basic auth is set
+curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/   # 401 where basic auth is set
 ```
 
 ## Sources (checked September 2026)
@@ -1981,7 +2016,9 @@ curl -s  https://app.example.com/                                    # 401 where
 - Ingress NGINX: Statement from the Kubernetes Steering and Security Response Committees (retirement, detection command): https://kubernetes.io/blog/2026/01/29/ingress-nginx-statement/ ; Kubernetes docs, Gateway API (successor to Ingress, migration guide): https://kubernetes.io/docs/concepts/services-networking/gateway/
 - Gateway API getting started (CRD install): https://gateway-api.sigs.k8s.io/guides/getting-started/ ; TLS: https://gateway-api.sigs.k8s.io/guides/tls/ ; HTTP routing: https://gateway-api.sigs.k8s.io/guides/http-routing/ ; redirects: https://gateway-api.sigs.k8s.io/guides/http-redirect-rewrite/
 - Envoy Gateway: https://gateway.envoyproxy.io/ ; Helm install: https://gateway.envoyproxy.io/docs/install/install-helm/ ; quickstart and its manifest (GatewayClass `controllerName`): https://gateway.envoyproxy.io/docs/tasks/quickstart/ , https://github.com/envoyproxy/gateway/releases/download/v1.9.1/quickstart.yaml
-- Envoy Gateway tasks, secure gateways (TLS listener): https://gateway.envoyproxy.io/docs/tasks/security/secure-gateways/ ; basic auth: https://gateway.envoyproxy.io/docs/tasks/security/basic-auth/ ; OIDC: https://gateway.envoyproxy.io/docs/tasks/security/oidc/ ; HTTP redirect: https://gateway.envoyproxy.io/docs/tasks/traffic/http-redirect/
+- Envoy Gateway tasks, secure gateways (TLS listener): https://gateway.envoyproxy.io/docs/tasks/security/secure-gateways/ ; basic auth: https://gateway.envoyproxy.io/docs/tasks/security/basic-auth/ ; OIDC: https://gateway.envoyproxy.io/docs/tasks/security/oidc/ ; external authorization (`extAuth`): https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/ ; HTTP redirect: https://gateway.envoyproxy.io/docs/tasks/traffic/http-redirect/
+- Authelia: proxy integration (the proxy calls the authorization endpoint): https://www.authelia.com/integration/proxies/introduction/ ; Envoy Gateway `SecurityPolicy` example: https://www.authelia.com/integration/kubernetes/envoy/gateway/
+- kubectl JSONPath filter syntax: https://kubernetes.io/docs/reference/kubectl/jsonpath/
 - cert-manager Gateway API usage (enabling support, annotations): https://cert-manager.io/docs/usage/gateway/ ; ACME HTTP-01 `gatewayHTTPRoute` solver: https://cert-manager.io/docs/configuration/acme/http01/
 - Traefik Kubernetes Gateway API provider: https://doc.traefik.io/traefik/reference/install-configuration/providers/kubernetes/kubernetes-gateway/ ; Cilium Gateway API support: https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/
 
@@ -2081,7 +2118,20 @@ import { handlers } from "@/auth"
 export const { GET, POST } = handlers
 ```
 
-Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for OIDC `AUTH_<PROVIDER>_ISSUER`; provider setup and the allowlist check are in [oidc-integration.md](oidc-integration.md) and [identity-providers.md](identity-providers.md). Behind a reverse proxy set `AUTH_TRUST_HOST=true` (automatic on Vercel). Server code calls `const session = await auth()`; a Route Handler wrapped as `export const GET = auth(function GET(req) { ... })` returns 401 when `req.auth` is absent. `export { auth as proxy }` in `proxy.ts` is the optimistic layer, and Auth.js says not to rely on it exclusively. MFA is not part of this configuration; enforce it at the identity provider ([mfa.md](mfa.md)).
+Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for OIDC `AUTH_<PROVIDER>_ISSUER`; provider setup and the allowlist check are in [oidc-integration.md](oidc-integration.md) and [identity-providers.md](identity-providers.md). Behind a reverse proxy set `AUTH_TRUST_HOST=true` (automatic on Vercel). Server code calls `const session = await auth()`. Wrapping a Route Handler with `auth(...)` only fills in `req.auth`; nothing refuses the request for you, so the handler must check the session, then authorise, then touch data:
+
+```ts
+// app/api/notes/route.ts
+import { NextResponse } from "next/server"
+import { auth } from "@/auth"
+export const GET = auth(async function GET(req) {
+  if (!req.auth) return NextResponse.json({ message: "Not authenticated" }, { status: 401 })  // no automatic 401
+  if (!isAllowed(req.auth.user)) return NextResponse.json({ message: "Forbidden" }, { status: 403 })  // your allowlist
+  return NextResponse.json(await loadNotes(req.auth.user))
+})
+```
+
+`export { auth as proxy }` in `proxy.ts` is the optimistic layer, and Auth.js says not to rely on it exclusively. MFA is not part of this configuration; enforce it at the identity provider ([mfa.md](mfa.md)).
 
 **Better Auth** (https://www.better-auth.com/docs/introduction): `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`) and `BETTER_AUTH_URL`; the placeholder default secret throws in production.
 
@@ -2128,6 +2178,7 @@ grep -rl "${SESSION_SECRET:0:8}" .next/static           # no output: the browser
 - Next.js authentication guide: https://nextjs.org/docs/app/guides/authentication ; data security guide: https://nextjs.org/docs/app/guides/data-security
 - Next.js `proxy.js`: https://nextjs.org/docs/app/api-reference/file-conventions/proxy ; `route.js`: https://nextjs.org/docs/app/api-reference/file-conventions/route ; `cookies`: https://nextjs.org/docs/app/api-reference/functions/cookies
 - Next.js environment variables: https://nextjs.org/docs/app/guides/environment-variables ; CLI (`next start` defaults): https://nextjs.org/docs/app/api-reference/cli/next ; self-hosting: https://nextjs.org/docs/app/guides/self-hosting
+- Auth.js protecting resources (Route Handler `req.auth` check): https://authjs.dev/getting-started/session-management/protecting
 - Auth.js installation: https://authjs.dev/getting-started/installation ; deployment (`AUTH_SECRET`, `AUTH_TRUST_HOST`, provider variables): https://authjs.dev/getting-started/deployment ; protecting resources: https://authjs.dev/getting-started/session-management/protecting
 - Better Auth introduction: https://www.better-auth.com/docs/introduction ; installation: https://www.better-auth.com/docs/installation ; options: https://www.better-auth.com/docs/reference/options ; Next.js integration: https://www.better-auth.com/docs/integrations/next ; two-factor plugin: https://www.better-auth.com/docs/plugins/2fa
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
@@ -2211,8 +2262,8 @@ client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{R
 ```bash
 curl -sI http://example.com/         # expect 301 with a https:// Location
 curl -sI https://example.com/        # succeeds without -k
-curl -s  https://example.com/api     # expect 401/403 without credentials
-ss -tlnp | grep <binary-name>        # behind a proxy: 127.0.0.1 only
+curl -sS -o /dev/null -w '%{http_code}\n' https://example.com/api   # 401 or 403 without credentials
+ss -tlnp | grep REPLACE_WITH_BINARY_NAME   # behind a proxy: 127.0.0.1 only
 ```
 
 ## Sources (checked September 2026)
@@ -2282,6 +2333,8 @@ builder.Services.ConfigureApplicationCookie(options => {
     options.ExpireTimeSpan = TimeSpan.FromHours(8); });
 ```
 
+Lockout counts a failure only when the sign-in call asks for it: pass `lockoutOnFailure: true` to `_signInManager.PasswordSignInAsync(email, password, rememberMe, lockoutOnFailure: true)`. With the default `false`, the `Lockout` options above never trigger.
+
 Without Identity, the same `Cookie.*` options go on `AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => ...)`; call `app.UseAuthentication()` then `app.UseAuthorization()` before the `Map*` calls. Deny by default with `AddAuthorizationBuilder().SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())` and mark public pages `[AllowAnonymous]`.
 
 Rate-limit the login route with the built-in middleware (`Microsoft.AspNetCore.RateLimiting`, .NET 7 and later):
@@ -2306,7 +2359,7 @@ SSO: the `Microsoft.AspNetCore.Authentication.OpenIdConnect` package adds `.AddO
 ```bash
 curl -sI http://example.com/         # expect 307 or 308 with a https:// Location
 curl -sI https://example.com/        # succeeds without -k; shows Strict-Transport-Security
-curl -s  https://example.com/api     # expect 401/403 without credentials
+curl -sS -o /dev/null -w '%{http_code}\n' https://example.com/api   # 401 or 403 without credentials
 ss -tlnp | grep dotnet               # behind a proxy: 127.0.0.1 and ::1 only
 ```
 
@@ -2383,10 +2436,11 @@ SSO: `spring-boot-starter-oauth2-client` plus properties and `http.oauth2Login(w
 spring.security.oauth2.client.registration.sso.client-id=REPLACE_WITH_CLIENT_ID
 spring.security.oauth2.client.registration.sso.client-secret=${SSO_CLIENT_SECRET}
 spring.security.oauth2.client.registration.sso.provider=sso
+spring.security.oauth2.client.registration.sso.scope=openid,profile,email
 spring.security.oauth2.client.provider.sso.issuer-uri=https://idp.example.com/
 ```
 
-The `issuer-uri` drives OpenID Connect discovery. Allowlist and token checks are in [oidc-integration.md](oidc-integration.md), providers in [identity-providers.md](identity-providers.md). MFA: enforce it at the identity provider, or front the app per [mfa.md](mfa.md).
+The `issuer-uri` drives OpenID Connect discovery, and the `openid` scope is what makes the registration an OpenID Connect login that returns an ID token; without it the login is plain OAuth2. Allowlist and token checks are in [oidc-integration.md](oidc-integration.md), providers in [identity-providers.md](identity-providers.md). MFA: enforce it at the identity provider, or front the app per [mfa.md](mfa.md).
 
 ## 4. Client-side TLS discipline
 
@@ -2397,7 +2451,7 @@ The `issuer-uri` drives OpenID Connect discovery. Allowlist and token checks are
 
 ```bash
 curl -sI https://example.com/        # succeeds without -k; shows Strict-Transport-Security
-curl -s  https://example.com/api     # expect 401 or a login redirect without credentials
+curl -sS -o /dev/null -w '%{http_code}\n' https://example.com/api   # 401, or 302 to the login page, without credentials
 ss -tlnp | grep java                 # behind a proxy: 127.0.0.1 only
 grep -c "Using generated security password" app.log   # must be 0: otherwise the default user is still active
 ```
@@ -2559,11 +2613,14 @@ end
 ## 4. Client-side TLS discipline
 
 ```ruby
-Net::HTTP.start("api.example.com", 443, use_ssl: true) do |http|   # verify_mode defaults to OpenSSL::SSL::VERIFY_PEER
-  http.ca_file = "/etc/ssl/certs/internal-ca.pem"                  # internal CA; or set SSL_CERT_FILE in the environment
+Net::HTTP.start("api.example.com", 443,
+                use_ssl: true,                                  # verify_mode defaults to OpenSSL::SSL::VERIFY_PEER
+                ca_file: "/etc/ssl/certs/internal-ca.pem") do |http|   # internal CA; or set SSL_CERT_FILE in the environment
   http.request(Net::HTTP::Get.new("/"))
 end
 ```
+
+`Net::HTTP.start` takes `use_ssl`, `ca_file`, `verify_mode`, and the other SSL settings in its options hash and applies them when it opens the connection. Assigning `http.ca_file` inside the block comes after the handshake and does not affect it; to set attributes on an instance, use `Net::HTTP.new` and set them before calling `start`.
 
 Never set `verify_mode = OpenSSL::SSL::VERIFY_NONE`. Ruby's default SSL context loads the system store through `set_default_paths`, and OpenSSL reads `SSL_CERT_FILE` and `SSL_CERT_DIR` to locate that store, so an internal CA goes there (see [self-signed.md](self-signed.md)) rather than into a disabled check.
 
@@ -2622,6 +2679,19 @@ sudo sshd -t && sudo systemctl reload ssh    # sshd on RHEL-family systems
 
 Add a second factor for SSH per [mfa.md](mfa.md): TOTP via [google-authenticator-libpam](https://github.com/google/google-authenticator-libpam) or push approval via Duo's `pam_duo`.
 
+Both run through PAM's keyboard-interactive path, which the block above turns off. When adding PAM MFA, change the block to:
+
+```
+PasswordAuthentication no
+KbdInteractiveAuthentication yes
+UsePAM yes
+AuthenticationMethods publickey,keyboard-interactive
+PermitRootLogin no
+PubkeyAuthentication yes
+```
+
+`AuthenticationMethods` with a comma-separated list requires every method in it, so a key alone is no longer enough. `PasswordAuthentication no` stays: the code prompt is keyboard-interactive, not password. Older sshd_config files spell the first option `ChallengeResponseAuthentication`; set that one to `yes` where it is the one present.
+
 ## 2. Firewall: default deny inbound
 
 ```bash
@@ -2647,6 +2717,7 @@ RHEL-family systems use firewalld (`firewall-cmd --permanent --add-service=https
 ss -tlnp                          # only intended listeners, on intended addresses
 sudo ufw status verbose           # default deny incoming, minimal allow list
 ssh -o PreferredAuthentications=password user@host   # expect: Permission denied
+ssh user@host                     # with PAM MFA: the key is accepted, then the code prompt appears before a shell
 ```
 
 Run the SSH test from a second terminal before closing your working session.
@@ -2657,6 +2728,7 @@ Run the SSH test from a second terminal before closing your working session.
 - fail2ban: https://github.com/fail2ban/fail2ban
 - CrowdSec: https://www.crowdsec.net/
 - google-authenticator-libpam: https://github.com/google/google-authenticator-libpam
+- Duo Unix (`UsePAM`, `KbdInteractiveAuthentication`, `AuthenticationMethods publickey,keyboard-interactive`): https://duo.com/docs/duounix
 
 ======================================================================
 ==> cloud-firewalls.md
@@ -2677,7 +2749,7 @@ On AWS (security groups), Google Cloud (VPC firewall rules), and Azure (network 
 ## Verify
 
 - Provider console or CLI: list rules allowing `0.0.0.0/0` and confirm that each one is 80/443 on the front layer, nothing else.
-- From an outside network: `nc -vz <public-ip> 5432 3306 27017 6379 22` fails on every port.
+- From an outside network: `for p in 22 3306 5432 6379 27017; do nc -vz -w 3 203.0.113.10 "$p"; done   # every line must fail to connect`. Each port must report a refused or timed-out connection; a usage error from `nc` (some netcat variants take one port or a range per invocation) is not a passing result.
 - An external scan of the public IP (for example with nmap, against your own infrastructure only) shows only the intended ports.
 
 ## Sources (checked September 2026)
@@ -2746,7 +2818,7 @@ ssl_min_protocol_version = 'TLSv1.2'      # PostgreSQL 12 and later
 password_encryption = scram-sha-256       # default from PostgreSQL 14; set explicitly on older versions
 ```
 
-Reload with `SELECT pg_reload_conf();` or `systemctl reload postgresql`.
+The `ssl*` and `password_encryption` settings apply on reload (`SELECT pg_reload_conf();` or `systemctl reload postgresql`); `listen_addresses` can only be set at server start, so a change to it needs `systemctl restart postgresql`, then `ss -tlnp | grep 5432` to confirm the bind.
 
 ## 2. Require TLS per connection in pg_hba.conf
 
@@ -2763,7 +2835,7 @@ Passwords set before `password_encryption = scram-sha-256` remain MD5-hashed; re
 
 For machine-to-machine links, add certificate verification on top of SCRAM: set `ssl_ca_file` in `postgresql.conf` and append `clientcert=verify-full` to the `hostssl` line (PostgreSQL 12 and later).
 
-MFA: the PostgreSQL wire protocol has no TOTP dialogue. Treat `clientcert=verify-full` as the second factor for direct connections, chain the `radius` authentication method to an MFA service (for example the Duo Authentication Proxy) where policy requires it, and put the human paths to the host (SSH, admin UIs) behind MFA per [mfa.md](mfa.md).
+MFA: the PostgreSQL wire protocol has no TOTP dialogue. For direct connections `clientcert=verify-full` adds a possession factor held by the connecting machine, stronger than a password alone but not MFA for a person; chain the `radius` authentication method to an MFA service (for example the Duo Authentication Proxy) where policy requires it, and put the human paths to the host (SSH, admin UIs) behind MFA per [mfa.md](mfa.md).
 
 ## 3. Client side
 
@@ -2840,7 +2912,7 @@ ALTER USER 'batch'@'10.0.0.%' REQUIRE X509;
 
 Account hygiene per [authentication.md](authentication.md): keep the default `caching_sha2_password` plugin for new accounts (MySQL 8) rather than re-enabling `mysql_native_password`, remove anonymous accounts, and give the application a least-privilege user, never `root`.
 
-MFA: MySQL 8.0.27 and later support up to 3 authentication factors per account, with factors 2 and 3 supplied by external plugins; the server-side FIDO plugin ships only in Enterprise Edition. On Community builds, treat `REQUIRE X509` client certificates as the practical second factor, and put human access paths behind MFA per [mfa.md](mfa.md).
+MFA: MySQL 8.0.27 and later support up to 3 authentication factors per account, with factors 2 and 3 supplied by external plugins. The device plugin is FIDO from 8.0.27 (deprecated as of 8.0.35) and WebAuthn, which replaces it, from 8.2 onward including 8.4 LTS; in both cases the server-side plugin ships only in Enterprise Edition. On Community builds, `REQUIRE X509` client certificates add a possession factor held by the connecting machine, stronger than a password alone but not MFA for a person; put human access paths behind MFA per [mfa.md](mfa.md).
 
 ## 3. Client side
 
@@ -2876,6 +2948,8 @@ ss -tlnp | grep 3306        # loopback only, unless remote access is deliberate
 - MySQL encrypted connections: https://dev.mysql.com/doc/refman/8.0/en/using-encrypted-connections.html
 - MySQL multifactor authentication: https://dev.mysql.com/doc/refman/8.0/en/multifactor-authentication.html
 - MariaDB TLS documentation: https://mariadb.com/kb/en/secure-connections-overview/
+- WebAuthn pluggable authentication (MySQL 8.4): https://dev.mysql.com/doc/refman/8.4/en/webauthn-pluggable-authentication.html
+- FIDO pluggable authentication (MySQL 8.0, deprecated as of 8.0.35): https://dev.mysql.com/doc/refman/8.0/en/fido-pluggable-authentication.html
 
 ======================================================================
 ==> mongodb.md
@@ -2910,7 +2984,7 @@ db.createUser({
 
 Create a separate least-privilege user per application (for example `readWrite` on its own database), per [authentication.md](authentication.md). Modern MongoDB authenticates with SCRAM-SHA-256 by default.
 
-MFA: the wire protocol has no TOTP dialogue in Community edition; x.509 client-certificate authentication is the second factor for direct connections, and human paths to the host (SSH, admin UIs) go behind MFA per [mfa.md](mfa.md).
+MFA: the wire protocol has no TOTP dialogue in Community edition; x.509 client-certificate authentication adds a possession factor held by the connecting machine for direct connections, stronger than a password alone but not MFA for a person, and human paths to the host (SSH, admin UIs) go behind MFA per [mfa.md](mfa.md).
 
 ## 2. Enable TLS
 
@@ -2926,10 +3000,13 @@ net:
   tls:
     mode: requireTLS
     certificateKeyFile: /etc/ssl/mongodb/server.pem
-    CAFile: /etc/ssl/mongodb/ca.crt     # needed when clients or cluster members present certificates
+    # validates any certificate a client or cluster member presents
+    CAFile: /etc/ssl/mongodb/ca.crt
+    # clients authenticate with SCRAM over TLS; set false when every client holds a certificate
+    allowConnectionsWithoutCertificates: true
 ```
 
-`requireTLS` rejects plain connections outright; the transitional modes (`allowTLS`, `preferTLS`) exist for rolling upgrades only.
+With `CAFile` set, `mongod` expects every client to present a certificate unless `allowConnectionsWithoutCertificates: true`; the setting still validates any certificate a client does present, and it is what lets the SCRAM-only `mongosh` connections below work. `requireTLS` rejects plain connections outright; the transitional modes (`allowTLS`, `preferTLS`) exist for rolling upgrades only.
 
 ## 3. Client side
 
@@ -3004,12 +3081,14 @@ MFA: Redis has no second-factor dialogue. For machine clients, `tls-auth-clients
 Get a certificate ([free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md)), then replace the plaintext port with a TLS listener:
 
 ```
-port 0                     # no plaintext listener at all
+# no plaintext listener at all
+port 0
 tls-port 6379
 tls-cert-file    /etc/redis/tls/server.crt
 tls-key-file     /etc/redis/tls/server.key
 tls-ca-cert-file /etc/redis/tls/ca.crt
-tls-auth-clients no        # yes = require client certificates (mutual TLS)
+# yes = require client certificates (mutual TLS)
+tls-auth-clients no
 ```
 
 Set `tls-auth-clients yes` for machine-to-machine deployments where clients can hold certificates; it is stronger than passwords alone.
@@ -3019,7 +3098,7 @@ Set `tls-auth-clients yes` for machine-to-machine deployments where clients can 
 ```bash
 redis-cli --tls --cacert /etc/redis/tls/ca.crt -h redis.example.com -p 6379
 > AUTH app REPLACE_WITH_PASSWORD
-> PING
+> GET app:probe          # allowed by ~app:* +@read; PING is @connection, which the ACL above does not grant
 ```
 
 Application clients take equivalent TLS and credential options; point them at the CA rather than disabling verification.
@@ -3087,6 +3166,8 @@ An unauthenticated `GET /` returning cluster JSON is the classic finding; so is 
 
 MinIO serves S3-compatible object storage; an exposed instance with weak or well-known credentials hands over every bucket. Both the S3 API port and the web console need the same care.
 
+Lifecycle note, as of September 2026: the MinIO community repository on GitHub was archived on 2026-04-25 and carries the notice that it is no longer maintained; MinIO now ships AIStor Free (a standalone edition under a free licence) and AIStor Enterprise. The settings below are documented for AIStor. An archived community build receives no security fixes, so treat running one as a finding and plan the migration.
+
 ## 1. Set real root credentials
 
 ```bash
@@ -3123,6 +3204,7 @@ mc alias set mys3 https://s3.example.com:9000 <access-key> <secret>   # app key 
 
 - MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/enterprise/aistor-object-store/installation/linux/network-encryption/
 - MinIO: https://min.io/
+- MinIO community repository (archived 2026-04-25, successor editions): https://github.com/minio/minio
 
 ======================================================================
 ==> rabbitmq.md
@@ -3160,7 +3242,7 @@ ssl_options.fail_if_no_peer_cert = true   # mutual TLS; set false to allow passw
 listeners.tcp = none
 ```
 
-Certificates per [self-signed.md](self-signed.md) (internal CA fits brokers well) or [free-certificates.md](free-certificates.md). Mutual TLS doubles as the second factor for machine clients ([mfa.md](mfa.md)).
+Certificates per [self-signed.md](self-signed.md) (internal CA fits brokers well) or [free-certificates.md](free-certificates.md). Mutual TLS gives a machine client a possession factor, a certificate held by the connecting host, stronger than a password alone but not MFA for a person ([mfa.md](mfa.md)).
 
 ## 3. Management UI
 
@@ -3214,7 +3296,7 @@ keyfile  /etc/mosquitto/tls/server.key
 # require_certificate true      # mutual TLS: clients must present certificates
 ```
 
-Port 8883 is the conventional MQTT-over-TLS port. Certificates per [self-signed.md](self-signed.md) (an internal CA suits device fleets) or [free-certificates.md](free-certificates.md). `require_certificate true` turns client certificates into the second factor for machines ([mfa.md](mfa.md)). Remove or firewall any plaintext `listener 1883` that is not strictly local.
+Port 8883 is the conventional MQTT-over-TLS port. Certificates per [self-signed.md](self-signed.md) (an internal CA suits device fleets) or [free-certificates.md](free-certificates.md). `require_certificate true` makes a client certificate a possession factor for the connecting device, stronger than a password alone but not MFA for a person ([mfa.md](mfa.md)). Remove or firewall any plaintext `listener 1883` that is not strictly local.
 
 ## 3. Verify
 
@@ -3256,7 +3338,9 @@ ssl.keystore.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ssl.truststore.location=/var/private/ssl/server.truststore.jks
 ssl.truststore.password=REPLACE_WITH_LONG_RANDOM_VALUE
-ssl.client.auth=none          # required = mutual TLS; requested = optional client certificates
+# Client certificates on the SASL_SSL listener: none (default), requested (optional), or required (mutual TLS).
+# The unprefixed ssl.client.auth applies only to SSL listeners, so a SASL_SSL listener needs the listener prefix.
+listener.name.sasl_ssl.ssl.client.auth=none
 ```
 
 ## 3. SASL/SCRAM credentials
@@ -3297,7 +3381,7 @@ bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config adm
 
 ## 5. Client side
 
-`client.properties`, kept out of the repository ([secrets.md](secrets.md)). MFA: the Kafka protocol has no second-factor dialogue; `ssl.client.auth=required` (mutual TLS) is the possession factor for machine clients ([machine-auth.md](machine-auth.md)), and human paths to the brokers or a management UI go behind MFA per [mfa.md](mfa.md).
+`client.properties`, kept out of the repository ([secrets.md](secrets.md)). MFA: the Kafka protocol has no second-factor dialogue; `listener.name.sasl_ssl.ssl.client.auth=required` (mutual TLS; the unprefixed `ssl.client.auth` applies only to `SSL` listeners, and Kafka logs a warning when it is set without the prefix on a `SASL_SSL` broker) is the possession factor for machine clients ([machine-auth.md](machine-auth.md)), and each client then presents its own keystore as in the last three lines below; human paths to the brokers or a management UI go behind MFA per [mfa.md](mfa.md).
 
 ```properties
 security.protocol=SASL_SSL
@@ -3305,6 +3389,10 @@ sasl.mechanism=SCRAM-SHA-512
 sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="app" password="REPLACE_WITH_LONG_RANDOM_VALUE";
 ssl.truststore.location=/var/private/ssl/client.truststore.jks
 ssl.truststore.password=REPLACE_WITH_LONG_RANDOM_VALUE
+# only when the listener requires client certificates
+ssl.keystore.location=/var/private/ssl/client.keystore.jks
+ssl.keystore.password=REPLACE_WITH_LONG_RANDOM_VALUE
+ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ```
 
 ## Verify
@@ -3312,14 +3400,18 @@ ssl.truststore.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ```bash
 ss -tlnp | grep -E '9092|9093'                                # 9093 only, or 9092 on 127.0.0.1
 openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake with your certificate
-bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --topic orders   # no credentials: fails
+# wrong.properties: a copy of client.properties (security.protocol=SASL_SSL) with a deliberately wrong SCRAM password
+bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
+  --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)
+bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config client.properties \
+  --topic orders --from-beginning --max-messages 1   # authorised app credential: reads one message
 bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties --list --topic orders
 ```
 
 ## Common mistakes
 
 - `SASL_SSL` added as a second listener while `PLAINTEXT://:9092` stays advertised, so clients quietly keep using it.
-- Authorizer enabled with `allow.everyone.if.no.acl.found=true` "temporarily", which equals no authorizer.
+- Authorizer enabled with `allow.everyone.if.no.acl.found=true` "temporarily". The flag opens only resources that have no ACL at all; existing ACLs are still enforced. That still means every new topic is world-readable and world-writable until someone adds its first ACL, so keep it `false`.
 
 ## Sources (checked September 2026)
 
@@ -3329,6 +3421,7 @@ bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config adm
 - Authentication using SASL, SCRAM section (source): https://raw.githubusercontent.com/apache/kafka/trunk/docs/security/authentication-using-sasl.md
 - Authorization and ACLs (source): https://raw.githubusercontent.com/apache/kafka/trunk/docs/security/authorization-and-acls.md
 - Broker configuration reference (defaults for `listeners`, `sasl.enabled.mechanisms`): https://kafka.apache.org/40/generated/kafka_config.html
+- SSL client authentication on `SASL_SSL` listeners needs the listener prefix (source, `ChannelBuilders.java`): https://raw.githubusercontent.com/apache/kafka/trunk/clients/src/main/java/org/apache/kafka/common/network/ChannelBuilders.java
 
 ======================================================================
 ==> clickhouse.md
@@ -3605,11 +3698,11 @@ IAM Access Analyzer for S3 lists every bucket in the account whose ACL, bucket p
 ## 3. Google Cloud Storage
 
 - Enable uniform bucket-level access so ACLs are disabled and only IAM grants access; after 90 consecutive days it cannot be turned off, which is the point.
-- Enforce public access prevention on the bucket, or at project, folder, or organization level with the `storage.publicAccessPrevention` constraint; grants to `allUsers` and `allAuthenticatedUsers` then fail with `401` or `403`. A bucket shows `enforced` or `inherited`.
+- Enforce public access prevention on the bucket, or at project, folder, or organization level with the `storage.publicAccessPrevention` constraint; attempts to grant `allUsers` or `allAuthenticatedUsers` then fail with `412 Precondition Failed`, and anonymous requests to data get `401` or `403`. A bucket shows `enforced` or `inherited`.
 - Signed URLs (V4) expire after at most 604800 seconds (7 days); `gcloud storage sign-url --duration=1h` allows up to 12 hours with the caller's credentials or 7 days with a service-account private key. Public access prevention does not apply to signed URLs, so keep their durations short.
 
 ```bash
-gcloud storage buckets update gs://example-bucket --uniform-bucket-level-access --public-access-prevention=enforced
+gcloud storage buckets update gs://example-bucket --uniform-bucket-level-access --public-access-prevention   # boolean flags; describe then reads back enforced
 gcloud storage buckets describe gs://example-bucket          # uniform_bucket_level_access: true, public access prevention enforced
 ```
 
@@ -3637,7 +3730,9 @@ using ( (select auth.jwt()->>'sub') = owner_id );
 
 ```bash
 curl -sI https://example-bucket.s3.amazonaws.com/model.safetensors        # 403, never 200
-curl -sI "$(aws s3 presign s3://example-bucket/model.safetensors --expires-in 60)"   # 200 now, 403 after a minute
+URL="$(aws s3 presign s3://example-bucket/model.safetensors --expires-in 60)"   # signs a GET, so test with GET
+curl -sS -o /dev/null -w '%{http_code}\n' "$URL"              # 200 now
+sleep 61; curl -sS -o /dev/null -w '%{http_code}\n' "$URL"    # 403 once the minute has passed
 ```
 
 - An anonymous request to any object URL is denied (S3 returns `403`; GCS `401` or `403`; Azure `401`, or `409` when the account disallows anonymous access; Supabase private buckets return an error, not the file).
@@ -3695,7 +3790,7 @@ Once TLS is on, connect via `https://`; the server no longer answers plain `http
 
 - Do not set `c.ServerApp.ip = '0.0.0.0'` (or `--ip 0.0.0.0`) without the password from step 1 **and** TLS from step 2 in place.
 - Never blank the token or password settings to make login prompts go away; that is exactly the configuration internet scanners look for.
-- A reverse proxy with its own auth ([nginx.md](nginx.md), [caddy.md](caddy.md)) or Cloudflare Access ([cloudflare.md](cloudflare.md)) in front of a loopback-bound Jupyter is a sound alternative to native TLS, and adds a second factor in the Access case.
+- A reverse proxy with its own auth ([nginx.md](nginx.md), [caddy.md](caddy.md)) or Cloudflare Access ([cloudflare.md](cloudflare.md)) in front of a loopback-bound Jupyter is a sound alternative to native TLS. It adds a second factor only if the Access policy or identity provider behind it is configured to require one; fronting alone does not.
 - MFA: the Jupyter password is single-factor, so the fronting options above are where the second factor comes from; multi-user deployments on JupyterHub can delegate login to an OIDC/OAuth provider that enforces MFA. Options in [mfa.md](mfa.md).
 
 ## 4. Verify
@@ -3802,10 +3897,12 @@ Open WebUI has account-based authentication built in; the risks are open signup 
 Environment variables (defaults per the Open WebUI reference):
 
 ```
-ENABLE_SIGNUP=false          # default true; disable once your accounts exist
+ENABLE_SIGNUP=false          # default true; disable once your accounts exist (persisted, see below)
 DEFAULT_USER_ROLE=pending    # the default; new accounts wait for admin approval
                              # other values: user, admin
 ```
+
+`ENABLE_SIGNUP` is a persisted setting: the reference marks it a `ConfigVar`, which means the value is written to the database on first launch and on later starts the stored value wins over the environment, unless `ENABLE_PERSISTENT_CONFIG=false` (default `true`). On an instance that has already started, change signup in the Admin panel rather than in the environment, then confirm the change took effect (Verify below).
 
 With signup left on, keep `DEFAULT_USER_ROLE=pending` so a stranger who registers gets no access until approved. An admin account can also be created at startup by setting `WEBUI_ADMIN_EMAIL` together with `WEBUI_ADMIN_PASSWORD` (supply the password via the environment, not a compose file in git; see [secrets.md](secrets.md)).
 
@@ -3824,8 +3921,9 @@ Publish it through [caddy.md](caddy.md)/[nginx.md](nginx.md) with a certificate 
 ```bash
 ss -tlnp | grep 3000                      # loopback only
 curl -sI https://chat.example.com/        # serves over TLS
-# In a private browser window: login page appears; registering a new account
-# yields a pending/unapproved user, not access.
+# In a private browser window: login page appears; with ENABLE_SIGNUP=false the
+# sign-up option is absent and an attempt to register is refused. With signup on,
+# registering a new account yields a pending/unapproved user, not access.
 ```
 
 ## Sources (checked September 2026)
@@ -3853,6 +3951,8 @@ The master key is the root credential for the proxy; it belongs to the operator 
 
 ## 2. Issue virtual keys per application
 
+Virtual keys need a PostgreSQL database: set `DATABASE_URL=postgresql://user:password@host:5432/dbname` in the environment (or `database_url` under `general_settings`) before `/key/generate` will work.
+
 ```bash
 curl https://llm.example.com/key/generate \
   -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
@@ -3869,7 +3969,7 @@ Run the proxy on loopback (or a private container network) and publish it only t
 ## 4. Verify
 
 ```bash
-curl -s https://llm.example.com/v1/models                       # 401 without a key
+curl -sS -o /dev/null -w '%{http_code}\n' https://llm.example.com/v1/models   # 401 without a key
 curl -s https://llm.example.com/v1/models -H "Authorization: Bearer <virtual-key>"   # model list
 ss -tlnp | grep 4000                                            # loopback only
 ```
@@ -3904,6 +4004,8 @@ vLLM's server supports requiring an API key; check `vllm serve --help` on your i
 ## Hugging Face Text Generation Inference (TGI)
 
 `text-generation-launcher` listens on `0.0.0.0:3000` by default (`--hostname`, env `HOSTNAME`; `--port`, env `PORT`), so a bare TGI container answers on every interface. Bind it to loopback, or publish nothing from the container network except the proxy:
+
+Lifecycle note, as of September 2026: the TGI repository is in maintenance mode and was archived on 2026-03-21 (read-only). Hugging Face recommends vLLM, SGLang, or local engines such as llama.cpp going forward. A server that no longer receives fixes belongs behind the same controls as any other, and on a migration list.
 
 ```bash
 text-generation-launcher --model-id <model> --hostname 127.0.0.1 --port 3000
@@ -3956,6 +4058,7 @@ curl -s https://models.example.com/v1/models -H "Authorization: Bearer <key>"   
 - vLLM documentation: https://docs.vllm.ai/
 - TGI launcher arguments (--hostname, --port, --api-key, --prometheus-port): https://huggingface.co/docs/text-generation-inference/reference/launcher
 - TGI router source (what --api-key enforces): https://github.com/huggingface/text-generation-inference/blob/main/router/src/server.rs
+- TGI repository (maintenance-mode notice, archived 2026-03-21): https://github.com/huggingface/text-generation-inference
 - SGLang server arguments (--host, --port, --api-key, --admin-api-key, SSL flags; docs.sglang.ai redirects here): https://docs.sglang.io/advanced_features/server_arguments.html
 - Triton secure deployment considerations: https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/deploy.html
 - Triton quickstart (default listeners on 8000, 8001, 8002): https://github.com/triton-inference-server/server/blob/main/docs/getting_started/quickstart.md
@@ -4063,17 +4166,25 @@ client_secret = "<from your identity provider>"
 server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
 ```
 
-Gate the app at the top of the script:
+Gate the app at the top of the script, then authorise. `st.login()` on its own accepts any account the provider will authenticate (with Google, any Google account), so check who logged in before showing anything:
 
 ```python
 import streamlit as st
+
+ALLOWED_DOMAIN = "example.com"
 
 if not st.user.is_logged_in:
     st.login()
     st.stop()
 
+if not str(st.user.email).lower().endswith("@" + ALLOWED_DOMAIN):
+    st.error("This account is not authorised for this app.")
+    st.stop()
+
 st.write(f"Hello, {st.user.name}")
 ```
+
+Streamlit copies the ID token claims onto `st.user`, readable as `st.user.email` or `st.user["email"]`; `email` is present under the default scope `openid profile email`. The check above uses the email domain because the Streamlit pages do not document Google's `hd` (hosted domain) claim on `st.user`; an email-domain check is weaker than a verified `hd` claim, so prefer an explicit allowlist of addresses where the user set is small. Allowlist rules and claim checks are in [oidc-integration.md](oidc-integration.md).
 
 Notes from the Streamlit docs: this is authentication only (identity, not per-resource authorization), the identity cookie lasts 30 days and that period is not configurable, and `secrets.toml` holds the client secret, so it must never be committed. Confirm that your installed Streamlit version includes these functions; they are absent from older releases.
 
@@ -4097,7 +4208,8 @@ curl -sI https://app.example.com/        # succeeds over TLS
 ## Sources (checked September 2026)
 
 - config.toml reference (server.address, server.sslCertFile, server.sslKeyFile, and the production warning): https://docs.streamlit.io/develop/api-reference/configuration/config.toml
-- Authentication concepts (st.login, st.logout, st.user, [auth] keys, stated limitations): https://docs.streamlit.io/develop/concepts/connections/authentication
+- Authentication concepts (st.login, st.logout, st.user, [auth] keys, default scope, stated limitations): https://docs.streamlit.io/develop/concepts/connections/authentication
+- st.user API reference (claims copied from the ID token, `st.user.email`): https://docs.streamlit.io/develop/api-reference/user/st.user
 
 ======================================================================
 ==> n8n.md
@@ -4237,13 +4349,13 @@ Environment equivalents: `QDRANT__SERVICE__API_KEY` and `QDRANT__SERVICE__READ_O
 environment:
   AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
   AUTHENTICATION_APIKEY_ENABLED: 'true'
-  AUTHENTICATION_APIKEY_ALLOWED_KEYS: 'REPLACE_WITH_LONG_RANDOM_VALUE'
-  AUTHENTICATION_APIKEY_USERS: 'app-user'
+  AUTHENTICATION_APIKEY_ALLOWED_KEYS: 'REPLACE_WITH_ADMIN_KEY,REPLACE_WITH_APP_KEY'
+  AUTHENTICATION_APIKEY_USERS: 'admin-user,app-user'
   AUTHORIZATION_RBAC_ENABLED: 'true'
-  AUTHORIZATION_RBAC_ROOT_USERS: 'app-user'
+  AUTHORIZATION_RBAC_ROOT_USERS: 'admin-user'
 ```
 
-Authentication alone lets any key holder do anything; add authorization with either RBAC (above, generally available from v1.29 per the authorization page) or the simpler admin list (`AUTHORIZATION_ADMINLIST_ENABLED`, `AUTHORIZATION_ADMINLIST_USERS`, `AUTHORIZATION_ADMINLIST_READONLY_USERS`; it cannot be combined with RBAC). For human logins, `AUTHENTICATION_OIDC_ENABLED` with `AUTHENTICATION_OIDC_ISSUER` and `AUTHENTICATION_OIDC_CLIENT_ID` delegates to an identity provider, where MFA is enforced ([mfa.md](mfa.md)). The documented deployment starts Weaviate with `--scheme http` and points to a reverse proxy for domain access, forwarding both 8080 and 50051; give the proxy the certificate ([free-certificates.md](free-certificates.md)) and do not expose the plain ports.
+Keys map to users by position, so the first key belongs to `admin-user` and the second to `app-user`. Only `admin-user` is a root user with full access; give `app-user` a custom role limited to its collections, created with the admin key through the RBAC API as the [RBAC configuration page](https://docs.weaviate.io/deploy/configuration/configuring-rbac) describes, and keep the admin key off the application host. Authentication alone lets any key holder do anything; add authorization with either RBAC (above, generally available from v1.29 per the authorization page) or the simpler admin list (`AUTHORIZATION_ADMINLIST_ENABLED`, `AUTHORIZATION_ADMINLIST_USERS`, `AUTHORIZATION_ADMINLIST_READONLY_USERS`; it cannot be combined with RBAC). For human logins, `AUTHENTICATION_OIDC_ENABLED` with `AUTHENTICATION_OIDC_ISSUER` and `AUTHENTICATION_OIDC_CLIENT_ID` delegates to an identity provider, where MFA is enforced ([mfa.md](mfa.md)). The documented deployment starts Weaviate with `--scheme http` and points to a reverse proxy for domain access, forwarding both 8080 and 50051; give the proxy the certificate ([free-certificates.md](free-certificates.md)) and do not expose the plain ports.
 
 ## 4. Milvus: enable authentication, change root, add TLS
 
@@ -4331,6 +4443,23 @@ The spec requires it: "Servers MUST validate the `Origin` header on all incoming
 
 Non-browser clients often send no `Origin` at all; the spec's requirement is about a present and invalid header, so decide deliberately whether a missing header is accepted (the nginx test above rejects it) and document the choice.
 
+To accept requests that carry no `Origin` while still rejecting a wrong one, use a `map` in the `http` block (an empty string key matches a missing header) and test the variable in the location:
+
+```nginx
+map $http_origin $bad_origin {
+    default                   1;
+    ""                        0;    # no Origin header: a non-browser MCP client
+    "https://mcp.example.com" 0;
+}
+```
+
+```nginx
+    location /mcp {
+        if ($bad_origin) { return 403; }
+        proxy_pass http://127.0.0.1:3000;
+    }
+```
+
 ## 3. TLS
 
 The MCP server itself speaks plain HTTP on loopback. Terminate TLS at the proxy per [nginx.md](nginx.md) or [caddy.md](caddy.md) with a certificate from [free-certificates.md](free-certificates.md), or publish through [cloudflare.md](cloudflare.md) or [tailscale.md](tailscale.md). Bearer tokens cross the network with every request, so the spec requires HTTPS for all authorization server endpoints, and [authentication.md](authentication.md) requires it for every credential.
@@ -4396,6 +4525,7 @@ A token issued for a different resource (wrong audience) must also fail with `40
 - Azure App Service authentication (protected resource metadata preview, `WEBSITE_AUTH_PRM_DEFAULT_WITH_SCOPES`): https://learn.microsoft.com/en-us/azure/app-service/overview-authentication-authorization
 - nginx `if` and `return` directives: https://nginx.org/en/docs/http/ngx_http_rewrite_module.html
 - nginx embedded variables (`$http_name`): https://nginx.org/en/docs/http/ngx_http_core_module.html
+- nginx ngx_http_map_module (Origin allowlist map): https://nginx.org/en/docs/http/ngx_http_map_module.html
 
 ======================================================================
 ==> ray.md
@@ -4413,7 +4543,7 @@ Ray's own security page is blunt: if you expose the Ray Dashboard, Ray Jobs, or 
 ray start --head --dashboard-host 127.0.0.1 --dashboard-port 8265
 ```
 
-Never pass `--dashboard-host 0.0.0.0` (or `::`) on a machine with a public interface. In Docker, publish the port to loopback only (`-p 127.0.0.1:8265:8265`) rather than changing the bind address inside the container.
+Never pass `--dashboard-host 0.0.0.0` (or `::`) on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback only (`-p 127.0.0.1:8265:8265`, which Docker's port-publishing docs say only the Docker host can reach), while inside the container the dashboard must listen on the container's own interface (`--dashboard-host 0.0.0.0` there, private to the Compose network and the host), because a dashboard bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md).
 
 Reach the dashboard and the Jobs API through a channel that already authenticates you:
 
@@ -4421,7 +4551,7 @@ Reach the dashboard and the Jobs API through a channel that already authenticate
 ssh -L 8265:127.0.0.1:8265 user@203.0.113.10          # then open http://127.0.0.1:8265
 ray job submit --address http://127.0.0.1:8265 -- python script.py
 ray dashboard cluster.yaml                             # cluster launcher: sets up the same SSH forwarding
-kubectl port-forward svc/<head-service> 8265:8265      # KubeRay
+kubectl port-forward svc/"$HEAD_SERVICE" 8265:8265    # KubeRay: the RayCluster head service
 ```
 
 A tailnet ([tailscale.md](tailscale.md)) is the other clean option: the dashboard binds to the tailnet address, and only enrolled devices can route to it. If a browser-facing hostname is unavoidable, put an authenticating TLS proxy in front ([nginx.md](nginx.md), [caddy.md](caddy.md), or [cloudflare.md](cloudflare.md) with Access) and keep the origin on loopback; Ray's docs themselves list "deploy a TLS proxy in front of your Ray cluster" as the pattern.
@@ -4450,13 +4580,13 @@ MFA: Ray has no user accounts, so a second factor can only come from the path to
 
 ## 4. TLS for the gRPC traffic
 
-Ray can encrypt and mutually authenticate its internal gRPC connections. Set these on every node:
+Ray can encrypt and mutually authenticate its internal gRPC connections. Export these in the environment of every node, head and workers alike, before Ray starts there; a node started without them joins in plaintext:
 
 ```bash
-RAY_USE_TLS=1                                 # default 0
-RAY_TLS_SERVER_CERT=/etc/ray/tls/tls.crt      # presented to other endpoints
-RAY_TLS_SERVER_KEY=/etc/ray/tls/tls.key
-RAY_TLS_CA_CERT=/etc/ray/tls/ca.crt           # CA that signs every node's certificate
+export RAY_USE_TLS=1                                 # default 0
+export RAY_TLS_SERVER_CERT=/etc/ray/tls/tls.crt      # presented to other endpoints
+export RAY_TLS_SERVER_KEY=/etc/ray/tls/tls.key
+export RAY_TLS_CA_CERT=/etc/ray/tls/ca.crt           # CA that signs every node's certificate
 ```
 
 Ray warns that this costs performance (large for small workloads, smaller for large ones) and that it "is not a replacement for network isolation". The docs describe it for the gRPC traffic; for the dashboard and Jobs HTTP API they point to a TLS proxy in front, which is the fronting proxy in step 1.
@@ -4467,7 +4597,7 @@ Ray warns that this costs performance (large for small workloads, smaller for la
 ss -tlnp | grep 8265                                    # 127.0.0.1:8265 (or the tailnet IP), never 0.0.0.0 or *
 ss -tlnp | grep -E ':6379|:10001'                       # private interface only
 curl -sI --max-time 5 http://203.0.113.10:8265/         # from another network: connection refused or timeout
-# From a machine without the token, with RAY_AUTH_MODE=token on the cluster:
+# Through the SSH tunnel of step 1, from a machine without the token, with RAY_AUTH_MODE=token on the cluster:
 ray job submit --address http://127.0.0.1:8265 -- python -c "print(1)"   # must fail: Unauthorized
 ```
 
@@ -4485,6 +4615,7 @@ ray job submit --address http://127.0.0.1:8265 -- python -c "print(1)"   # must 
 - `ray start` CLI reference (`--dashboard-host` default, `--dashboard-port` 8265, `--port` 6379, `--ray-client-server-port` 10001): https://docs.ray.io/en/latest/cluster/cli.html
 - Configuring Ray (TLS environment variables, ports opened by nodes): https://docs.ray.io/en/latest/ray-core/configure.html
 - Configure Ray clusters to use token authentication (KubeRay `authOptions`, 401 without token): https://docs.ray.io/en/latest/cluster/kubernetes/user-guides/kuberay-auth.html
+- Docker, port publishing (loopback publishing): https://docs.docker.com/engine/network/port-publishing/
 
 ======================================================================
 ==> mlflow.md
@@ -4502,7 +4633,7 @@ The defaults are already loopback:
 mlflow server --host 127.0.0.1 --port 5000
 ```
 
-The CLI help for `--host` says it plainly: "This is NOT a security setting". Do not switch to `--host 0.0.0.0` on a machine with a public interface. In Docker, publish to loopback (`-p 127.0.0.1:5000:5000`) rather than binding wide inside the container. If the server must listen beyond loopback for a proxy on another host, set `--allowed-hosts mlflow.example.com` (the default allows localhost and private ranges only) and `--cors-allowed-origins https://mlflow.example.com`, and never use `--disable-security-middleware` outside a test.
+The CLI help for `--host` says it plainly: "This is NOT a security setting". Do not switch to `--host 0.0.0.0` on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback (`-p 127.0.0.1:5000:5000`, which Docker's port-publishing docs say only the Docker host can reach), while inside the container the server must listen on the container's own interface (`--host 0.0.0.0` there, private to the Compose network and the host), because a process bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md). If the server must listen beyond loopback for a proxy on another host, set `--allowed-hosts mlflow.example.com` (the default allows localhost and private ranges only) and `--cors-allowed-origins https://mlflow.example.com`, and never use `--disable-security-middleware` outside a test.
 
 ## 2. TLS from a fronting proxy
 
@@ -4523,7 +4654,8 @@ The first start creates an admin user named `admin` with password `password1234`
 ```ini
 # /etc/mlflow/basic_auth.ini
 [mlflow]
-default_permission = NO_PERMISSIONS          # default is READ on every resource
+# default is READ on every resource
+default_permission = NO_PERMISSIONS
 database_uri = postgresql://mlflow_auth:REPLACE_WITH_LONG_RANDOM_VALUE@127.0.0.1:5432/mlflow_auth
 admin_username = admin
 admin_password = REPLACE_WITH_LONG_RANDOM_VALUE
@@ -4550,9 +4682,13 @@ With `--serve-artifacts` (the default) and `--artifacts-destination s3://bucket`
 ```bash
 ss -tlnp | grep 5000                                                   # 127.0.0.1 only
 curl -sI --max-time 5 http://203.0.113.10:5000/                        # from another machine: connection refused
-curl -s -o /dev/null -w '%{http_code}\n' https://mlflow.example.com/api/2.0/mlflow/experiments/search   # 401
-curl -s -u admin https://mlflow.example.com/api/2.0/mlflow/experiments/search                            # JSON with credentials
-curl -s -u admin:password1234 https://mlflow.example.com/api/2.0/mlflow/experiments/search               # must be 401: default password gone
+# experiments/search is a POST endpoint, so each check posts a minimal body
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"max_results":1}' \
+  https://mlflow.example.com/api/2.0/mlflow/experiments/search                         # 401: no credentials
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"max_results":1}' \
+  -u admin https://mlflow.example.com/api/2.0/mlflow/experiments/search                # 200 with the new admin password
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"max_results":1}' \
+  -u admin:password1234 https://mlflow.example.com/api/2.0/mlflow/experiments/search   # must be 401: default password gone
 ```
 
 An authenticated user without permission on a resource gets `403`; a missing or wrong credential gets `401`.
@@ -4570,6 +4706,8 @@ An authenticated user without permission on a resource gets `403`; a missing or 
 - MLflow authentication REST API (`2.0/mlflow/users/update-password` request fields): https://mlflow.org/docs/latest/api_reference/auth/rest-api.html
 - `mlflow server` CLI reference (`--host` default 127.0.0.1, `--port` 5000, `--app-name`, `--allowed-hosts`, `--cors-allowed-origins`, `--serve-artifacts`): https://mlflow.org/docs/latest/api_reference/cli.html
 - MLflow tracking server (default address, reverse proxy or VPN for TLS and auth, `MLFLOW_TRACKING_TOKEN`, `MLFLOW_TRACKING_INSECURE_TLS`, artifact proxying): https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server
+- MLflow REST API, Search Experiments (`POST 2.0/mlflow/experiments/search`): https://mlflow.org/docs/latest/api_reference/rest-api.html
+- Docker, port publishing (loopback publishing): https://docs.docker.com/engine/network/port-publishing/
 
 ======================================================================
 ==> agent-builders.md
@@ -4590,7 +4728,7 @@ ports:
   - "127.0.0.1:3080:3080"    # LibreChat (PORT defaults to 3080)
 ```
 
-Dify is different: its Compose stack includes an nginx container that publishes `EXPOSE_NGINX_PORT=80` and `EXPOSE_NGINX_SSL_PORT=443` from `docker/.env`. Either make that nginx the TLS edge (section 2) or move both to unused high ports, put your own proxy in front, and block the Dify ports with the host firewall ([host.md](host.md), [cloud-firewalls.md](cloud-firewalls.md)).
+Dify is different: its Compose file publishes nginx on `EXPOSE_NGINX_PORT=80` and `EXPOSE_NGINX_SSL_PORT=443` from `docker/.env`, plus the plugin daemon's `EXPOSE_PLUGIN_DEBUGGING_PORT=5003` (optional vector store profiles publish more). Do not hide a published port with the host firewall: Docker's NAT rules divert the traffic before it reaches the chains UFW uses, so a UFW deny on a published port does nothing ([docker.md](docker.md)). Leave the backend services unpublished on the Compose network, bind anything you must reach locally to loopback (`EXPOSE_PLUGIN_DEBUGGING_PORT=127.0.0.1:5003` yields the mapping `127.0.0.1:5003:5003`), and make Dify's nginx the only service with a public port: either as the TLS edge (section 2) or on loopback (`EXPOSE_NGINX_PORT=127.0.0.1:8080`) behind your own proxy.
 
 ## 2. TLS
 
@@ -4603,10 +4741,12 @@ Dify's bundled nginx can terminate TLS. In `docker/.env`, per the certbot README
 ## 3. Dify
 
 ```bash
-cd dify/docker && cp .env.example .env && docker compose up -d
+cd dify/docker && cp .env.example .env
+# edit .env now: INIT_PASSWORD, SECRET_KEY, the EXPOSE_* bindings (section 1), the public URLs (section 2)
+docker compose up -d
 ```
 
-- Before the first `up`, set `INIT_PASSWORD=REPLACE_WITH_LONG_RANDOM_VALUE` in `.env`. It is empty by default; when set, the `/install` page demands it before anyone can create the admin account. Then open `https://dify.example.com/install` yourself, immediately.
+- `INIT_PASSWORD=REPLACE_WITH_LONG_RANDOM_VALUE` goes into `.env` before the first `up`. It is empty by default; when set, the `/install` page demands it before anyone can create the admin account. Once the stack is up, open `https://dify.example.com/install` yourself, immediately.
 - Set `SECRET_KEY` from `openssl rand -base64 42`. It signs session cookies and JWTs and encrypts stored OAuth credentials (left empty, Dify auto-generates one in its storage directory, per `.env.example`).
 - App API keys are created inside each app and sent as `Authorization: Bearer <key>` to the service API. They are not console accounts, so tightening console login does nothing for a leaked key. Dify's guidance: call the API from your backend only; a key in frontend code can be extracted.
 
@@ -4633,9 +4773,9 @@ LANGFLOW_SECRET_KEY=REPLACE_WITH_LONG_RANDOM_VALUE
 
 ## 6. LibreChat
 
-- The first registered account becomes the admin. Register it, then set `ALLOW_REGISTRATION=false` (or keep it on only while `ALLOW_SOCIAL_REGISTRATION=false` and your identity provider decides who exists).
+- The first registered account becomes the admin. Register it, then set `ALLOW_REGISTRATION=false` so nobody else can create an email account. For SSO-only operation, also set `ALLOW_EMAIL_LOGIN=false` and enable `ALLOW_SOCIAL_REGISTRATION=true` deliberately, with the provider's allowlist deciding who may exist.
 - `ALLOW_SOCIAL_LOGIN=true` enables the OAuth2 providers (Apple, Discord, Facebook, GitHub, Google) and OIDC through `OPENID_ISSUER`, `OPENID_CLIENT_ID`, `OPENID_CLIENT_SECRET`, `OPENID_SESSION_SECRET`, `OPENID_SCOPE="openid profile email"`, `OPENID_CALLBACK_URL=/oauth/openid/callback`, optionally `OPENID_REQUIRED_ROLE`. The docs cover Keycloak, Authentik, Authelia, Auth0, Cognito, and Entra; with OIDC in place, set `ALLOW_EMAIL_LOGIN=false` and enforce MFA at the provider ([identity-providers.md](identity-providers.md), [oidc-integration.md](oidc-integration.md)).
-- `CREDS_KEY` (64 hex characters), `CREDS_IV` (32 hex characters), `JWT_SECRET`, and `JWT_REFRESH_SECRET` must be unique random values of at least 32 bytes; the docs point to the Credentials Generator. Never keep the `.env.example` values.
+- `CREDS_KEY` is a 32-byte key (64 hexadecimal characters) and `CREDS_IV` a 16-byte IV (32 hexadecimal characters); `JWT_SECRET` and `JWT_REFRESH_SECRET` are unique random values of at least 32 bytes each. The docs point to the Credentials Generator. Never keep the `.env.example` values.
 - Set `DOMAIN_CLIENT` and `DOMAIN_SERVER` to the public `https://` URL. TLS comes from the fronting proxy (section 2).
 - The v0.7.7 changelog lists two-factor authentication with backup codes and QR enrolment, but the authentication documentation we checked does not describe it, so do not count on it as the enforced control; MFA at the OIDC provider is the documented path.
 
@@ -4646,10 +4786,10 @@ None of the four documents instance-wide MFA enforcement. Where OIDC exists (Lib
 ## Verify
 
 ```bash
-ss -tlnp | grep -E ':(3000|7860|3080|80|443) '        # container ports on 127.0.0.1 only
+ss -tlnp | grep -E ':(3000|7860|3080|80|443) '        # app ports on 127.0.0.1; 80/443 public only where Dify's own nginx is the TLS edge
 curl -sI https://builder.example.com/                  # TLS; login page or redirect, not the editor
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://flowise.example.com/api/v1/prediction/<chatflow-id>   # 401
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://langflow.example.com/api/v1/run/<flow-id>            # 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST 'https://flowise.example.com/api/v1/prediction/REPLACE_WITH_CHATFLOW_ID'   # 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST 'https://langflow.example.com/api/v1/run/REPLACE_WITH_FLOW_ID'            # 401
 curl -s -o /dev/null -w '%{http_code}\n' https://dify.example.com/v1/parameters                              # 401
 ```
 
@@ -4664,7 +4804,8 @@ curl -s -o /dev/null -w '%{http_code}\n' https://dify.example.com/v1/parameters 
 
 - Dify Docker Compose deployment (setup at `/install`): https://docs.dify.ai/en/self-host/deploy/quick-start/docker-compose
 - Dify environment variables (`SECRET_KEY`, `INIT_PASSWORD`, `CONSOLE_API_URL`, `CONSOLE_WEB_URL`, `APP_WEB_URL`): https://docs.dify.ai/en/self-host/deploy/configuration/environments
-- Dify `docker/.env.example` (`EXPOSE_NGINX_PORT`, `NGINX_HTTPS_ENABLED`, certificate variables): https://github.com/langgenius/dify/blob/main/docker/.env.example
+- Dify `docker/.env.example` (`EXPOSE_NGINX_PORT`, `NGINX_HTTPS_ENABLED`, certificate variables): https://github.com/langgenius/dify/blob/main/docker/.env.example ; `docker-compose.yaml` (which services publish ports): https://github.com/langgenius/dify/blob/main/docker/docker-compose.yaml
+- Docker packet filtering and firewalls (published ports bypass UFW): https://docs.docker.com/engine/network/packet-filtering-firewalls/
 - Dify certbot README (HTTPS steps): https://github.com/langgenius/dify/blob/main/docker/certbot/README.md
 - Dify API keys (Bearer, backend-only): https://docs.dify.ai/en/api-reference/guides/get-started
 - Flowise app-level authentication (v3.0.1 accounts, deprecated username/password, JWT secrets): https://docs.flowiseai.com/configuration/authorization/app-level
@@ -4788,7 +4929,7 @@ The admin UI is on port `81`; the proxy itself is on `80`/`443`. Port `81` is ne
 - As of September 2026 the Kubernetes documentation marks the Dashboard deprecated and unmaintained (the repository was archived in January 2026) and points new installs to Headlamp; the pattern below applies to any cluster UI.
 - Do not expose it with a LoadBalancer or Ingress. Reach it from the operator's machine with `kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443` and open `https://localhost:8443`; the UI is then reachable only from that machine.
 - Login is by bearer token of a ServiceAccount with a minimal RBAC role; the tutorial's sample user is cluster-admin and is for demonstration only. On the older 2.x releases, `--enable-skip-login` and `--enable-insecure-login` both default to `false`; never turn them on.
-- MFA is the cluster's identity provider (OIDC to the API server, [kubernetes.md](kubernetes.md)), not the dashboard.
+- A ServiceAccount token is a machine credential, so configuring OIDC on the API server puts no MFA on this login. Human MFA comes from the access path (a port-forward over SSH from a machine that already required it, a tailnet per [tailscale.md](tailscale.md), or Cloudflare Access per [cloudflare.md](cloudflare.md)) or from a UI that performs an identity-provider login itself; see [mfa.md](mfa.md).
 
 ## Jenkins
 
@@ -4802,7 +4943,7 @@ The admin UI is on port `81`; the proxy itself is on `80`/`443`. Port `81` is ne
 
 - It listens on `HTTP_ADDR = 0.0.0.0`, `HTTP_PORT = 3000` by default; set `HTTP_ADDR = 127.0.0.1` behind a proxy, or `PROTOCOL = https` with `CERT_FILE` and `KEY_FILE` to terminate TLS itself.
 - In `[service]`, `DISABLE_REGISTRATION = true` (default `false`) and, for a private forge, `REQUIRE_SIGNIN_VIEW = true` (default `false`).
-- Users enrol TOTP or a WebAuthn key under Settings > Security; `TWO_FACTOR_AUTH = enforced` in `[security]` requires it. With MFA on, Git over HTTP uses an access token instead of the password, and tokens bypass MFA, so scope them and revoke unused ones ([machine-auth.md](machine-auth.md)).
+- Users enrol TOTP or a WebAuthn key under Settings > Security; `TWO_FACTOR_AUTH = enforced` in `[security]` (Gitea 1.24 and later) requires it. With MFA on, Git over HTTP uses an access token instead of the password, and tokens bypass MFA, so scope them and revoke unused ones ([machine-auth.md](machine-auth.md)).
 
 ## Uptime Kuma
 
@@ -4981,7 +5122,14 @@ using ( auth.uid() = user_id );
 
 Write separate policies per operation (`select`, `insert`, `update`, `delete`); no policy means no access once RLS is on, which is the correct starting point.
 - The `service_role` key bypasses RLS; it is a server-only secret that must never reach the client bundle or the repository.
-- Supabase Auth supports MFA on user accounts; enable it for anything sensitive ([mfa.md](mfa.md) for the general rules).
+- Supabase Auth supports MFA (TOTP on every plan). Enrolment alone changes nothing: enforce it in your policies by requiring the `aal2` assurance level, so a session that has not completed the second factor cannot read protected rows ([mfa.md](mfa.md) for the general rules):
+
+```sql
+create policy "mfa required"
+on profiles as restrictive
+to authenticated
+using ((select auth.jwt()->>'aal') = 'aal2');
+```
 
 ## Verify
 
@@ -4993,6 +5141,7 @@ Write separate policies per operation (`select`, `insert`, `update`, `delete`); 
 
 - Firebase security rules: https://firebase.google.com/docs/rules
 - Supabase row level security: https://supabase.com/docs/guides/database/postgres/row-level-security
+- Supabase multi-factor authentication (aal1, aal2, enforcement policy): https://supabase.com/docs/guides/auth/auth-mfa
 
 ======================================================================
 ==> common-mistakes.md

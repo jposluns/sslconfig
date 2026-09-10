@@ -21,6 +21,23 @@ The spec requires it: "Servers MUST validate the `Origin` header on all incoming
 
 Non-browser clients often send no `Origin` at all; the spec's requirement is about a present and invalid header, so decide deliberately whether a missing header is accepted (the nginx test above rejects it) and document the choice.
 
+To accept requests that carry no `Origin` while still rejecting a wrong one, use a `map` in the `http` block (an empty string key matches a missing header) and test the variable in the location:
+
+```nginx
+map $http_origin $bad_origin {
+    default                   1;
+    ""                        0;    # no Origin header: a non-browser MCP client
+    "https://mcp.example.com" 0;
+}
+```
+
+```nginx
+    location /mcp {
+        if ($bad_origin) { return 403; }
+        proxy_pass http://127.0.0.1:3000;
+    }
+```
+
 ## 3. TLS
 
 The MCP server itself speaks plain HTTP on loopback. Terminate TLS at the proxy per [nginx.md](nginx.md) or [caddy.md](caddy.md) with a certificate from [free-certificates.md](free-certificates.md), or publish through [cloudflare.md](cloudflare.md) or [tailscale.md](tailscale.md). Bearer tokens cross the network with every request, so the spec requires HTTPS for all authorization server endpoints, and [authentication.md](authentication.md) requires it for every credential.
@@ -86,3 +103,4 @@ A token issued for a different resource (wrong audience) must also fail with `40
 - Azure App Service authentication (protected resource metadata preview, `WEBSITE_AUTH_PRM_DEFAULT_WITH_SCOPES`): https://learn.microsoft.com/en-us/azure/app-service/overview-authentication-authorization
 - nginx `if` and `return` directives: https://nginx.org/en/docs/http/ngx_http_rewrite_module.html
 - nginx embedded variables (`$http_name`): https://nginx.org/en/docs/http/ngx_http_core_module.html
+- nginx ngx_http_map_module (Origin allowlist map): https://nginx.org/en/docs/http/ngx_http_map_module.html

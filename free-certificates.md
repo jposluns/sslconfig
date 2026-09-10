@@ -60,14 +60,14 @@ Certificates land in stable paths that server configuration should reference dir
 
 Let's Encrypt certificates are valid for 90 days at the time of writing, so renewal must be automated. Package and snap installs of certbot register a systemd timer or cron job that runs `certbot renew` for you. Confirm that it works and reload the server after each renewal:
 
-Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day short-lived certificates are available now to every subscriber; the default `classic` profile moves to 64-day certificates on 2027-02-10 and to 45-day certificates on 2028-02-16; and industry rules cap publicly trusted certificates at 47 days from 2029-03-15. Any renewal step that involves a person will fail at those lifetimes, so the automation below is the only viable path. Let's Encrypt also switched off its OCSP service on 2025-08-06 and publishes revocation only through CRLs, so do not add OCSP stapling directives for Let's Encrypt certificates.
-
 ```bash
 sudo certbot renew --dry-run
 sudo certbot renew --deploy-hook "systemctl reload nginx"
 ```
 
 Set the deploy hook once with `certonly`/`renew`, or drop a script into `/etc/letsencrypt/renewal-hooks/deploy/`. A certificate that issues once and then expires in production is the most common ACME failure; the dry run belongs in your deployment checklist.
+
+Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day short-lived certificates are available now to every subscriber; the default `classic` profile moves to 64-day certificates on 2027-02-10 and to 45-day certificates on 2028-02-16; and industry rules cap publicly trusted certificates at 47 days from 2029-03-15. Any renewal step that involves a person will fail at those lifetimes, so the automation below is the only viable path. Let's Encrypt also switched off its OCSP service on 2025-08-06 and publishes revocation only through CRLs, so do not add OCSP stapling directives for Let's Encrypt certificates.
 
 ## Rate limits
 

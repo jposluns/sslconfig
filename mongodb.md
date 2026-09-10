@@ -27,7 +27,7 @@ db.createUser({
 
 Create a separate least-privilege user per application (for example `readWrite` on its own database), per [authentication.md](authentication.md). Modern MongoDB authenticates with SCRAM-SHA-256 by default.
 
-MFA: the wire protocol has no TOTP dialogue in Community edition; x.509 client-certificate authentication is the second factor for direct connections, and human paths to the host (SSH, admin UIs) go behind MFA per [mfa.md](mfa.md).
+MFA: the wire protocol has no TOTP dialogue in Community edition; x.509 client-certificate authentication adds a possession factor held by the connecting machine for direct connections, stronger than a password alone but not MFA for a person, and human paths to the host (SSH, admin UIs) go behind MFA per [mfa.md](mfa.md).
 
 ## 2. Enable TLS
 
@@ -43,10 +43,13 @@ net:
   tls:
     mode: requireTLS
     certificateKeyFile: /etc/ssl/mongodb/server.pem
-    CAFile: /etc/ssl/mongodb/ca.crt     # needed when clients or cluster members present certificates
+    # validates any certificate a client or cluster member presents
+    CAFile: /etc/ssl/mongodb/ca.crt
+    # clients authenticate with SCRAM over TLS; set false when every client holds a certificate
+    allowConnectionsWithoutCertificates: true
 ```
 
-`requireTLS` rejects plain connections outright; the transitional modes (`allowTLS`, `preferTLS`) exist for rolling upgrades only.
+With `CAFile` set, `mongod` expects every client to present a certificate unless `allowConnectionsWithoutCertificates: true`; the setting still validates any certificate a client does present, and it is what lets the SCRAM-only `mongosh` connections below work. `requireTLS` rejects plain connections outright; the transitional modes (`allowTLS`, `preferTLS`) exist for rolling upgrades only.
 
 ## 3. Client side
 

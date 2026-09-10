@@ -39,13 +39,13 @@ Environment equivalents: `QDRANT__SERVICE__API_KEY` and `QDRANT__SERVICE__READ_O
 environment:
   AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
   AUTHENTICATION_APIKEY_ENABLED: 'true'
-  AUTHENTICATION_APIKEY_ALLOWED_KEYS: 'REPLACE_WITH_LONG_RANDOM_VALUE'
-  AUTHENTICATION_APIKEY_USERS: 'app-user'
+  AUTHENTICATION_APIKEY_ALLOWED_KEYS: 'REPLACE_WITH_ADMIN_KEY,REPLACE_WITH_APP_KEY'
+  AUTHENTICATION_APIKEY_USERS: 'admin-user,app-user'
   AUTHORIZATION_RBAC_ENABLED: 'true'
-  AUTHORIZATION_RBAC_ROOT_USERS: 'app-user'
+  AUTHORIZATION_RBAC_ROOT_USERS: 'admin-user'
 ```
 
-Authentication alone lets any key holder do anything; add authorization with either RBAC (above, generally available from v1.29 per the authorization page) or the simpler admin list (`AUTHORIZATION_ADMINLIST_ENABLED`, `AUTHORIZATION_ADMINLIST_USERS`, `AUTHORIZATION_ADMINLIST_READONLY_USERS`; it cannot be combined with RBAC). For human logins, `AUTHENTICATION_OIDC_ENABLED` with `AUTHENTICATION_OIDC_ISSUER` and `AUTHENTICATION_OIDC_CLIENT_ID` delegates to an identity provider, where MFA is enforced ([mfa.md](mfa.md)). The documented deployment starts Weaviate with `--scheme http` and points to a reverse proxy for domain access, forwarding both 8080 and 50051; give the proxy the certificate ([free-certificates.md](free-certificates.md)) and do not expose the plain ports.
+Keys map to users by position, so the first key belongs to `admin-user` and the second to `app-user`. Only `admin-user` is a root user with full access; give `app-user` a custom role limited to its collections, created with the admin key through the RBAC API as the [RBAC configuration page](https://docs.weaviate.io/deploy/configuration/configuring-rbac) describes, and keep the admin key off the application host. Authentication alone lets any key holder do anything; add authorization with either RBAC (above, generally available from v1.29 per the authorization page) or the simpler admin list (`AUTHORIZATION_ADMINLIST_ENABLED`, `AUTHORIZATION_ADMINLIST_USERS`, `AUTHORIZATION_ADMINLIST_READONLY_USERS`; it cannot be combined with RBAC). For human logins, `AUTHENTICATION_OIDC_ENABLED` with `AUTHENTICATION_OIDC_ISSUER` and `AUTHENTICATION_OIDC_CLIENT_ID` delegates to an identity provider, where MFA is enforced ([mfa.md](mfa.md)). The documented deployment starts Weaviate with `--scheme http` and points to a reverse proxy for domain access, forwarding both 8080 and 50051; give the proxy the certificate ([free-certificates.md](free-certificates.md)) and do not expose the plain ports.
 
 ## 4. Milvus: enable authentication, change root, add TLS
 

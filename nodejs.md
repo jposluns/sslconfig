@@ -60,9 +60,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET,      // long random value from the environment
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: true, httpOnly: true, sameSite: 'lax' },
+  // store: a production session store (see below); the default MemoryStore is for development only
+  cookie: { secure: true, httpOnly: true, sameSite: 'lax', maxAge: 8 * 60 * 60 * 1000 },   // milliseconds
 }));
 ```
+
+Express says the default `MemoryStore` is not designed for production (it leaks memory and does not scale past one process): pass `store:` a production store such as [connect-redis](https://www.npmjs.com/package/connect-redis) or [connect-pg-simple](https://www.npmjs.com/package/connect-pg-simple), and set `cookie.maxAge` so sessions expire, since no maximum age is set by default.
 
 Rate-limit the login route (express-rate-limit v7):
 
@@ -93,4 +96,5 @@ ss -tlnp | grep node                 # behind a proxy: bound to 127.0.0.1 only
 
 - Node.js HTTPS module: https://nodejs.org/api/https.html
 - Express behind proxies: https://expressjs.com/en/guide/behind-proxies.html
+- express-session (MemoryStore warning, cookie.maxAge, compatible stores): https://expressjs.com/en/resources/middleware/session/
 - helmet: https://helmetjs.github.io/

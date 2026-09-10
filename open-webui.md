@@ -7,10 +7,12 @@ Open WebUI has account-based authentication built in; the risks are open signup 
 Environment variables (defaults per the Open WebUI reference):
 
 ```
-ENABLE_SIGNUP=false          # default true; disable once your accounts exist
+ENABLE_SIGNUP=false          # default true; disable once your accounts exist (persisted, see below)
 DEFAULT_USER_ROLE=pending    # the default; new accounts wait for admin approval
                              # other values: user, admin
 ```
+
+`ENABLE_SIGNUP` is a persisted setting: the reference marks it a `ConfigVar`, which means the value is written to the database on first launch and on later starts the stored value wins over the environment, unless `ENABLE_PERSISTENT_CONFIG=false` (default `true`). On an instance that has already started, change signup in the Admin panel rather than in the environment, then confirm the change took effect (Verify below).
 
 With signup left on, keep `DEFAULT_USER_ROLE=pending` so a stranger who registers gets no access until approved. An admin account can also be created at startup by setting `WEBUI_ADMIN_EMAIL` together with `WEBUI_ADMIN_PASSWORD` (supply the password via the environment, not a compose file in git; see [secrets.md](secrets.md)).
 
@@ -29,8 +31,9 @@ Publish it through [caddy.md](caddy.md)/[nginx.md](nginx.md) with a certificate 
 ```bash
 ss -tlnp | grep 3000                      # loopback only
 curl -sI https://chat.example.com/        # serves over TLS
-# In a private browser window: login page appears; registering a new account
-# yields a pending/unapproved user, not access.
+# In a private browser window: login page appears; with ENABLE_SIGNUP=false the
+# sign-up option is absent and an attempt to register is refused. With signup on,
+# registering a new account yields a pending/unapproved user, not access.
 ```
 
 ## Sources (checked September 2026)

@@ -75,8 +75,10 @@ Do not ship `curl -k`, `verify=False`, `rejectUnauthorized: false`, or `NODE_TLS
 
 ```bash
 openssl x509 -in server.crt -noout -subject -dates -ext subjectAltName
-openssl s_client -connect app.internal:443 -CAfile server.crt </dev/null
+openssl s_client -connect app.internal:443 -servername app.internal -verify_hostname app.internal -verify_return_error -CAfile server.crt </dev/null
 ```
+
+A pass prints `Verification: OK`, `Verified peername: app.internal`, and `Verify return code: 0 (ok)`, and the command exits 0. Without `-verify_hostname` the check ignores the name, and without `-verify_return_error` `s_client` reports a failure yet still completes the handshake and exits 0; with both, a name mismatch or an untrusted chain closes the connection and exits non-zero (`Verify return code: 62 (hostname mismatch)` for the wrong name).
 
 ## Limits to plan around
 
@@ -84,5 +86,5 @@ Self-signed certificates have no revocation and no third-party accountability, a
 
 ## Sources (checked September 2026)
 
-- OpenSSL documentation: https://www.openssl.org/docs/
+- OpenSSL documentation: https://www.openssl.org/docs/ ; `openssl s_client` (`-servername`, `-verify_return_error`): https://docs.openssl.org/master/man1/openssl-s_client/ ; verification options (`-verify_hostname`): https://docs.openssl.org/master/man1/openssl-verification-options/
 - mkcert: https://github.com/FiloSottile/mkcert

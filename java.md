@@ -59,10 +59,11 @@ SSO: `spring-boot-starter-oauth2-client` plus properties and `http.oauth2Login(w
 spring.security.oauth2.client.registration.sso.client-id=REPLACE_WITH_CLIENT_ID
 spring.security.oauth2.client.registration.sso.client-secret=${SSO_CLIENT_SECRET}
 spring.security.oauth2.client.registration.sso.provider=sso
+spring.security.oauth2.client.registration.sso.scope=openid,profile,email
 spring.security.oauth2.client.provider.sso.issuer-uri=https://idp.example.com/
 ```
 
-The `issuer-uri` drives OpenID Connect discovery. Allowlist and token checks are in [oidc-integration.md](oidc-integration.md), providers in [identity-providers.md](identity-providers.md). MFA: enforce it at the identity provider, or front the app per [mfa.md](mfa.md).
+The `issuer-uri` drives OpenID Connect discovery, and the `openid` scope is what makes the registration an OpenID Connect login that returns an ID token; without it the login is plain OAuth2. Allowlist and token checks are in [oidc-integration.md](oidc-integration.md), providers in [identity-providers.md](identity-providers.md). MFA: enforce it at the identity provider, or front the app per [mfa.md](mfa.md).
 
 ## 4. Client-side TLS discipline
 
@@ -73,7 +74,7 @@ The `issuer-uri` drives OpenID Connect discovery. Allowlist and token checks are
 
 ```bash
 curl -sI https://example.com/        # succeeds without -k; shows Strict-Transport-Security
-curl -s  https://example.com/api     # expect 401 or a login redirect without credentials
+curl -sS -o /dev/null -w '%{http_code}\n' https://example.com/api   # 401, or 302 to the login page, without credentials
 ss -tlnp | grep java                 # behind a proxy: 127.0.0.1 only
 grep -c "Using generated security password" app.log   # must be 0: otherwise the default user is still active
 ```

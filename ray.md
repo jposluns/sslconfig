@@ -10,7 +10,7 @@ Ray's own security page is blunt: if you expose the Ray Dashboard, Ray Jobs, or 
 ray start --head --dashboard-host 127.0.0.1 --dashboard-port 8265
 ```
 
-Never pass `--dashboard-host 0.0.0.0` (or `::`) on a machine with a public interface. In Docker, publish the port to loopback only (`-p 127.0.0.1:8265:8265`) rather than changing the bind address inside the container.
+Never pass `--dashboard-host 0.0.0.0` (or `::`) on a machine with a public interface. In Docker the two binds are different things: the host publishes on loopback only (`-p 127.0.0.1:8265:8265`, which Docker's port-publishing docs say only the Docker host can reach), while inside the container the dashboard must listen on the container's own interface (`--dashboard-host 0.0.0.0` there, private to the Compose network and the host), because a dashboard bound to the container's `127.0.0.1` is not reachable through the published port at all. See [docker.md](docker.md).
 
 Reach the dashboard and the Jobs API through a channel that already authenticates you:
 
@@ -18,7 +18,7 @@ Reach the dashboard and the Jobs API through a channel that already authenticate
 ssh -L 8265:127.0.0.1:8265 user@203.0.113.10          # then open http://127.0.0.1:8265
 ray job submit --address http://127.0.0.1:8265 -- python script.py
 ray dashboard cluster.yaml                             # cluster launcher: sets up the same SSH forwarding
-kubectl port-forward svc/<head-service> 8265:8265      # KubeRay
+kubectl port-forward svc/"$HEAD_SERVICE" 8265:8265    # KubeRay: the RayCluster head service
 ```
 
 A tailnet ([tailscale.md](tailscale.md)) is the other clean option: the dashboard binds to the tailnet address, and only enrolled devices can route to it. If a browser-facing hostname is unavoidable, put an authenticating TLS proxy in front ([nginx.md](nginx.md), [caddy.md](caddy.md), or [cloudflare.md](cloudflare.md) with Access) and keep the origin on loopback; Ray's docs themselves list "deploy a TLS proxy in front of your Ray cluster" as the pattern.
@@ -47,13 +47,13 @@ MFA: Ray has no user accounts, so a second factor can only come from the path to
 
 ## 4. TLS for the gRPC traffic
 
-Ray can encrypt and mutually authenticate its internal gRPC connections. Set these on every node:
+Ray can encrypt and mutually authenticate its internal gRPC connections. Export these in the environment of every node, head and workers alike, before Ray starts there; a node started without them joins in plaintext:
 
 ```bash
-RAY_USE_TLS=1                                 # default 0
-RAY_TLS_SERVER_CERT=/etc/ray/tls/tls.crt      # presented to other endpoints
-RAY_TLS_SERVER_KEY=/etc/ray/tls/tls.key
-RAY_TLS_CA_CERT=/etc/ray/tls/ca.crt           # CA that signs every node's certificate
+export RAY_USE_TLS=1                                 # default 0
+export RAY_TLS_SERVER_CERT=/etc/ray/tls/tls.crt      # presented to other endpoints
+export RAY_TLS_SERVER_KEY=/etc/ray/tls/tls.key
+export RAY_TLS_CA_CERT=/etc/ray/tls/ca.crt           # CA that signs every node's certificate
 ```
 
 Ray warns that this costs performance (large for small workloads, smaller for large ones) and that it "is not a replacement for network isolation". The docs describe it for the gRPC traffic; for the dashboard and Jobs HTTP API they point to a TLS proxy in front, which is the fronting proxy in step 1.
@@ -64,7 +64,7 @@ Ray warns that this costs performance (large for small workloads, smaller for la
 ss -tlnp | grep 8265                                    # 127.0.0.1:8265 (or the tailnet IP), never 0.0.0.0 or *
 ss -tlnp | grep -E ':6379|:10001'                       # private interface only
 curl -sI --max-time 5 http://203.0.113.10:8265/         # from another network: connection refused or timeout
-# From a machine without the token, with RAY_AUTH_MODE=token on the cluster:
+# Through the SSH tunnel of step 1, from a machine without the token, with RAY_AUTH_MODE=token on the cluster:
 ray job submit --address http://127.0.0.1:8265 -- python -c "print(1)"   # must fail: Unauthorized
 ```
 
@@ -82,3 +82,4 @@ ray job submit --address http://127.0.0.1:8265 -- python -c "print(1)"   # must 
 - `ray start` CLI reference (`--dashboard-host` default, `--dashboard-port` 8265, `--port` 6379, `--ray-client-server-port` 10001): https://docs.ray.io/en/latest/cluster/cli.html
 - Configuring Ray (TLS environment variables, ports opened by nodes): https://docs.ray.io/en/latest/ray-core/configure.html
 - Configure Ray clusters to use token authentication (KubeRay `authOptions`, 401 without token): https://docs.ray.io/en/latest/cluster/kubernetes/user-guides/kuberay-auth.html
+- Docker, port publishing (loopback publishing): https://docs.docker.com/engine/network/port-publishing/

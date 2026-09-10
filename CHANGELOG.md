@@ -12,8 +12,10 @@ are grouped by the date the change landed on `main`.
   `machine-auth.md`, `nextjs.md`, `go.md`, `dotnet.md`, `java.md`, `php.md`, `ruby.md`, `kafka.md`,
   `clickhouse.md`, `neo4j.md`, `memcached.md`, `object-storage.md`, `vector-databases.md`,
   `mcp-servers.md`, `ray.md`, `mlflow.md`, `agent-builders.md`, and `devops-uis.md`. Configuration
-  syntax in each was checked against vendor documentation fetched in September 2026; each guide's
-  Sources section lists the pages, and details that could not be confirmed were left out.
+  syntax in each was checked against vendor documentation fetched in September 2026, and each
+  guide's Sources section lists the pages. A three-family review (Claude, Codex, Gemini) of the
+  whole branch then found and corrected further defects, listed under Fixed; details that no page
+  confirmed were left out.
 - `authentication.md` rules 11 to 15: federated login is not authorisation, OIDC and OAuth hygiene,
   MFA enforced where access is granted, control-plane MFA, and authentication on every transport;
   plus a negative-test quick check.
@@ -49,6 +51,16 @@ are grouped by the date the change landed on `main`.
   patch in `.aiqt/PIN`.
 - `CLAUDE.md` and `AGENTS.md` now describe the wiring gate's real coverage, and `.aiqt/gensrc.json`
   lists every source of `site/llms-full.txt`.
+- Pre-existing guide defects found by the review: Redis inline comments that its parser rejects;
+  PostgreSQL `listen_addresses` needing a restart rather than a reload; MongoDB client examples
+  lacking the certificate the server configuration demanded; Caddy `/admin/*` not matching
+  `/admin`; lighttpd `mod_redirect` not loaded; SSH MFA advice that conflicted with
+  `KbdInteractiveAuthentication no`; Open WebUI's persisted `ENABLE_SIGNUP`; the Streamlit login
+  example admitting any Google account; the multi-port `nc` check in `cloud-firewalls.md`; and
+  several inline comments inside properties and INI values in the new guides.
+- A gate that recomputes the sha256 of every inline script in `site/index.html` and requires it in
+  the effective CSP line of `site/_headers`; the wiring gate now matches real index rows and menu
+  links rather than any text; same-page anchors are validated.
 
 ## 2026-09-09
 

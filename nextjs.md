@@ -90,7 +90,20 @@ import { handlers } from "@/auth"
 export const { GET, POST } = handlers
 ```
 
-Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for OIDC `AUTH_<PROVIDER>_ISSUER`; provider setup and the allowlist check are in [oidc-integration.md](oidc-integration.md) and [identity-providers.md](identity-providers.md). Behind a reverse proxy set `AUTH_TRUST_HOST=true` (automatic on Vercel). Server code calls `const session = await auth()`; a Route Handler wrapped as `export const GET = auth(function GET(req) { ... })` returns 401 when `req.auth` is absent. `export { auth as proxy }` in `proxy.ts` is the optimistic layer, and Auth.js says not to rely on it exclusively. MFA is not part of this configuration; enforce it at the identity provider ([mfa.md](mfa.md)).
+Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for OIDC `AUTH_<PROVIDER>_ISSUER`; provider setup and the allowlist check are in [oidc-integration.md](oidc-integration.md) and [identity-providers.md](identity-providers.md). Behind a reverse proxy set `AUTH_TRUST_HOST=true` (automatic on Vercel). Server code calls `const session = await auth()`. Wrapping a Route Handler with `auth(...)` only fills in `req.auth`; nothing refuses the request for you, so the handler must check the session, then authorise, then touch data:
+
+```ts
+// app/api/notes/route.ts
+import { NextResponse } from "next/server"
+import { auth } from "@/auth"
+export const GET = auth(async function GET(req) {
+  if (!req.auth) return NextResponse.json({ message: "Not authenticated" }, { status: 401 })  // no automatic 401
+  if (!isAllowed(req.auth.user)) return NextResponse.json({ message: "Forbidden" }, { status: 403 })  // your allowlist
+  return NextResponse.json(await loadNotes(req.auth.user))
+})
+```
+
+`export { auth as proxy }` in `proxy.ts` is the optimistic layer, and Auth.js says not to rely on it exclusively. MFA is not part of this configuration; enforce it at the identity provider ([mfa.md](mfa.md)).
 
 **Better Auth** (https://www.better-auth.com/docs/introduction): `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`) and `BETTER_AUTH_URL`; the placeholder default secret throws in production.
 
@@ -137,6 +150,7 @@ grep -rl "${SESSION_SECRET:0:8}" .next/static           # no output: the browser
 - Next.js authentication guide: https://nextjs.org/docs/app/guides/authentication ; data security guide: https://nextjs.org/docs/app/guides/data-security
 - Next.js `proxy.js`: https://nextjs.org/docs/app/api-reference/file-conventions/proxy ; `route.js`: https://nextjs.org/docs/app/api-reference/file-conventions/route ; `cookies`: https://nextjs.org/docs/app/api-reference/functions/cookies
 - Next.js environment variables: https://nextjs.org/docs/app/guides/environment-variables ; CLI (`next start` defaults): https://nextjs.org/docs/app/api-reference/cli/next ; self-hosting: https://nextjs.org/docs/app/guides/self-hosting
+- Auth.js protecting resources (Route Handler `req.auth` check): https://authjs.dev/getting-started/session-management/protecting
 - Auth.js installation: https://authjs.dev/getting-started/installation ; deployment (`AUTH_SECRET`, `AUTH_TRUST_HOST`, provider variables): https://authjs.dev/getting-started/deployment ; protecting resources: https://authjs.dev/getting-started/session-management/protecting
 - Better Auth introduction: https://www.better-auth.com/docs/introduction ; installation: https://www.better-auth.com/docs/installation ; options: https://www.better-auth.com/docs/reference/options ; Next.js integration: https://www.better-auth.com/docs/integrations/next ; two-factor plugin: https://www.better-auth.com/docs/plugins/2fa
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection

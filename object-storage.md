@@ -25,11 +25,11 @@ IAM Access Analyzer for S3 lists every bucket in the account whose ACL, bucket p
 ## 3. Google Cloud Storage
 
 - Enable uniform bucket-level access so ACLs are disabled and only IAM grants access; after 90 consecutive days it cannot be turned off, which is the point.
-- Enforce public access prevention on the bucket, or at project, folder, or organization level with the `storage.publicAccessPrevention` constraint; grants to `allUsers` and `allAuthenticatedUsers` then fail with `401` or `403`. A bucket shows `enforced` or `inherited`.
+- Enforce public access prevention on the bucket, or at project, folder, or organization level with the `storage.publicAccessPrevention` constraint; attempts to grant `allUsers` or `allAuthenticatedUsers` then fail with `412 Precondition Failed`, and anonymous requests to data get `401` or `403`. A bucket shows `enforced` or `inherited`.
 - Signed URLs (V4) expire after at most 604800 seconds (7 days); `gcloud storage sign-url --duration=1h` allows up to 12 hours with the caller's credentials or 7 days with a service-account private key. Public access prevention does not apply to signed URLs, so keep their durations short.
 
 ```bash
-gcloud storage buckets update gs://example-bucket --uniform-bucket-level-access --public-access-prevention=enforced
+gcloud storage buckets update gs://example-bucket --uniform-bucket-level-access --public-access-prevention   # boolean flags; describe then reads back enforced
 gcloud storage buckets describe gs://example-bucket          # uniform_bucket_level_access: true, public access prevention enforced
 ```
 
@@ -57,7 +57,9 @@ using ( (select auth.jwt()->>'sub') = owner_id );
 
 ```bash
 curl -sI https://example-bucket.s3.amazonaws.com/model.safetensors        # 403, never 200
-curl -sI "$(aws s3 presign s3://example-bucket/model.safetensors --expires-in 60)"   # 200 now, 403 after a minute
+URL="$(aws s3 presign s3://example-bucket/model.safetensors --expires-in 60)"   # signs a GET, so test with GET
+curl -sS -o /dev/null -w '%{http_code}\n' "$URL"              # 200 now
+sleep 61; curl -sS -o /dev/null -w '%{http_code}\n' "$URL"    # 403 once the minute has passed
 ```
 
 - An anonymous request to any object URL is denied (S3 returns `403`; GCS `401` or `403`; Azure `401`, or `409` when the account disallows anonymous access; Supabase private buckets return an error, not the file).

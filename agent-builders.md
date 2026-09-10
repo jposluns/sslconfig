@@ -13,7 +13,7 @@ ports:
   - "127.0.0.1:3080:3080"    # LibreChat (PORT defaults to 3080)
 ```
 
-Dify is different: its Compose stack includes an nginx container that publishes `EXPOSE_NGINX_PORT=80` and `EXPOSE_NGINX_SSL_PORT=443` from `docker/.env`. Either make that nginx the TLS edge (section 2) or move both to unused high ports, put your own proxy in front, and block the Dify ports with the host firewall ([host.md](host.md), [cloud-firewalls.md](cloud-firewalls.md)).
+Dify is different: its Compose file publishes nginx on `EXPOSE_NGINX_PORT=80` and `EXPOSE_NGINX_SSL_PORT=443` from `docker/.env`, plus the plugin daemon's `EXPOSE_PLUGIN_DEBUGGING_PORT=5003` (optional vector store profiles publish more). Do not hide a published port with the host firewall: Docker's NAT rules divert the traffic before it reaches the chains UFW uses, so a UFW deny on a published port does nothing ([docker.md](docker.md)). Leave the backend services unpublished on the Compose network, bind anything you must reach locally to loopback (`EXPOSE_PLUGIN_DEBUGGING_PORT=127.0.0.1:5003` yields the mapping `127.0.0.1:5003:5003`), and make Dify's nginx the only service with a public port: either as the TLS edge (section 2) or on loopback (`EXPOSE_NGINX_PORT=127.0.0.1:8080`) behind your own proxy.
 
 ## 2. TLS
 
@@ -26,10 +26,12 @@ Dify's bundled nginx can terminate TLS. In `docker/.env`, per the certbot README
 ## 3. Dify
 
 ```bash
-cd dify/docker && cp .env.example .env && docker compose up -d
+cd dify/docker && cp .env.example .env
+# edit .env now: INIT_PASSWORD, SECRET_KEY, the EXPOSE_* bindings (section 1), the public URLs (section 2)
+docker compose up -d
 ```
 
-- Before the first `up`, set `INIT_PASSWORD=REPLACE_WITH_LONG_RANDOM_VALUE` in `.env`. It is empty by default; when set, the `/install` page demands it before anyone can create the admin account. Then open `https://dify.example.com/install` yourself, immediately.
+- `INIT_PASSWORD=REPLACE_WITH_LONG_RANDOM_VALUE` goes into `.env` before the first `up`. It is empty by default; when set, the `/install` page demands it before anyone can create the admin account. Once the stack is up, open `https://dify.example.com/install` yourself, immediately.
 - Set `SECRET_KEY` from `openssl rand -base64 42`. It signs session cookies and JWTs and encrypts stored OAuth credentials (left empty, Dify auto-generates one in its storage directory, per `.env.example`).
 - App API keys are created inside each app and sent as `Authorization: Bearer <key>` to the service API. They are not console accounts, so tightening console login does nothing for a leaked key. Dify's guidance: call the API from your backend only; a key in frontend code can be extracted.
 
@@ -56,9 +58,9 @@ LANGFLOW_SECRET_KEY=REPLACE_WITH_LONG_RANDOM_VALUE
 
 ## 6. LibreChat
 
-- The first registered account becomes the admin. Register it, then set `ALLOW_REGISTRATION=false` (or keep it on only while `ALLOW_SOCIAL_REGISTRATION=false` and your identity provider decides who exists).
+- The first registered account becomes the admin. Register it, then set `ALLOW_REGISTRATION=false` so nobody else can create an email account. For SSO-only operation, also set `ALLOW_EMAIL_LOGIN=false` and enable `ALLOW_SOCIAL_REGISTRATION=true` deliberately, with the provider's allowlist deciding who may exist.
 - `ALLOW_SOCIAL_LOGIN=true` enables the OAuth2 providers (Apple, Discord, Facebook, GitHub, Google) and OIDC through `OPENID_ISSUER`, `OPENID_CLIENT_ID`, `OPENID_CLIENT_SECRET`, `OPENID_SESSION_SECRET`, `OPENID_SCOPE="openid profile email"`, `OPENID_CALLBACK_URL=/oauth/openid/callback`, optionally `OPENID_REQUIRED_ROLE`. The docs cover Keycloak, Authentik, Authelia, Auth0, Cognito, and Entra; with OIDC in place, set `ALLOW_EMAIL_LOGIN=false` and enforce MFA at the provider ([identity-providers.md](identity-providers.md), [oidc-integration.md](oidc-integration.md)).
-- `CREDS_KEY` (64 hex characters), `CREDS_IV` (32 hex characters), `JWT_SECRET`, and `JWT_REFRESH_SECRET` must be unique random values of at least 32 bytes; the docs point to the Credentials Generator. Never keep the `.env.example` values.
+- `CREDS_KEY` is a 32-byte key (64 hexadecimal characters) and `CREDS_IV` a 16-byte IV (32 hexadecimal characters); `JWT_SECRET` and `JWT_REFRESH_SECRET` are unique random values of at least 32 bytes each. The docs point to the Credentials Generator. Never keep the `.env.example` values.
 - Set `DOMAIN_CLIENT` and `DOMAIN_SERVER` to the public `https://` URL. TLS comes from the fronting proxy (section 2).
 - The v0.7.7 changelog lists two-factor authentication with backup codes and QR enrolment, but the authentication documentation we checked does not describe it, so do not count on it as the enforced control; MFA at the OIDC provider is the documented path.
 
@@ -69,10 +71,10 @@ None of the four documents instance-wide MFA enforcement. Where OIDC exists (Lib
 ## Verify
 
 ```bash
-ss -tlnp | grep -E ':(3000|7860|3080|80|443) '        # container ports on 127.0.0.1 only
+ss -tlnp | grep -E ':(3000|7860|3080|80|443) '        # app ports on 127.0.0.1; 80/443 public only where Dify's own nginx is the TLS edge
 curl -sI https://builder.example.com/                  # TLS; login page or redirect, not the editor
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://flowise.example.com/api/v1/prediction/<chatflow-id>   # 401
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://langflow.example.com/api/v1/run/<flow-id>            # 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST 'https://flowise.example.com/api/v1/prediction/REPLACE_WITH_CHATFLOW_ID'   # 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST 'https://langflow.example.com/api/v1/run/REPLACE_WITH_FLOW_ID'            # 401
 curl -s -o /dev/null -w '%{http_code}\n' https://dify.example.com/v1/parameters                              # 401
 ```
 
@@ -87,7 +89,8 @@ curl -s -o /dev/null -w '%{http_code}\n' https://dify.example.com/v1/parameters 
 
 - Dify Docker Compose deployment (setup at `/install`): https://docs.dify.ai/en/self-host/deploy/quick-start/docker-compose
 - Dify environment variables (`SECRET_KEY`, `INIT_PASSWORD`, `CONSOLE_API_URL`, `CONSOLE_WEB_URL`, `APP_WEB_URL`): https://docs.dify.ai/en/self-host/deploy/configuration/environments
-- Dify `docker/.env.example` (`EXPOSE_NGINX_PORT`, `NGINX_HTTPS_ENABLED`, certificate variables): https://github.com/langgenius/dify/blob/main/docker/.env.example
+- Dify `docker/.env.example` (`EXPOSE_NGINX_PORT`, `NGINX_HTTPS_ENABLED`, certificate variables): https://github.com/langgenius/dify/blob/main/docker/.env.example ; `docker-compose.yaml` (which services publish ports): https://github.com/langgenius/dify/blob/main/docker/docker-compose.yaml
+- Docker packet filtering and firewalls (published ports bypass UFW): https://docs.docker.com/engine/network/packet-filtering-firewalls/
 - Dify certbot README (HTTPS steps): https://github.com/langgenius/dify/blob/main/docker/certbot/README.md
 - Dify API keys (Bearer, backend-only): https://docs.dify.ai/en/api-reference/guides/get-started
 - Flowise app-level authentication (v3.0.1 accounts, deprecated username/password, JWT secrets): https://docs.flowiseai.com/configuration/authorization/app-level

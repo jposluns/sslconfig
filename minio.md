@@ -2,6 +2,8 @@
 
 MinIO serves S3-compatible object storage; an exposed instance with weak or well-known credentials hands over every bucket. Both the S3 API port and the web console need the same care.
 
+Lifecycle note, as of September 2026: the MinIO community repository on GitHub was archived on 2026-04-25 and carries the notice that it is no longer maintained; MinIO now ships AIStor Free (a standalone edition under a free licence) and AIStor Enterprise. The settings below are documented for AIStor. An archived community build receives no security fixes, so treat running one as a finding and plan the migration.
+
 ## 1. Set real root credentials
 
 ```bash
@@ -38,3 +40,4 @@ mc alias set mys3 https://s3.example.com:9000 <access-key> <secret>   # app key 
 
 - MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/enterprise/aistor-object-store/installation/linux/network-encryption/
 - MinIO: https://min.io/
+- MinIO community repository (archived 2026-04-25, successor editions): https://github.com/minio/minio

@@ -51,6 +51,8 @@ builder.Services.ConfigureApplicationCookie(options => {
     options.ExpireTimeSpan = TimeSpan.FromHours(8); });
 ```
 
+Lockout counts a failure only when the sign-in call asks for it: pass `lockoutOnFailure: true` to `_signInManager.PasswordSignInAsync(email, password, rememberMe, lockoutOnFailure: true)`. With the default `false`, the `Lockout` options above never trigger.
+
 Without Identity, the same `Cookie.*` options go on `AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => ...)`; call `app.UseAuthentication()` then `app.UseAuthorization()` before the `Map*` calls. Deny by default with `AddAuthorizationBuilder().SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())` and mark public pages `[AllowAnonymous]`.
 
 Rate-limit the login route with the built-in middleware (`Microsoft.AspNetCore.RateLimiting`, .NET 7 and later):
@@ -75,7 +77,7 @@ SSO: the `Microsoft.AspNetCore.Authentication.OpenIdConnect` package adds `.AddO
 ```bash
 curl -sI http://example.com/         # expect 307 or 308 with a https:// Location
 curl -sI https://example.com/        # succeeds without -k; shows Strict-Transport-Security
-curl -s  https://example.com/api     # expect 401/403 without credentials
+curl -sS -o /dev/null -w '%{http_code}\n' https://example.com/api   # 401 or 403 without credentials
 ss -tlnp | grep dotnet               # behind a proxy: 127.0.0.1 and ::1 only
 ```
 

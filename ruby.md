@@ -47,11 +47,14 @@ end
 ## 4. Client-side TLS discipline
 
 ```ruby
-Net::HTTP.start("api.example.com", 443, use_ssl: true) do |http|   # verify_mode defaults to OpenSSL::SSL::VERIFY_PEER
-  http.ca_file = "/etc/ssl/certs/internal-ca.pem"                  # internal CA; or set SSL_CERT_FILE in the environment
+Net::HTTP.start("api.example.com", 443,
+                use_ssl: true,                                  # verify_mode defaults to OpenSSL::SSL::VERIFY_PEER
+                ca_file: "/etc/ssl/certs/internal-ca.pem") do |http|   # internal CA; or set SSL_CERT_FILE in the environment
   http.request(Net::HTTP::Get.new("/"))
 end
 ```
+
+`Net::HTTP.start` takes `use_ssl`, `ca_file`, `verify_mode`, and the other SSL settings in its options hash and applies them when it opens the connection. Assigning `http.ca_file` inside the block comes after the handshake and does not affect it; to set attributes on an instance, use `Net::HTTP.new` and set them before calling `start`.
 
 Never set `verify_mode = OpenSSL::SSL::VERIFY_NONE`. Ruby's default SSL context loads the system store through `set_default_paths`, and OpenSSL reads `SSL_CERT_FILE` and `SSL_CERT_DIR` to locate that store, so an internal CA goes there (see [self-signed.md](self-signed.md)) rather than into a disabled check.
 

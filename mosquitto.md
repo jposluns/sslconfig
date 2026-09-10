@@ -29,7 +29,7 @@ keyfile  /etc/mosquitto/tls/server.key
 # require_certificate true      # mutual TLS: clients must present certificates
 ```
 
-Port 8883 is the conventional MQTT-over-TLS port. Certificates per [self-signed.md](self-signed.md) (an internal CA suits device fleets) or [free-certificates.md](free-certificates.md). `require_certificate true` turns client certificates into the second factor for machines ([mfa.md](mfa.md)). Remove or firewall any plaintext `listener 1883` that is not strictly local.
+Port 8883 is the conventional MQTT-over-TLS port. Certificates per [self-signed.md](self-signed.md) (an internal CA suits device fleets) or [free-certificates.md](free-certificates.md). `require_certificate true` makes a client certificate a possession factor for the connecting device, stronger than a password alone but not MFA for a person ([mfa.md](mfa.md)). Remove or firewall any plaintext `listener 1883` that is not strictly local.
 
 ## 3. Verify
 

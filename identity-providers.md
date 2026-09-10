@@ -37,7 +37,7 @@ A login proves who the person is. **It does not decide whether they may use your
 ## 4. Developer identity
 
 - **GitHub OAuth**: an OAuth app gives login for any GitHub user; restrict to members of your organisation or team in the app (or with oauth2-proxy, which has a GitHub provider with org and team restrictions). GitHub Actions OIDC is a different mechanism for workloads, covered in [machine-auth.md](machine-auth.md).
-- **AWS IAM Identity Center**: the free workforce directory for your own AWS console and CLI access, and an OIDC source for Application Load Balancer authentication.
+- **AWS IAM Identity Center**: the free workforce directory for your team's own AWS console and CLI access. It is not a general OIDC provider for Application Load Balancer authentication; for app login on AWS pair the ALB with Cognito or an OIDC provider from section 3 ([cloud-identity-proxies.md](cloud-identity-proxies.md)).
 
 ## 5. Self-hosted identity providers
 
@@ -47,7 +47,7 @@ Keycloak, authentik, Zitadel, Ory, and Authelia ([mfa.md](mfa.md)) give you OIDC
 
 - **Duo**: the Duo Free edition covers up to 10 users with MFA and the Duo Mobile app. Its Authentication Proxy speaks RADIUS and LDAP, which retrofits MFA onto VPNs and services with RADIUS support.
 - **Provider-native authenticators**: Microsoft Authenticator (Entra), Okta Verify (Okta), Google prompts (Google). Any RFC 6238 authenticator app works where a provider offers TOTP.
-- **Hardware keys and passkeys**: YubiKey and other FIDO2 keys, and platform passkeys, are the phishing-resistant factor. Every provider in sections 2 and 3 supports WebAuthn at some tier; require it for administrators ([mfa.md](mfa.md)).
+- **Hardware keys and passkeys**: YubiKey and other FIDO2 keys, and platform passkeys, are the phishing-resistant factor. Most of the providers above document passkey or WebAuthn support; check the tier before relying on it, and require it for administrators ([mfa.md](mfa.md)).
 
 ## 7. Poor fits for a small project
 
@@ -74,4 +74,5 @@ Zscaler Private Access, HashiCorp Boundary, Ping Identity, OneLogin, and Okta as
 - Supabase pricing: https://supabase.com/pricing
 - Duo editions and pricing: https://duo.com/editions-and-pricing
 - GitHub OAuth apps: https://docs.github.com/en/apps/oauth-apps
-- AWS IAM Identity Center: https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html
+- AWS IAM Identity Center: https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html ; its OIDC service (AWS CLI and native clients): https://docs.aws.amazon.com/singlesignon/latest/OIDCAPIReference/Welcome.html
+- Application Load Balancer user authentication (OIDC-compliant IdP or Cognito user pool): https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html

@@ -22,7 +22,9 @@ ssl.keystore.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ssl.truststore.location=/var/private/ssl/server.truststore.jks
 ssl.truststore.password=REPLACE_WITH_LONG_RANDOM_VALUE
-ssl.client.auth=none          # required = mutual TLS; requested = optional client certificates
+# Client certificates on the SASL_SSL listener: none (default), requested (optional), or required (mutual TLS).
+# The unprefixed ssl.client.auth applies only to SSL listeners, so a SASL_SSL listener needs the listener prefix.
+listener.name.sasl_ssl.ssl.client.auth=none
 ```
 
 ## 3. SASL/SCRAM credentials
@@ -63,7 +65,7 @@ bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config adm
 
 ## 5. Client side
 
-`client.properties`, kept out of the repository ([secrets.md](secrets.md)). MFA: the Kafka protocol has no second-factor dialogue; `ssl.client.auth=required` (mutual TLS) is the possession factor for machine clients ([machine-auth.md](machine-auth.md)), and human paths to the brokers or a management UI go behind MFA per [mfa.md](mfa.md).
+`client.properties`, kept out of the repository ([secrets.md](secrets.md)). MFA: the Kafka protocol has no second-factor dialogue; `listener.name.sasl_ssl.ssl.client.auth=required` (mutual TLS; the unprefixed `ssl.client.auth` applies only to `SSL` listeners, and Kafka logs a warning when it is set without the prefix on a `SASL_SSL` broker) is the possession factor for machine clients ([machine-auth.md](machine-auth.md)), and each client then presents its own keystore as in the last three lines below; human paths to the brokers or a management UI go behind MFA per [mfa.md](mfa.md).
 
 ```properties
 security.protocol=SASL_SSL
@@ -71,6 +73,10 @@ sasl.mechanism=SCRAM-SHA-512
 sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="app" password="REPLACE_WITH_LONG_RANDOM_VALUE";
 ssl.truststore.location=/var/private/ssl/client.truststore.jks
 ssl.truststore.password=REPLACE_WITH_LONG_RANDOM_VALUE
+# only when the listener requires client certificates
+ssl.keystore.location=/var/private/ssl/client.keystore.jks
+ssl.keystore.password=REPLACE_WITH_LONG_RANDOM_VALUE
+ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ```
 
 ## Verify
@@ -78,14 +84,18 @@ ssl.truststore.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ```bash
 ss -tlnp | grep -E '9092|9093'                                # 9093 only, or 9092 on 127.0.0.1
 openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake with your certificate
-bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --topic orders   # no credentials: fails
+# wrong.properties: a copy of client.properties (security.protocol=SASL_SSL) with a deliberately wrong SCRAM password
+bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
+  --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)
+bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config client.properties \
+  --topic orders --from-beginning --max-messages 1   # authorised app credential: reads one message
 bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties --list --topic orders
 ```
 
 ## Common mistakes
 
 - `SASL_SSL` added as a second listener while `PLAINTEXT://:9092` stays advertised, so clients quietly keep using it.
-- Authorizer enabled with `allow.everyone.if.no.acl.found=true` "temporarily", which equals no authorizer.
+- Authorizer enabled with `allow.everyone.if.no.acl.found=true` "temporarily". The flag opens only resources that have no ACL at all; existing ACLs are still enforced. That still means every new topic is world-readable and world-writable until someone adds its first ACL, so keep it `false`.
 
 ## Sources (checked September 2026)
 
@@ -95,3 +105,4 @@ bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config adm
 - Authentication using SASL, SCRAM section (source): https://raw.githubusercontent.com/apache/kafka/trunk/docs/security/authentication-using-sasl.md
 - Authorization and ACLs (source): https://raw.githubusercontent.com/apache/kafka/trunk/docs/security/authorization-and-acls.md
 - Broker configuration reference (defaults for `listeners`, `sasl.enabled.mechanisms`): https://kafka.apache.org/40/generated/kafka_config.html
+- SSL client authentication on `SASL_SSL` listeners needs the listener prefix (source, `ChannelBuilders.java`): https://raw.githubusercontent.com/apache/kafka/trunk/clients/src/main/java/org/apache/kafka/common/network/ChannelBuilders.java
