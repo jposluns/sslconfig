@@ -47,7 +47,7 @@ MFA: Ray has no user accounts, so a second factor can only come from the path to
 
 ## 4. TLS for the gRPC traffic
 
-Ray can encrypt and mutually authenticate its internal gRPC connections. Export these in the environment of every node, head and workers alike, before Ray starts there; a node started without them joins in plaintext:
+Ray can encrypt and mutually authenticate its internal gRPC connections. Export these in the environment of every node, head and workers alike, before Ray starts there; Ray reads them at startup (`RAY_USE_TLS` defaults to `0`), so a plain assignment without `export`, or a variable set after the node started, never reaches the Ray processes:
 
 ```bash
 export RAY_USE_TLS=1                                 # default 0

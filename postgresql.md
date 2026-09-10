@@ -66,3 +66,4 @@ A connection attempt without TLS from a remote host must fail once only `hostssl
 - Secure TCP/IP connections with SSL: https://www.postgresql.org/docs/current/ssl-tcp.html
 - pg_hba.conf: https://www.postgresql.org/docs/current/auth-pg-hba-conf.html
 - libpq SSL support (sslmode): https://www.postgresql.org/docs/current/libpq-ssl.html
+- Connections and authentication (`listen_addresses` "can only be set at server start"): https://www.postgresql.org/docs/current/runtime-config-connection.html

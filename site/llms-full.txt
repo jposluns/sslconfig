@@ -2869,6 +2869,7 @@ A connection attempt without TLS from a remote host must fail once only `hostssl
 - Secure TCP/IP connections with SSL: https://www.postgresql.org/docs/current/ssl-tcp.html
 - pg_hba.conf: https://www.postgresql.org/docs/current/auth-pg-hba-conf.html
 - libpq SSL support (sslmode): https://www.postgresql.org/docs/current/libpq-ssl.html
+- Connections and authentication (`listen_addresses` "can only be set at server start"): https://www.postgresql.org/docs/current/runtime-config-connection.html
 
 ======================================================================
 ==> mysql.md
@@ -2912,7 +2913,7 @@ ALTER USER 'batch'@'10.0.0.%' REQUIRE X509;
 
 Account hygiene per [authentication.md](authentication.md): keep the default `caching_sha2_password` plugin for new accounts (MySQL 8) rather than re-enabling `mysql_native_password`, remove anonymous accounts, and give the application a least-privilege user, never `root`.
 
-MFA: MySQL 8.0.27 and later support up to 3 authentication factors per account, with factors 2 and 3 supplied by external plugins. The device plugin is FIDO from 8.0.27 (deprecated as of 8.0.35) and WebAuthn, which replaces it, from 8.2 onward including 8.4 LTS; in both cases the server-side plugin ships only in Enterprise Edition. On Community builds, `REQUIRE X509` client certificates add a possession factor held by the connecting machine, stronger than a password alone but not MFA for a person; put human access paths behind MFA per [mfa.md](mfa.md).
+MFA: MySQL 8.0.27 and later support up to 3 authentication factors per account, with factors 2 and 3 supplied by external plugins. The device plugin is FIDO from 8.0.27 (deprecated as of 8.0.35, removed in 8.4) and WebAuthn, which replaces it, from 8.2 onward including 8.4 LTS; in both cases the server-side plugin ships only in Enterprise Edition. On Community builds, `REQUIRE X509` client certificates add a possession factor held by the connecting machine, stronger than a password alone but not MFA for a person; put human access paths behind MFA per [mfa.md](mfa.md).
 
 ## 3. Client side
 
@@ -2950,6 +2951,7 @@ ss -tlnp | grep 3306        # loopback only, unless remote access is deliberate
 - MariaDB TLS documentation: https://mariadb.com/kb/en/secure-connections-overview/
 - WebAuthn pluggable authentication (MySQL 8.4): https://dev.mysql.com/doc/refman/8.4/en/webauthn-pluggable-authentication.html
 - FIDO pluggable authentication (MySQL 8.0, deprecated as of 8.0.35): https://dev.mysql.com/doc/refman/8.0/en/fido-pluggable-authentication.html
+- What is new in MySQL 8.4 (`authentication_fido` plugins removed): https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html
 
 ======================================================================
 ==> mongodb.md
@@ -3038,6 +3040,7 @@ From an unauthenticated session, `show dbs` must fail with an authorization erro
 - MongoDB security checklist: https://www.mongodb.com/docs/manual/administration/security-checklist/
 - Configure TLS/SSL for mongod: https://www.mongodb.com/docs/manual/tutorial/configure-ssl/
 - Enable access control: https://www.mongodb.com/docs/manual/tutorial/enable-authentication/
+- Configuration file options (`net.tls.CAFile`, `net.tls.allowConnectionsWithoutCertificates`): https://www.mongodb.com/docs/manual/reference/configuration-options/
 
 ======================================================================
 ==> redis.md
@@ -3098,10 +3101,10 @@ Set `tls-auth-clients yes` for machine-to-machine deployments where clients can 
 ```bash
 redis-cli --tls --cacert /etc/redis/tls/ca.crt -h redis.example.com -p 6379
 > AUTH app REPLACE_WITH_PASSWORD
-> GET app:probe          # allowed by ~app:* +@read; PING is @connection, which the ACL above does not grant
+> GET app:probe
 ```
 
-Application clients take equivalent TLS and credential options; point them at the CA rather than disabling verification.
+`GET app:probe` is allowed by `~app:* +@read` (a `(nil)` reply is a success); `PING` sits in the `@connection` and `@fast` categories, which the ACL above does not grant, so it fails for `app`. Application clients take equivalent TLS and credential options; point them at the CA rather than disabling verification.
 
 ## 5. Verify
 
@@ -3121,6 +3124,8 @@ redis-cli --tls --cacert ca.crt -h redis.example.com ping   # NOAUTH error until
 
 - Redis documentation (security, TLS, and ACL pages): https://redis.io/docs/latest/
 - redis.conf self-documented example in the Redis source distribution: https://github.com/redis/redis
+- Redis configuration (directive format `keyword argument1 argument2 ... argumentN`): https://redis.io/docs/latest/operate/oss_and_stack/management/config/
+- PING command reference (ACL categories `@fast`, `@connection`): https://redis.io/docs/latest/commands/ping/
 
 ======================================================================
 ==> elasticsearch.md
@@ -3402,9 +3407,9 @@ ss -tlnp | grep -E '9092|9093'                                # 9093 only, or 90
 openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake with your certificate
 # wrong.properties: a copy of client.properties (security.protocol=SASL_SSL) with a deliberately wrong SCRAM password
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
-  --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)
+  --group app-workers --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config client.properties \
-  --topic orders --from-beginning --max-messages 1   # authorised app credential: reads one message
+  --group app-workers --topic orders --from-beginning --max-messages 1   # authorised app credential (group from the ACL in step 4): reads one message
 bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties --list --topic orders
 ```
 
@@ -4580,7 +4585,7 @@ MFA: Ray has no user accounts, so a second factor can only come from the path to
 
 ## 4. TLS for the gRPC traffic
 
-Ray can encrypt and mutually authenticate its internal gRPC connections. Export these in the environment of every node, head and workers alike, before Ray starts there; a node started without them joins in plaintext:
+Ray can encrypt and mutually authenticate its internal gRPC connections. Export these in the environment of every node, head and workers alike, before Ray starts there; Ray reads them at startup (`RAY_USE_TLS` defaults to `0`), so a plain assignment without `export`, or a variable set after the node started, never reaches the Ray processes:
 
 ```bash
 export RAY_USE_TLS=1                                 # default 0

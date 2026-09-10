@@ -81,3 +81,4 @@ From an unauthenticated session, `show dbs` must fail with an authorization erro
 - MongoDB security checklist: https://www.mongodb.com/docs/manual/administration/security-checklist/
 - Configure TLS/SSL for mongod: https://www.mongodb.com/docs/manual/tutorial/configure-ssl/
 - Enable access control: https://www.mongodb.com/docs/manual/tutorial/enable-authentication/
+- Configuration file options (`net.tls.CAFile`, `net.tls.allowConnectionsWithoutCertificates`): https://www.mongodb.com/docs/manual/reference/configuration-options/
