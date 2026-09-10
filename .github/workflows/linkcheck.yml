@@ -17,6 +17,9 @@ jobs:
         uses: lycheeverse/lychee-action@v2
         with:
           fail: true
+          # Accepted non-2xx codes: 403 and 999 are bot-blocking responses from sites that refuse automated
+          # clients (LinkedIn answers 999); 301/302 are redirects; 429 is rate limiting. A green sweep therefore
+          # proves that every URL answered, not that every page was readable. The sweep is advisory for that reason.
           args: >-
             --no-progress
             --root-dir ${{ github.workspace }}/site

@@ -12,7 +12,7 @@
 #   tools/_walk.py                    <- tools/_walk.py
 #   tools/_standards.py               <- tools/_standards.py
 #   tools/_gen_common.py              <- tools/_gen_common.py   (LOCAL PATCH, see below)
-#   tools/check_site.py               <- tools/check_site.py
+#   tools/check_site.py               <- tools/check_site.py   (LOCAL PATCH, see below)
 #   tools/check_no_dashes.py          <- tools/check_no_dashes.py
 #   tools/check_newtab.py             <- tools/check_newtab.py
 #
@@ -21,6 +21,10 @@
 #     environment variable, defaulting to the upstream "aiqt.ai". This repo sets
 #     AIQT_SITE_HOST=sslconfig.ai in tools/run_all_checks.sh. Worth proposing upstream so the
 #     helper becomes site-agnostic and this patch can be dropped.
+#   tools/check_site.py   SITE_HOSTS is derived from AIQT_SITE_HOST (default aiqt.ai) instead of the
+#     hardcoded {"aiqt.ai", "www.aiqt.ai"}, so absolute https://sslconfig.ai/... self-links in
+#     site/index.html are classified internal and resolved. Upstream hardcodes the host; worth proposing
+#     upstream alongside the _gen_common.py patch.
 #
 # Generated from the vendored files, do not hand-edit:
 #   .claude/settings.json  <- python3 tools/gen_aiqt_settings.py

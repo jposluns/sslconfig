@@ -4,7 +4,7 @@ On Render, Fly.io, Railway, Vercel, Heroku, and similar platforms, TLS is not yo
 
 ## 1. Authentication: entirely yours
 
-The platform authenticates nobody. Every non-public endpoint still needs login or keys per [authentication.md](authentication.md), MFA where viable per [mfa.md](mfa.md). "It is on Vercel" changes nothing about an open `/api/admin`.
+The platform does not authenticate your application's users. Some platforms protect the deployment itself: Vercel Deployment Protection, for example, can require a Vercel login to open preview and deployment URLs on every plan, and production domains on Pro and above, with Password Protection as a paid add-on (per https://vercel.com/docs/deployment-protection as of September 2026). That gate keeps the public out of a preview; it is not your app's login. Every non-public endpoint still needs login or keys per [authentication.md](authentication.md), MFA where viable per [mfa.md](mfa.md), and a hosted provider makes both easy ([identity-providers.md](identity-providers.md)). "It is on Vercel" changes nothing about an open `/api/admin`.
 
 ## 2. Secrets: use the platform's store
 
@@ -31,3 +31,4 @@ curl -s  https://app.example.com/api/...  # 401/403 without credentials
 ## Sources (checked September 2026)
 
 - Render: https://render.com/docs ; Fly.io: https://fly.io/docs ; Vercel: https://vercel.com/docs (each documents managed TLS and environment configuration; consult your platform's pages for the exact toggles)
+- Vercel Deployment Protection: https://vercel.com/docs/deployment-protection

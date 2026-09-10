@@ -45,8 +45,10 @@ for f in *.md; do
   not_a_guide "$f" && continue
   grep -qF " $f" scripts/build-llms-full.sh || { bad "$f is not listed in scripts/build-llms-full.sh"; wired=0; }
   grep -qF "main/$f" site/llms.txt || { bad "$f is not linked from site/llms.txt"; wired=0; }
+  [ "$f" = README.md ] || grep -qF "[$f]($f)" README.md || { bad "$f is not indexed in README.md"; wired=0; }
+  grep -qF "blob/main/$f\"" site/index.html || { bad "$f is not linked from the site/index.html menu"; wired=0; }
 done
-[ "$wired" = 1 ] && ok "every guide is listed in the build script and linked from llms.txt"
+[ "$wired" = 1 ] && ok "every guide is listed in the build script, linked from llms.txt, indexed in README.md, and in the site menu"
 
 echo "== local links resolve =="
 links=1

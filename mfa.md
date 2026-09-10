@@ -12,6 +12,8 @@ Passwords fail through phishing, reuse, and credential stuffing; a second factor
    4. A hosted MFA service such as Duo.
 3. Prefer phishing-resistant factors (WebAuthn/passkeys) over TOTP where the platform offers them, and TOTP over emailed or SMS codes.
 4. When implementing TOTP yourself, the required pieces are: a random per-user secret; an `otpauth://` provisioning URI rendered as a QR code for the user's authenticator app; verification of 1 valid code before the factor activates; single-use recovery codes (stored hashed); rate limiting on code attempts; and TOTP secrets encrypted at rest and excluded from the repository (they cannot be hashed, since the server must read them to verify codes).
+5. Give administrators a phishing-resistant factor (a passkey or a FIDO2 hardware key) wherever the platform offers one. TOTP is the floor; SMS is not acceptable for administrator accounts.
+6. Enrolment is not enforcement. After users enrol, require the factor at the point of access (provider policy such as Conditional Access, Supabase `aal2` in policies, or the app's own check) and test that a password-only session is refused.
 
 ## Identity layers (open source, QR-code TOTP enrolment built in)
 
@@ -35,10 +37,15 @@ Each generates and verifies RFC 6238 codes and pairs with a QR library so users 
 
 ## Hosted MFA
 
+- **Hosted identity providers** (Microsoft Entra ID, Google Workspace, Auth0, Amazon Cognito, Clerk, Supabase Auth, and others) enforce MFA for every app that signs in through them. Which tiers include MFA, and which do not, is in [identity-providers.md](identity-providers.md); wiring is in [oidc-integration.md](oidc-integration.md).
 - **Duo**: the Duo Free edition covers up to 10 users with MFA and the Duo Mobile authenticator app (per https://duo.com/editions-and-pricing as of September 2026; verify current terms). Its Authentication Proxy speaks RADIUS and LDAP, which retrofits MFA onto VPNs and onto services with RADIUS support.
 - **Cloudflare Access** ([cloudflare.md](cloudflare.md)): the emailed one-time PIN proves control of a mailbox only; for sensitive apps connect an identity provider and enforce MFA there, which Access then inherits.
 
 Enforcing MFA once at a central identity provider is easier to operate and audit than separate factors per app; prefer it when more than 1 service is involved.
+
+## Passkeys and hardware keys
+
+WebAuthn passkeys and FIDO2 hardware keys (YubiKey and similar) resist phishing because the credential is bound to the site's origin; a look-alike domain gets nothing. Every hosted provider in [identity-providers.md](identity-providers.md) offers them at some tier. When implementing them yourself, use a maintained WebAuthn library rather than parsing attestation by hand, store the credential public key and sign count, and keep a recovery path (a second key or single-use recovery codes) so a lost key is not a lockout.
 
 ## Where direct MFA is not viable
 
