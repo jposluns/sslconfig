@@ -91,8 +91,15 @@ curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin     # 401 with the @admin matcher
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin/x   # 401 as well
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://app.example.com/
-                                     # 413: larger than request_body max_size
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://app.example.com/
+                                     # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
+                                     # 413. Supply credentials: this site's authentication runs before
+                                     # the body handler, so an unauthenticated probe returns 401 and
+                                     # tells you nothing about max_size. Send from a file, not a pipe,
+                                     # so curl sets Content-Length
+rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which
                                      # bypasses Caddy's TLS and its authentication

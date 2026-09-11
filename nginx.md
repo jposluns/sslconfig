@@ -75,25 +75,36 @@ denial of wallet when the endpoint costs GPU time ([authentication.md](authentic
 zones in the `http` block and apply the limits per location.
 
 ```nginx
-# http block
+# http block, alongside the other http-level directives
 limit_req_zone  $binary_remote_addr zone=api:10m rate=10r/s;
 limit_conn_zone $binary_remote_addr zone=apiconn:10m;
 
+# merge these into the SAME server block from section 1, not a new one
 server {
     client_max_body_size 10m;                   # 413 above this; the default is 1m
 
-    location /api/ {
+    location / {
+        auth_basic           "Restricted";      # keep the section 3 directives here
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
         limit_req  zone=api burst=20 nodelay;   # 503 once the burst is spent
         limit_conn apiconn 10;                  # concurrent connections per client address
-        proxy_read_timeout 60s;                 # match realistic response time, not the default 60s blindly
-        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
         proxy_pass http://127.0.0.1:3000;
     }
 }
 ```
 
-A streaming response needs a longer `proxy_read_timeout` than a JSON API. Set it on the streaming
-location only; raising it globally removes the timeout from every route that does not stream.
+Put the limits in the location that already carries authentication. nginx selects the single most
+specific matching location and does not inherit `auth_basic` from a less specific one, so adding a
+separate `location /api/` for the limits would create a route that is rate limited and unauthenticated.
+If you do split them out, repeat the `auth_basic` directives in each location, or move them to the
+`server` level so every location inherits them.
+
+`proxy_read_timeout` bounds the gap between successive reads from the upstream, not the total duration
+of a response. A stream that keeps sending stays alive indefinitely under a 60s value; a stream that
+stalls for 61s is cut. Choose it from the longest acceptable silence, and note that raising it lengthens
+that tolerance rather than removing the timeout.
 
 ## 5. Verify
 
@@ -102,11 +113,19 @@ sudo nginx -t && sudo systemctl reload nginx
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 200 without -k
 curl -s  https://example.com/api    # expect 401/403 without credentials
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/api/
-                                    # 413: larger than client_max_body_size
-for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' https://example.com/api/; done; echo
-                                    # 503 appears once the rate and burst are spent. All 200s means
-                                    # limit_req is not applying to this location
+head -c 1M  /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://example.com/
+                                    # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
+                                    # 413. Send from a FILE, not a pipe: curl sets Content-Length from a
+                                    # file, so nginx refuses at the headers. Piped stdin is sent chunked
+                                    # with no length, which a backend may reject instead, and a 413 from
+                                    # the backend looks identical here
+seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://example.com/ | sort | uniq -c
+                                    # 503 must appear. Run them CONCURRENTLY: a sequential loop pays a
+                                    # TLS handshake per request and can stay under 10r/s, so every
+                                    # request is admitted and the check passes while no limit exists
+rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the app also answers directly on port 3000,
                                     # which bypasses this proxy's TLS and its authentication. That

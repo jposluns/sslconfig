@@ -98,10 +98,16 @@ caps concurrent in-flight requests rather than their rate, and the two bound dif
 ```bash
 curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://app.example.com/
-                                     # 413: larger than buffering.maxRequestBodyBytes
-for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' https://app.example.com/; done; echo
-                                     # 429 appears once the rate limit and burst are spent
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://app.example.com/
+                                     # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
+                                     # 413. Credentials matter: app-auth is first in the middleware
+                                     # chain, so an unauthenticated probe stops at 401 before buffering
+                                     # sees the body. Send from a file so curl sets Content-Length
+seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://app.example.com/ | sort | uniq -c
+                                     # 429 must appear. Concurrently, for the same reason as above
+rm -f /tmp/under.bin /tmp/over.bin
 docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
 ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. The TLS and auth
                                      # checks above pass while the app is published directly, which

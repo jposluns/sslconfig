@@ -1543,25 +1543,36 @@ denial of wallet when the endpoint costs GPU time ([authentication.md](authentic
 zones in the `http` block and apply the limits per location.
 
 ```nginx
-# http block
+# http block, alongside the other http-level directives
 limit_req_zone  $binary_remote_addr zone=api:10m rate=10r/s;
 limit_conn_zone $binary_remote_addr zone=apiconn:10m;
 
+# merge these into the SAME server block from section 1, not a new one
 server {
     client_max_body_size 10m;                   # 413 above this; the default is 1m
 
-    location /api/ {
+    location / {
+        auth_basic           "Restricted";      # keep the section 3 directives here
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
         limit_req  zone=api burst=20 nodelay;   # 503 once the burst is spent
         limit_conn apiconn 10;                  # concurrent connections per client address
-        proxy_read_timeout 60s;                 # match realistic response time, not the default 60s blindly
-        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
         proxy_pass http://127.0.0.1:3000;
     }
 }
 ```
 
-A streaming response needs a longer `proxy_read_timeout` than a JSON API. Set it on the streaming
-location only; raising it globally removes the timeout from every route that does not stream.
+Put the limits in the location that already carries authentication. nginx selects the single most
+specific matching location and does not inherit `auth_basic` from a less specific one, so adding a
+separate `location /api/` for the limits would create a route that is rate limited and unauthenticated.
+If you do split them out, repeat the `auth_basic` directives in each location, or move them to the
+`server` level so every location inherits them.
+
+`proxy_read_timeout` bounds the gap between successive reads from the upstream, not the total duration
+of a response. A stream that keeps sending stays alive indefinitely under a 60s value; a stream that
+stalls for 61s is cut. Choose it from the longest acceptable silence, and note that raising it lengthens
+that tolerance rather than removing the timeout.
 
 ## 5. Verify
 
@@ -1570,11 +1581,19 @@ sudo nginx -t && sudo systemctl reload nginx
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 200 without -k
 curl -s  https://example.com/api    # expect 401/403 without credentials
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/api/
-                                    # 413: larger than client_max_body_size
-for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' https://example.com/api/; done; echo
-                                    # 503 appears once the rate and burst are spent. All 200s means
-                                    # limit_req is not applying to this location
+head -c 1M  /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://example.com/
+                                    # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
+                                    # 413. Send from a FILE, not a pipe: curl sets Content-Length from a
+                                    # file, so nginx refuses at the headers. Piped stdin is sent chunked
+                                    # with no length, which a backend may reject instead, and a 413 from
+                                    # the backend looks identical here
+seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://example.com/ | sort | uniq -c
+                                    # 503 must appear. Run them CONCURRENTLY: a sequential loop pays a
+                                    # TLS handshake per request and can stay under 10r/s, so every
+                                    # request is admitted and the check passes while no limit exists
+rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the app also answers directly on port 3000,
                                     # which bypasses this proxy's TLS and its authentication. That
@@ -1788,8 +1807,15 @@ curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin     # 401 with the @admin matcher
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin/x   # 401 as well
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://app.example.com/
-                                     # 413: larger than request_body max_size
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://app.example.com/
+                                     # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
+                                     # 413. Supply credentials: this site's authentication runs before
+                                     # the body handler, so an unauthenticated probe returns 401 and
+                                     # tells you nothing about max_size. Send from a file, not a pipe,
+                                     # so curl sets Content-Length
+rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which
                                      # bypasses Caddy's TLS and its authentication
@@ -1880,16 +1906,18 @@ Basic authentication here is single-factor. For human-facing sites, add MFA with
 The timeouts in section 1 are half of this. Add a concurrency cap with `maxconn`, which in `global` is
 the maximum per-process concurrent connections and in a frontend caps that frontend.
 
-HAProxy has **no single request-body-size directive**. Its `req.body_size` fetch reads only what has
-been buffered, and the manual recommends `option http-buffer-request` to wait for the body first, which
-is itself bounded by `tune.bufsize`. Treat the check below as a coarse guard and enforce the real limit
-at the application.
+HAProxy has **no single request-body-size directive**. The rule below uses the `req.body_size` fetch,
+which the manual defines as the *advertised* length of the body, so it reads `Content-Length` and
+refuses at the headers. That is the useful case. It does not cover a chunked request, which advertises
+no length at all: for those, `req.body_len` reads only the *available* buffered bytes, bounded by
+`tune.bufsize`, so a chunked upload is not constrained by this rule. Enforce the real limit at the
+application and treat this as a front-door guard against the common case.
 
 ```haproxy
 global
     maxconn 4096
 
-frontend https-in
+frontend web
     maxconn 2000
     option  http-buffer-request
     http-request deny deny_status 413 if { req.body_size gt 10485760 }
@@ -1901,8 +1929,14 @@ frontend https-in
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 401 without credentials once auth is on
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/
-                                    # 413, subject to the tune.bufsize caveat in section 3
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://example.com/
+                                    # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
+                                    # 413. A file gives curl a Content-Length, which is what
+                                    # req.body_size reads. A piped body is chunked, advertises no
+                                    # length, and this rule will not refuse it
+rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the backend also answers directly on port 3000,
                                     # which bypasses HAProxy's TLS and its authentication
@@ -2024,10 +2058,16 @@ caps concurrent in-flight requests rather than their rate, and the two bound dif
 ```bash
 curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://app.example.com/
-                                     # 413: larger than buffering.maxRequestBodyBytes
-for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' https://app.example.com/; done; echo
-                                     # 429 appears once the rate limit and burst are spent
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://app.example.com/
+                                     # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
+                                     # 413. Credentials matter: app-auth is first in the middleware
+                                     # chain, so an unauthenticated probe stops at 401 before buffering
+                                     # sees the body. Send from a file so curl sets Content-Length
+seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://app.example.com/ | sort | uniq -c
+                                     # 429 must appear. Concurrently, for the same reason as above
+rm -f /tmp/under.bin /tmp/over.bin
 docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
 ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. The TLS and auth
                                      # checks above pass while the app is published directly, which
@@ -7014,7 +7054,7 @@ Apply the shared lesson everywhere: use a distinct secret per endpoint (rotating
 
 ## 4. Bound the expensive endpoints too
 
-Inference, upload, and job-submission endpoints are usually the ones behind these transports, and an authenticated caller can still exhaust them. Two layers need separate limits. At the proxy in front of the app: a maximum request or body size, a connection concurrency cap per client, and a request timeout matched to realistic response time bound the HTTP connection itself; the nginx, Caddy, HAProxy and Traefik guides here each carry those directives in their "Bound the expensive endpoints" section, including where a proxy has no native control for one of them. After a WebSocket upgrade, a single accepted connection can still carry unlimited messages or job submissions, which the connection-level limits above do not touch; OWASP's WebSocket Security Cheat Sheet calls for message-level authorization (checking that each individual message is allowed, not only the handshake) and message-level rate limiting (capping messages per connection per time window) as the separate control that applies once the socket is open. [authentication.md](authentication.md) covers the identity side these limits key off.
+Inference, upload, and job-submission endpoints are usually the ones behind these transports, and an authenticated caller can still exhaust them. Two layers need separate limits. At the proxy in front of the app: a maximum request or body size, a connection concurrency cap per client, and a request timeout matched to realistic response time bound the HTTP connection itself; the nginx, Caddy, HAProxy and Traefik guides here each have a "Bound the expensive endpoints" section covering what that proxy can enforce natively and saying plainly where it cannot: nginx carries all four controls, Traefik carries body size, concurrency and rate but no timeout, HAProxy carries timeouts and an aggregate connection cap with a header-based body check, and Caddy carries body size only, with no rate limiting in its standard build. After a WebSocket upgrade, a single accepted connection can still carry unlimited messages or job submissions, which the connection-level limits above do not touch; OWASP's WebSocket Security Cheat Sheet calls for message-level authorization (checking that each individual message is allowed, not only the handshake) and message-level rate limiting (capping messages per connection per time window) as the separate control that applies once the socket is open. [authentication.md](authentication.md) covers the identity side these limits key off.
 
 ## Verify
 

@@ -63,16 +63,18 @@ Basic authentication here is single-factor. For human-facing sites, add MFA with
 The timeouts in section 1 are half of this. Add a concurrency cap with `maxconn`, which in `global` is
 the maximum per-process concurrent connections and in a frontend caps that frontend.
 
-HAProxy has **no single request-body-size directive**. Its `req.body_size` fetch reads only what has
-been buffered, and the manual recommends `option http-buffer-request` to wait for the body first, which
-is itself bounded by `tune.bufsize`. Treat the check below as a coarse guard and enforce the real limit
-at the application.
+HAProxy has **no single request-body-size directive**. The rule below uses the `req.body_size` fetch,
+which the manual defines as the *advertised* length of the body, so it reads `Content-Length` and
+refuses at the headers. That is the useful case. It does not cover a chunked request, which advertises
+no length at all: for those, `req.body_len` reads only the *available* buffered bytes, bounded by
+`tune.bufsize`, so a chunked upload is not constrained by this rule. Enforce the real limit at the
+application and treat this as a front-door guard against the common case.
 
 ```haproxy
 global
     maxconn 4096
 
-frontend https-in
+frontend web
     maxconn 2000
     option  http-buffer-request
     http-request deny deny_status 413 if { req.body_size gt 10485760 }
@@ -84,8 +86,14 @@ frontend https-in
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 401 without credentials once auth is on
-head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/
-                                    # 413, subject to the tune.bufsize caveat in section 3
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://example.com/
+                                    # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
+                                    # 413. A file gives curl a Content-Length, which is what
+                                    # req.body_size reads. A piped body is chunked, advertises no
+                                    # length, and this rule will not refuse it
+rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the backend also answers directly on port 3000,
                                     # which bypasses HAProxy's TLS and its authentication
