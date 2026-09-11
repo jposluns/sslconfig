@@ -33,7 +33,11 @@ N8N_SSL_CERT=/path/to/fullchain.pem
 
 ```bash
 ss -tlnp | grep 5678                    # 127.0.0.1, not :: or 0.0.0.0
-curl -sI https://n8n.example.com/       # TLS, and a login page rather than the editor
+curl -sI https://n8n.example.com/       # TLS
+curl -s -o /dev/null -w '%{http_code}\n' https://n8n.example.com/api/v1/workflows
+                                        # 401 without an `X-N8N-API-KEY` header. Use a request that returns a body,
+                                        # not `-I`: a HEAD response carries none, so it cannot tell a login page
+                                        # from the editor
 ```
 
 ## Sources (checked September 2026)
@@ -41,3 +45,4 @@ curl -sI https://n8n.example.com/       # TLS, and a login page rather than the 
 - n8n deployment environment variables (N8N_LISTEN_ADDRESS, N8N_PROTOCOL, N8N_SSL_KEY, N8N_SSL_CERT, defaults): https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/deployment.md
 - n8n security policies (MFA enforcement, licensing, SSO exception): https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/manage-security-policies.md
 - n8n SSL setup: https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/set-up-ssl.md
+- n8n public API authentication (`/api/v1` base path, `X-N8N-API-KEY` header): https://docs.n8n.io/api/authentication/

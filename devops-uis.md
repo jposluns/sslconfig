@@ -98,7 +98,14 @@ Without `--tlsverify` the daemon does not check client certificates. Firewall 23
 ss -tlnp | grep -E ':(9443|9000|8000|3000|81|3001|2375|2376) '   # 127.0.0.1 or absent, never 0.0.0.0
 curl -skI https://panel.example.com/                              # 401/403 or a login redirect, never a dashboard
 docker -H tcp://203.0.113.10:2375 info                            # must fail: connection refused or filtered
-docker -H tcp://203.0.113.10:2376 info                            # must fail without the client certificate
+env -u DOCKER_HOST -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH \
+  curl -sS -o /dev/null -w '%{http_code}\n' --cacert ca.pem https://203.0.113.10:2376/_ping
+                                                                  # must fail the handshake on the CLIENT certificate. Do not use
+                                                                  # `docker ... info` here: without `--tlsverify` it fails for the
+                                                                  # wrong reason, and `DOCKER_CERT_PATH` exported in the setup above
+                                                                  # can silently supply the very certificate the check is meant to lack
+curl -sS -o /dev/null -w '%{http_code}\n' --cacert ca.pem --cert client-cert.pem --key client-key.pem \
+  https://203.0.113.10:2376/_ping                                 # positive control: 200 with the right client certificate
 ```
 
 From outside the network, every panel URL is unreachable or shows a login; a page that renders host, container, or repository data without one is a finding.

@@ -81,16 +81,25 @@ curl -s -o /dev/null -w '%{http_code}\n' https://example.com/config.php.bak
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/db.sql
 # each line above must print 403 or 404, never the file's content
 
-curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known/acme-challenge/x
-# must not be 403 or 404; the DirectoryMatch exemption must still let the real ACME
-# challenge path through
+printf 'probe' | sudo tee /var/www/html/.well-known/acme-challenge/probe >/dev/null
+curl -s https://example.com/.well-known/acme-challenge/probe
+sudo rm -f /var/www/html/.well-known/acme-challenge/probe
+# must return "probe", never 403: the exemption has to let a real challenge file through.
+# Requesting a token that does not exist proves nothing, because a correctly exempted
+# directory still answers 404 for a file that is not there
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known-backup/config
 # must be 403 or 404; a directory name that only starts with "well-known" must not
 # inherit that exemption
 
-grep -rn "sk-\|AKIA\|-----BEGIN" .next/static build dist 2>/dev/null
-# must print nothing when run against the built client bundle, not the source;
-# a variable that never compiled in cannot leak
+for d in .next/static build dist; do
+  [ -d "$d" ] || { echo "$d: absent, nothing scanned"; continue; }
+  grep -rn "sk-\|AKIA\|ghp_\|sb_secret_\|-----BEGIN" "$d"; echo "$d exit: $?"
+done
+# run against the built client bundle, not the source. Exit 1 with no output is clean, exit 0
+# is a match, and exit 2 is a grep failure that is NOT clean. Do not send the errors to
+# /dev/null and read silence as a pass: against a directory that does not exist, grep exits 2
+# and prints nothing, which looks exactly like success. A clean result is evidence, not proof:
+# a bundler can split or encode a value, so scan for the literal secret as well
 ```
 
 Any backup path known to have existed on the server should also 404 at the deployed URL.

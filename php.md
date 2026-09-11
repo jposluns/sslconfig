@@ -68,6 +68,10 @@ curl_setopt($ch, CURLOPT_CAINFO, '/etc/ssl/certs/internal-ca.pem'); // internal 
 ss -xlnp | grep php-fpm                                       # Unix socket; with TCP, ss -tlnp shows 127.0.0.1:9000 only
 curl -sI https://app.example.com/                             # succeeds without -k
 curl -sI https://app.example.com/login | grep -i set-cookie   # secure; httponly; samesite=lax
+curl -s -o /dev/null -w '%{http_code}\n' https://app.example.com/REPLACE_WITH_PROTECTED_PATH
+                                                              # 401, 403, or a redirect to /login with no session cookie.
+                                                              # TLS and cookie flags say nothing about whether a route
+                                                              # actually refuses an unauthenticated request
 ```
 
 ## Sources (checked September 2026)

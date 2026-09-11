@@ -96,7 +96,12 @@ still need their own TLS and auth on top ([postgresql.md](postgresql.md), [mysql
 
 ```bash
 docker exec app id                                  # uid is not 0
-docker exec app sh -c 'touch /x'                    # read-only fs: fails
+docker exec app sh -c 'touch /app/probe && echo WRITABLE || echo refused'
+                                                    # read-only fs: prints "refused". Probe a directory the container
+                                                    # user owns, not `/`: a non-root user cannot write `/` on a writable
+                                                    # filesystem either, so `touch /x` refuses for the wrong reason and
+                                                    # passes even after `read_only` is removed. A tmpfs you mounted for
+                                                    # scratch stays writable by design; do not probe that path
 kubectl get pod app -o jsonpath='{.spec.containers[0].securityContext}'
 
 # resolve the db Service's ClusterIP once and probe that same IP from both pods below; the
@@ -107,13 +112,27 @@ DBIP=$(kubectl get svc db -o jsonpath='{.spec.clusterIP}')
 
 # a probe pod needs its own admission-compliant securityContext under the restricted PSA level, and a
 # real TCP connect to the db's actual port (a Postgres port does not speak HTTP, so wget cannot test it)
-SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3",'"$DBIP"',"5432"]}]}}'
+# Quote the address into the JSON: unquoted, `10.96.0.5` is a bare token and the array is not valid
+# JSON, so kubectl rejects the override and neither probe below runs. The override's container name
+# must also match the pod name, because kubectl run names the container after the pod and a strategic
+# merge keys containers by name, so a mismatched name adds a second container instead of replacing
+# the command. Build the override per pod:
+probe_override() {
+  printf '%s' '{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"'"$1"'","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3","'"$DBIP"'","5432"]}]}}'
+}
 
 kubectl run probe-permitted --rm -it --restart=Never --image=busybox:1.36 --labels=role=app \
-  --overrides="$SC" -- true                          # from a pod labeled role=app, by IP: must succeed first, proving the path works
+  --overrides="$(probe_override probe-permitted)" -- true
+                                                     # from a pod labeled role=app, by IP: must succeed FIRST. This is the
+                                                     # positive control. If it fails, the policy, the override, or this
+                                                     # image's `nc` is the problem, and the forbidden probe below proves
+                                                     # nothing: a refusal you cannot distinguish from a broken probe is
+                                                     # not evidence
 
 kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labels=role=other \
-  --overrides="$SC" -- true                          # from a pod without that label, same IP: must time out or be refused at TCP, not fail on DNS
+  --overrides="$(probe_override probe-forbidden)" -- true
+                                                     # from a pod without that label, same IP: must time out or be refused
+                                                     # at TCP, not fail on DNS
 ```
 
 ## Sources (checked September 2026)
