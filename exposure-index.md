@@ -27,14 +27,14 @@ one of them is the application's.
 | Port | May be | Documented in |
 | --- | --- | --- |
 | 22 | SSH, which should not be publicly reachable | [cloud-firewalls.md](cloud-firewalls.md), [host.md](host.md) |
-| 80, 443 | Usually the TLS proxy, but also native HTTPS listeners in the language guides and a container publishing 80 directly | [nginx.md](nginx.md), [caddy.md](caddy.md), [haproxy.md](haproxy.md), [traefik.md](traefik.md), [apache.md](apache.md), [lighttpd.md](lighttpd.md), [go.md](go.md), [dotnet.md](dotnet.md) |
+| 80, 443 | Usually the TLS proxy, but also native HTTPS listeners in the language guides, and Vaultwarden's container port 80 | [nginx.md](nginx.md), [caddy.md](caddy.md), [haproxy.md](haproxy.md), [traefik.md](traefik.md), [apache.md](apache.md), [lighttpd.md](lighttpd.md), [go.md](go.md), [dotnet.md](dotnet.md) |
 | 81 | Nginx Proxy Manager admin UI (the proxy itself is on 80 and 443) | [devops-uis.md](devops-uis.md) |
 | 1234 | LM Studio local server | [model-servers.md](model-servers.md) |
 | 1880 | Node-RED editor and admin API, which have no authentication by default | [devops-uis.md](devops-uis.md) |
 | 1883 | MQTT, plaintext | [mosquitto.md](mosquitto.md) |
 | 2375 | Docker API, plaintext and unauthenticated | [devops-uis.md](devops-uis.md) |
 | 2376 | Docker API over TLS. The port is a convention, not proof of client-certificate authentication: `--tls` and `--tlsverify` are different settings | [devops-uis.md](devops-uis.md), [docker.md](docker.md) |
-| 3000 | The most crowded port here, documented by 23 guides. Metabase, Dagster, Gitea, Dokploy, Next.js, Rails, Langfuse, TGI, and the backend behind most proxy examples. Open WebUI's 3000 is a **published host port** mapping to container 8080 | [nextjs.md](nextjs.md), [ruby.md](ruby.md), [bi-dashboards.md](bi-dashboards.md), [workflow-orchestrators.md](workflow-orchestrators.md), [devops-uis.md](devops-uis.md), [open-webui.md](open-webui.md), [llm-observability.md](llm-observability.md), [model-servers.md](model-servers.md), [agent-builders.md](agent-builders.md), [chat-uis.md](chat-uis.md), [mcp-servers.md](mcp-servers.md), [fronting-auth.md](fronting-auth.md) |
+| 3000 | The most crowded port here, documented by 23 guides. Metabase, Dagster, Gitea, Dokploy, Next.js, SvelteKit's Node adapter (which defaults to `0.0.0.0`), Rails, Flowise, OpenHands, Langfuse, TGI, and the backend behind most proxy examples. Open WebUI's 3000 is a **published host port** mapping to container 8080 | [nextjs.md](nextjs.md), [frontend-frameworks.md](frontend-frameworks.md), [ruby.md](ruby.md), [bi-dashboards.md](bi-dashboards.md), [workflow-orchestrators.md](workflow-orchestrators.md), [devops-uis.md](devops-uis.md), [open-webui.md](open-webui.md), [llm-observability.md](llm-observability.md), [model-servers.md](model-servers.md), [agent-builders.md](agent-builders.md), [chat-uis.md](chat-uis.md), [mcp-servers.md](mcp-servers.md), [fronting-auth.md](fronting-auth.md) |
 | 3001 | AnythingLLM, or Uptime Kuma | [chat-uis.md](chat-uis.md), [devops-uis.md](devops-uis.md) |
 | 3080 | LibreChat | [agent-builders.md](agent-builders.md) |
 | 3210 | LobeChat | [chat-uis.md](chat-uis.md) |
@@ -45,7 +45,7 @@ one of them is the application's.
 | 4222 | NATS client connections | [nats.md](nats.md) |
 | 4317, 4318 | OTLP gRPC and OTLP HTTP receivers | [llm-observability.md](llm-observability.md) |
 | 5000 | Redash, MLflow tracking server, or a .NET Kestrel default | [bi-dashboards.md](bi-dashboards.md), [mlflow.md](mlflow.md), [dotnet.md](dotnet.md) |
-| 5003 | Dify plugin debugging, when that profile is published | [agent-builders.md](agent-builders.md) |
+| 5003 | Dify's plugin daemon debugging port, published by the supplied Compose configuration unless you remove or restrict that mapping | [agent-builders.md](agent-builders.md) |
 | 5432 | PostgreSQL, and pgvector on the same port | [postgresql.md](postgresql.md), [vector-databases.md](vector-databases.md), [cloud-firewalls.md](cloud-firewalls.md) |
 | 5555 | Flower, the Celery monitor | [workflow-orchestrators.md](workflow-orchestrators.md) |
 | 5671, 5672 | AMQP over TLS, and AMQP plaintext | [rabbitmq.md](rabbitmq.md) |
@@ -58,15 +58,15 @@ one of them is the application's.
 | 7000 | frp server | [tunnels.md](tunnels.md) |
 | 7233 | Temporal frontend gRPC | [workflow-orchestrators.md](workflow-orchestrators.md) |
 | 7473, 7474, 7687 | Neo4j HTTPS, HTTP, and Bolt | [neo4j.md](neo4j.md) |
-| 7860 | Gradio, and applications built on it including Stable Diffusion WebUI and Langflow | [gradio.md](gradio.md), [image-gen-uis.md](image-gen-uis.md), [agent-builders.md](agent-builders.md) |
-| 8000 | SurrealDB, Chroma, Triton HTTP, Coolify, or Portainer's Edge agent tunnel | [surrealdb.md](surrealdb.md), [vector-databases.md](vector-databases.md), [model-servers.md](model-servers.md), [devops-uis.md](devops-uis.md) |
+| 7860 | Gradio, Stable Diffusion WebUI, or Langflow | [gradio.md](gradio.md), [image-gen-uis.md](image-gen-uis.md), [agent-builders.md](agent-builders.md) |
+| 8000 | SurrealDB, Chroma, Triton HTTP, Coolify, Vaultwarden outside Docker, or Portainer's Edge agent tunnel | [surrealdb.md](surrealdb.md), [vector-databases.md](vector-databases.md), [model-servers.md](model-servers.md), [devops-uis.md](devops-uis.md) |
 | 8001, 8002 | Triton gRPC and Triton Prometheus metrics | [model-servers.md](model-servers.md) |
-| 8080 | llama.cpp, Weaviate HTTP, Airflow, code-server, Open WebUI's container port, Spring Boot, Go, and the Vast.ai Jupyter deployment | [model-servers.md](model-servers.md), [vector-databases.md](vector-databases.md), [workflow-orchestrators.md](workflow-orchestrators.md), [code-server.md](code-server.md), [open-webui.md](open-webui.md), [java.md](java.md), [go.md](go.md), [gpu-clouds.md](gpu-clouds.md) |
+| 8080 | llama.cpp, Weaviate HTTP, Airflow, code-server, Open WebUI's container port, Dify's nginx when mapped to `127.0.0.1:8080`, Spring Boot, Go, and the Vast.ai Jupyter deployment | [model-servers.md](model-servers.md), [vector-databases.md](vector-databases.md), [workflow-orchestrators.md](workflow-orchestrators.md), [code-server.md](code-server.md), [open-webui.md](open-webui.md), [agent-builders.md](agent-builders.md), [java.md](java.md), [go.md](go.md), [gpu-clouds.md](gpu-clouds.md) |
 | 8088 | Apache Superset | [bi-dashboards.md](bi-dashboards.md) |
 | 8123 | ClickHouse HTTP, plaintext | [clickhouse.md](clickhouse.md) |
 | 8188 | ComfyUI | [image-gen-uis.md](image-gen-uis.md) |
 | 8222 | NATS monitoring endpoints | [nats.md](nats.md) |
-| 8233 | Temporal Web UI as started by `temporal server start-dev`. A separately deployed Web UI documents 8080 | [workflow-orchestrators.md](workflow-orchestrators.md) |
+| 8233 | Temporal Web UI as started by `temporal server start-dev`, which is the context this corpus documents | [workflow-orchestrators.md](workflow-orchestrators.md) |
 | 8265 | Ray dashboard | [ray.md](ray.md) |
 | 8443 | ClickHouse HTTPS, the Kubernetes Dashboard forwarding example, and the configured HTTPS listeners in the Gradio, Python, Java and Ruby guides | [clickhouse.md](clickhouse.md), [devops-uis.md](devops-uis.md), [gradio.md](gradio.md), [python.md](python.md), [java.md](java.md), [ruby.md](ruby.md) |
 | 8501 | Streamlit | [streamlit.md](streamlit.md) |
@@ -94,52 +94,76 @@ one of them is the application's.
 
 ## Verify
 
-This section checks that you have *accounted for* every listener. It does not check that any of them is
-secure, and it cannot. Finishing here proves nothing on its own.
+**This is an inventory, not a security check.** Completing it establishes that you know what is
+listening and by how many routes it can be reached. It does not establish that any of those services
+is safe to expose, and no checklist on an index page can. The security claim belongs to each service's
+own guide, and even there the Verify blocks are worked examples over sampled URLs, not an enumeration
+of your application's sensitive routes.
 
 ```bash
 sudo ss -tlnp                    # listening TCP sockets, with the owning process
 sudo ss -tlunp                   # again including UDP, which Memcached and WireGuard answer on
-docker ps --format '{{.Names}}\t{{.Ports}}'   # published container ports, which the host view above can miss
+docker ps --format '{{.Names}}\t{{.Ports}}'   # published container ports, which the host view can miss
 ```
 
-`ss` reports the sockets in its own network namespace, so a container's own listeners are not all
-visible from the host, and a diagnostic message such as `Cannot open netlink socket` means the command
-failed. Empty output plus a zero exit status is not a pass.
+`ss` reports sockets in its own network namespace, so a container's listeners are not all visible from
+the host. A diagnostic such as `Cannot open netlink socket` means the command failed: empty output with
+a zero exit status is not a pass.
 
-From a second machine, on a different network, against a host **you own or are authorized to test**:
+From a second machine on a different network, against a host **you own or are authorized to test**.
+Substitute a literal address, and check the target Nmap prints before you read the result: the
+placeholder below is a hostname as far as Nmap is concerned, and if it resolves in your environment
+Nmap will scan whatever it resolved to.
 
 ```bash
-nmap -Pn -p- REPLACE_WITH_YOUR_PUBLIC_IP          # TCP, IPv4
-nmap -Pn -6 -p- REPLACE_WITH_YOUR_PUBLIC_IPV6     # again for IPv6, which the line above does not cover
-nmap -Pn -sU --top-ports 100 REPLACE_WITH_YOUR_PUBLIC_IP   # UDP, which the TCP scans do not cover
+sudo nmap -Pn -p- REPLACE_WITH_A_LITERAL_IPV4_ADDRESS            # TCP over IPv4
+sudo nmap -Pn -6 -p- REPLACE_WITH_A_LITERAL_IPV6_ADDRESS         # TCP over IPv6, which the line above never covers
+sudo nmap -Pn -sU --top-ports 100 REPLACE_WITH_A_LITERAL_IPV4_ADDRESS      # UDP, preliminary only
+sudo nmap -Pn -6 -sU --top-ports 100 REPLACE_WITH_A_LITERAL_IPV6_ADDRESS   # UDP over IPv6
 ```
 
-Substitute your own address. Left as a placeholder, the scan reaches nothing, reports nothing open, and
-looks exactly like a clean result.
+UDP scanning needs privilege and returns `open|filtered` when it cannot distinguish the two, so a
+clean-looking UDP result is weaker evidence than a clean TCP one. Treat the top-100 scan as a first
+pass and probe the UDP ports your own inventory names.
 
-Completion requires all four, and the fourth is the one that carries the security claim:
+Four things to establish, and none of them is "the service is secure":
 
-1. Every listening socket has a named owning process, and you can say what it is. A port appearing in
-   the table above is not that: the number is a hint, not an identification.
-2. Each one is bound to `127.0.0.1`, `::1`, a private address, or a tailnet address, unless it is
-   deliberately public and you can say why.
-3. The external scans show only the ports you intend to be reachable, on both address families.
-4. For every service still reachable, its own guide's Verify passes, including the checks that an
-   unauthenticated request is refused. A private bind and a TLS proxy in front do not make an
-   application authenticate anyone; [fronting-auth.md](fronting-auth.md) covers what fronting does and
-   does not give you, and [common-mistakes.md](common-mistakes.md) lists the recurring failures.
+1. **Every listening socket has a named owning process.** A port appearing in the table above is a hint
+   about which guides to read, not an identification of what is running.
+2. **Every socket's bind address is deliberate.** `127.0.0.1`, `::1`, a private address or a tailnet
+   address, unless you can say why it is public.
+3. **Every inbound route is inventoried, not just the ones a port scan finds.** A scan of your public
+   address says nothing about an outbound tunnel. An application on loopback reached through
+   [tunnels.md](tunnels.md), [cloudflare.md](cloudflare.md) or [tailscale.md](tailscale.md) is exposed
+   at that hostname while your host shows no open inbound port at all. List every hostname, tunnel,
+   proxy and alternate virtual host that reaches this machine, and treat each as its own route.
+4. **Each reachable service has been through its own guide**, by every route from condition 3, not only
+   the ones the scan surfaced. Those guides are where the authentication and TLS checks live.
+
+Then keep going: enumerate your own sensitive routes and request each one anonymously and as an
+unauthorized user. A deployment can satisfy all four conditions above and still serve private data from
+an endpoint no guide here knows the name of.
 
 ## Sources (checked September 2026)
 
-- `ss` manual, including the note that it reports sockets within a network namespace:
+- `ss` manual, including that it reports sockets within a network namespace:
   https://man7.org/linux/man-pages/man8/ss.8.html
-- Nmap port specification (`-p-`) and host discovery (`-Pn`):
-  https://nmap.org/book/man-port-specification.html and https://nmap.org/book/man-host-discovery.html
-- Nmap scan techniques, for the UDP (`-sU`) and IPv6 (`-6`) scans above:
+- Nmap port specification, for `-p-` and `--top-ports`:
+  https://nmap.org/book/man-port-specification.html
+- Nmap host discovery, for `-Pn`: https://nmap.org/book/man-host-discovery.html
+- Nmap target specification, for how a target string is resolved:
+  https://nmap.org/book/man-target-specification.html
+- Nmap scan techniques, for `-sU` and the `open|filtered` state:
   https://nmap.org/book/man-port-scanning-techniques.html
+- Nmap miscellaneous options, for `-6`: https://nmap.org/book/man-misc-options.html
 - Nmap legal issues, on scanning only hosts you are authorized to scan:
   https://nmap.org/book/legal-issues.html
+- Docker `container ls`, for `--format` and the `.Names` and `.Ports` placeholders:
+  https://docs.docker.com/reference/cli/docker/container/ls/
+- Docker port publishing, for the `-p host:container` mapping this page distinguishes:
+  https://docs.docker.com/engine/network/port-publishing/
+- Docker daemon protection, for the difference between `--tls` and `--tlsverify` noted on port 2376:
+  https://docs.docker.com/engine/security/protect-access/
 - IANA Service Name and Transport Protocol Port Number Registry, including its statement that traffic on
   a port need not belong to the assigned service:
   https://www.iana.org/assignments/service-names-port-numbers
