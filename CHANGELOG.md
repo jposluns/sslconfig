@@ -20,7 +20,20 @@ are grouped by the date the change landed on `main`.
 - The `sslconfig.ai` domain was retired. Its DNS record was removed on 2026-09-11, so the old
   hostname no longer resolves and `secureconfig.ai` is now the only site hostname. GitHub continues
   to redirect the old `jposluns/sslconfig` repository path, but there is no redirect for the old
-  domain: URLs in the wild that point at `sslconfig.ai` fail to resolve rather than forwarding.
+  domain: URLs in the wild that point at `sslconfig.ai` fail to resolve rather than forwarding. (#9)
+
+- Three items in the README verification checklist were rewritten so that they discriminate. Each
+  could previously be recorded as verified while the exposure it exists to catch was still standing.
+  Item 4 now asks the reader to establish whether a failed `openssl s_client -tls1_1` came from the
+  server or from a local client that never offered TLS 1.1, since the two are indistinguishable from
+  the error alone. Item 7 now requires confirming that something is scheduled to invoke
+  `certbot renew`, because a passing dry run proves the command works and nothing about whether it
+  will ever be run. Item 10 no longer accepts a Shodan or Censys lookup in place of a live probe from
+  a second host, because those services report what they last observed rather than what is listening
+  now. (#10)
+
+- The "Jump to" line was removed from the top of `site/index.html`. The left-hand menu and the
+  in-page anchors it pointed at are unchanged. (#9)
 
 - The README and the site front page (`site/index.html`) were realigned with the current corpus.
   One canonical description now appears in the README title, the site tagline, and both the meta and
@@ -40,12 +53,12 @@ are grouped by the date the change landed on `main`.
   calendar alone. The gate covers only the structural floor of `CONTRIBUTING.md` rule 5: it cannot
   prove that a Verify body holds a runnable command, that a Verify step fails while the service is
   still exposed, or that a cited page contains the line it is cited for, and it says so rather than
-  implying wider coverage. `common-mistakes.md` is the one documented exemption.
+  implying wider coverage. `common-mistakes.md` is the one documented exemption. (#9)
 - `README.sources.md`, holding the citations for the README verification checklist. The checklist
   names tools, status codes and services without citing them inline, so the sources now sit in a
   companion file and the front page stays readable. `README.md` is held to the same Verify and Sources
   contract as any guide, resolving its Sources through that file. Nothing mechanically ties a numbered
-  check to its citation, so that correspondence is kept by reading.
+  check to its citation, so that correspondence is kept by reading. (#9)
 - A fifth copy-ready prompt on the site that audits the AI and agent stack. (#6)
 - A gate in `tools/run_all_checks.sh` that fails if the README guide-index category headings and the
   site menu category headings drift apart. (#6)
