@@ -4,6 +4,24 @@ sslconfig is published continuously and carries no version number: there is no r
 version, and each guide is dated by its own "Sources (checked <month year>)" section. Entries here
 are grouped by the date the change landed on `main`.
 
+## 2026-09-11
+
+### Changed
+
+- The README and the site front page (`site/index.html`) were realigned with the current corpus.
+  One canonical description now appears in the README title, the site tagline, and both the meta and
+  Open Graph descriptions. The AI-assistant rules, the decision guide, and the verification checklist
+  were rewritten to cover identity and the allowlist, machine credentials, secrets, egress and
+  metadata, exposed files, and the AI stack, and the README and site rule lists were reconciled. The
+  flat guide index and the site menu were regrouped into the same twelve categories. No guide content
+  changed. (#6)
+
+### Added
+
+- A fifth copy-ready prompt on the site that audits the AI and agent stack. (#6)
+- A gate in `tools/run_all_checks.sh` that fails if the README guide-index category headings and the
+  site menu category headings drift apart. (#6)
+
 ## 2026-09-10 (gap guides)
 
 ### Added
