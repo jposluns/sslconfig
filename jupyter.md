@@ -36,7 +36,11 @@ Once TLS is on, connect via `https://`; the server no longer answers plain `http
 ## 4. Verify
 
 ```bash
-curl -skI https://host:8888/           # answers over TLS
+curl -s -o /dev/null -w '%{http_code}\n' --cacert /path/cert.pem https://jupyter.example.com:8888/
+                                       # answers over TLS AND the certificate verifies. Use --cacert against the
+                                       # certificate from step 2, and request it by the name that certificate
+                                       # carries. Never -k here: it accepts any certificate, so the check passes
+                                       # against a substituted one and proves nothing about your TLS
 # In a private browser window: the server asks for the password before showing any notebook.
 ss -tlnp | grep 8888                   # bound to 127.0.0.1 unless deliberately exposed
 ```

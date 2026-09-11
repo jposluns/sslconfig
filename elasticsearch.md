@@ -19,7 +19,16 @@ Open Elasticsearch instances produced some of the largest data leaks on record. 
 
 ```bash
 curl -s https://search.example.com:9200/            # 401 without credentials
-curl -sk https://localhost:9200/ -u elastic         # prompts; TLS answers, HTTP does not
+curl -s --cacert /path/http_ca.crt https://search.example.com:9200/ -u elastic
+                                                    # prompts, then 200 with the right password. Verify the certificate
+                                                    # against the CA your installer generated (Elasticsearch writes
+                                                    # http_ca.crt on first start; the OpenSearch demo configuration
+                                                    # installs its own) and never pass -k here: -k accepts a substituted
+                                                    # certificate exactly as readily as yours, and this line sends
+                                                    # credentials over whatever it accepted
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://search.example.com:9200/
+                                                    # plaintext must NOT answer: expect a connection failure or a
+                                                    # protocol error, never cluster JSON
 ss -tlnp | grep 9200                                # loopback/private only, unless deliberate
 ```
 
@@ -27,5 +36,6 @@ An unauthenticated `GET /` returning cluster JSON is the classic finding; so is 
 
 ## Sources (checked September 2026)
 
-- Elasticsearch security configuration: https://www.elastic.co/guide/en/elasticsearch/reference/current/configuring-stack-security.html
+- Elasticsearch security configuration (current docs home for cluster security): https://www.elastic.co/docs/deploy-manage/security
 - OpenSearch demo security configuration: https://docs.opensearch.org/latest/security/configuration/demo-configuration/
+- Elasticsearch, automatic TLS setup for self-managed clusters (the generated `http_ca.crt` used to verify TLS from a client): https://www.elastic.co/docs/deploy-manage/security/self-auto-setup

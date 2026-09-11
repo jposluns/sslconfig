@@ -47,6 +47,17 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 - `egress-metadata.md` verified the metadata services' header requirement rather than the network block
   the guide itself recommends as the control (#13). Added a probe of the block, sending the header the
   service requires, which must time out or be refused.
+- Three Verify steps that disabled TLS certificate verification, which the corpus forbids in
+  `common-mistakes.md`, `self-signed.md` and `README.sources.md` (#14). `elasticsearch.md` sent
+  credentials over a connection whose certificate was never checked, and claimed in a comment that
+  plaintext does not answer while making no plaintext request; `jupyter.md` and `devops-uis.md` probed
+  with `curl -skI`. A `-k` probe passes against a substituted certificate as readily as against the real
+  one, so the TLS half of each check proved nothing. All three now verify, and the plaintext refusal is
+  its own check.
+- A citation in `elasticsearch.md` that still returned 200 but redirected to a generic install page
+  carrying no security configuration (#14). The weekly link sweep treats a redirect as passing, so a
+  stale citation of this shape stays green indefinitely. Replaced with the current documentation home,
+  and the page documenting the generated `http_ca.crt` is now cited beside it.
 
 ### Changed
 
