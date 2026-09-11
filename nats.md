@@ -77,7 +77,8 @@ curl -s http://monitor.example.com:8222/connz                                   
 
 - Securing NATS overview: https://docs.nats.io/learn/security/
 - Authentication basics (token, user/password, nkeys, no_auth_user): https://docs.nats.io/learn/security/authentication-basics
-- Authorization (subject permissions, allow/deny) and Encryption/TLS (tls block): https://docs.nats.io/learn/security/authorization and https://docs.nats.io/learn/security/encryption
-- TLS Authentication (verify vs verify_and_map): https://docs.nats.io/learn/security/encryption
+- Authorization (subject permissions, allow/deny): https://docs.nats.io/learn/security/authorization
+- Encryption and TLS (tls block, and TLS authentication with verify vs verify_and_map; NATS merged its
+  mutual-TLS page into this one): https://docs.nats.io/learn/security/encryption
 - Monitoring (http_port/https_port, /varz, /connz, /routez, /jsz): https://docs.nats.io/learn/monitoring/monitoring-endpoints
 - JetStream concepts: https://docs.nats.io/concepts/jetstream

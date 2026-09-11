@@ -87,7 +87,7 @@ ss -tlnp | grep -E 'gunicorn|uvicorn|python'   # behind a proxy: 127.0.0.1 only
 
 ## Sources (checked September 2026)
 
-- Gunicorn documentation (settings reference): https://gunicorn.org/
+- Gunicorn documentation (settings reference: bind, certfile, keyfile, ca_certs): https://gunicorn.org/reference/settings/
 - Uvicorn settings reference: https://github.com/Kludex/uvicorn/blob/main/docs/settings.md
 - Django deployment checklist: https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 - argon2-cffi: https://argon2-cffi.readthedocs.io/

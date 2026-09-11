@@ -63,7 +63,7 @@ API keys, client secrets, and client-certificate keys that cannot be federated a
 
 ## Sources (checked September 2026)
 
-- OAuth 2.0 client credentials grant (RFC 6749 section 4.4): https://www.rfc-editor.org/info/rfc6749/
+- OAuth 2.0 client credentials grant (RFC 6749 section 4.4): https://datatracker.ietf.org/doc/html/rfc6749#section-4.4
 - OAuth 2.0 bearer token usage, TLS and URL rules (RFC 6750 sections 5.2 and 5.3): https://www.rfc-editor.org/info/rfc6750/
 - Python `hmac.compare_digest`: https://docs.python.org/3/library/hmac.html ; Node.js `crypto.timingSafeEqual`: https://nodejs.org/api/crypto.html
 - Microsoft Entra External ID billing model (M2M add-on): https://learn.microsoft.com/en-us/entra/external-id/external-identities-pricing
