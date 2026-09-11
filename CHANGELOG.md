@@ -142,6 +142,25 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 
 ### Added
 
+- Two gates for conventions this repository stated and never checked (#21).
+  `tools/check_verify_safety.py` fails when a command inside a Verify block skips TLS certificate
+  verification, a rule stated in `common-mistakes.md`, `self-signed.md` and `README.sources.md` and
+  broken in three Verify blocks before anything checked. `tools/check_prose_conventions.py` fails on
+  British `-ise` spellings and on placeholders outside the house set. Both found defects live on `main`
+  the first time they ran: `ray.md` carried `randomised`, which the corpus-wide conversion in #18 missed
+  because its word list omitted that stem, and `pocketbase.md` carried `yourdomain.com`, a real
+  registered domain that an audit had identified and no change had fixed.
+- Three Verify steps that asserted a certificate check they did not perform (#21). `kafka.md`,
+  `neo4j.md` and `memcached.md` each ran a bare `openssl s_client -connect` in a Verify block, two of
+  them commented "TLS handshake with your certificate". Without `-CAfile`, `-verify_hostname` or
+  `-verify_return_error` the handshake succeeds against any certificate, so the comment asserted what
+  the command did not check, and `self-signed.md` and `rabbitmq.md` already carried the correct form.
+  These surfaced only because the first version of the new gate got the openssl case backwards: it
+  matched `-verify_return_error 0`, a syntax OpenSSL does not have, for a flag whose presence is the
+  safe state. Cross-family review found the dead pattern, and fixing it exposed the guides behind it.
+  Two further uses are deliberately not flagged: `deployment-lifecycle.md` and `free-certificates.md`
+  pipe `s_client` into `openssl x509` to read an expiry or issuer, which inspects a certificate rather
+  than trusting it, and in both the real verification check sits on the line above.
 - A "Bound the expensive endpoints" section in each of the four proxy guides (#20).
   `realtime-webhooks.md` and `authentication.md` both require request-size, concurrency and timeout
   limits on inference, upload and job-submission endpoints, naming denial of wallet as the failure
