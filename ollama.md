@@ -48,6 +48,8 @@ Clients then call `https://ollama.example.com` with the basic-auth credentials. 
     location / {
         if ($http_authorization != "Bearer REPLACE_WITH_LONG_RANDOM_TOKEN") { return 401; }
         proxy_pass http://127.0.0.1:11434;
+        proxy_set_header Host localhost:11434;
+        proxy_read_timeout 300s;        # as above: model responses can be slow
     }
 ```
 
