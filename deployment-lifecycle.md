@@ -51,7 +51,8 @@ nmap -p- 203.0.113.10                                  # only the intended ports
 nmap -6 -p- 2001:db8::10                               # same, over the public IPv6 address
 curl -sI https://retired-preview.example.com/          # expect DNS failure or connection error
 dig +short retired-preview.example.com                 # expect no record, not a dangling CNAME
-openssl s_client -connect app.example.com:443 -servername app.example.com </dev/null \
+openssl s_client -connect app.example.com:443 -servername app.example.com \
+  -verify_hostname app.example.com -verify_return_error </dev/null \
   | openssl x509 -noout -enddate                        # run from outside on a schedule
 ```
 

@@ -74,7 +74,7 @@ ISE_STEMS = (
 # No leading \b: `unauthorised` and `reinitialised` carry a listed stem mid-word, and an
 # anchored prefix let both through while claiming to cover `authoris` and `initialis`.
 ISE_RE = re.compile(r"(" + "|".join(ISE_STEMS) +
-                    r")(e|es|ed|ing|ation|ations|er|ers|able|ables|ational)?\b", re.I)
+                    r")(e|es|ed|ing|ation|ations|er|ers|able|ables|ability|abilities|ational)?\b", re.I)
 
 # Placeholders that are not in the house set. Each is a domain someone may actually own.
 BAD_PLACEHOLDERS = re.compile(

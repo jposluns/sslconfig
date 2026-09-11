@@ -89,7 +89,8 @@ A CAA DNS record restricts which certificate authorities may issue for your doma
 ```bash
 sudo certbot certificates                       # what is issued and when it expires
 curl -sI https://example.com/                   # succeeds without -k
-openssl s_client -connect example.com:443 -servername example.com </dev/null \
+openssl s_client -connect example.com:443 -servername example.com \
+  -verify_hostname example.com -verify_return_error </dev/null \
   | openssl x509 -noout -issuer -dates
 ```
 

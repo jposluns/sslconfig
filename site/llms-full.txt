@@ -316,7 +316,8 @@ A CAA DNS record restricts which certificate authorities may issue for your doma
 ```bash
 sudo certbot certificates                       # what is issued and when it expires
 curl -sI https://example.com/                   # succeeds without -k
-openssl s_client -connect example.com:443 -servername example.com </dev/null \
+openssl s_client -connect example.com:443 -servername example.com \
+  -verify_hostname example.com -verify_return_error </dev/null \
   | openssl x509 -noout -issuer -dates
 ```
 
@@ -3801,7 +3802,8 @@ nmap -p- 203.0.113.10                                  # only the intended ports
 nmap -6 -p- 2001:db8::10                               # same, over the public IPv6 address
 curl -sI https://retired-preview.example.com/          # expect DNS failure or connection error
 dig +short retired-preview.example.com                 # expect no record, not a dangling CNAME
-openssl s_client -connect app.example.com:443 -servername app.example.com </dev/null \
+openssl s_client -connect app.example.com:443 -servername app.example.com \
+  -verify_hostname app.example.com -verify_return_error </dev/null \
   | openssl x509 -noout -enddate                        # run from outside on a schedule
 ```
 
@@ -4709,10 +4711,17 @@ MFA: there is no login for a person, so no second factor applies; human access t
 ss -tlnup | grep 11211                                    # 127.0.0.1 or the private address; no UDP line
 printf 'stats\r\nquit\r\n' | nc 127.0.0.1 11211           # works locally
 printf 'stats\r\nquit\r\n' | nc cache.example.com 11211   # from outside: connection refused or timeout
-openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_return_error </dev/null
+openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_ip 10.0.0.5 \
+  -verify_return_error </dev/null
                                                           # prints Verification: OK when -Z is on. A bare
                                                           # handshake with no CA file shows TLS is enabled,
                                                           # not that the certificate is trusted
+                                                          # -verify_ip binds the certificate to this
+                                                          # address, so it needs an iPAddress SAN for
+                                                          # 10.0.0.5; use -verify_hostname with the
+                                                          # name instead where the certificate carries
+                                                          # a DNS SAN. Chain checks alone accept any
+                                                          # certificate that CA signed
 ```
 
 With `-S`, a plain `stats` over the text protocol is rejected, because the binary protocol is enforced.

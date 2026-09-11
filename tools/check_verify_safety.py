@@ -52,9 +52,9 @@ SETEXT_RE = re.compile(r"^ {0,3}(=+|-+)\s*$")
 VERIFY_TITLE = re.compile(r"\b(verif\w*|quick checks)\b", re.I)
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
-# A command segment ends at a pipe, a separator, or a command substitution, so a flag
-# belonging to a later command is not attributed to curl. This is what stops `sort -k`
-# inside `curl ... -o $(sort -k 2)` from reading as `curl -k`.
+# A command substitution is blanked rather than split on, so the enclosing command survives
+# while the flags of the inner command are not attributed to it. That is what keeps
+# `curl ... -o $(sort -k 2)` from reading as `curl -k` while `curl -H $(x) -k` still does.
 def split_segments(code):
     """Split a command line on separators that appear OUTSIDE quotes.
 
@@ -84,7 +84,7 @@ def split_segments(code):
                 elif code[j] == ")":
                     depth -= 1
                 j += 1
-            buf.append(code[i:j])
+            buf.append(" " * (j - i))  # opaque: keeps the enclosing command, hides its guts
             i = j
             continue
         elif ch in "|;&":
@@ -100,7 +100,7 @@ def split_segments(code):
     return out
 
 INSECURE_CURL = re.compile(r"(?:^|[\s'\"/=`(])curl\b")
-CURL_FLAG = re.compile(r"(?:\s|^)(?:-[a-zA-Z]*k[a-zA-Z]*|--insecure|--proxy-insecure)(?:\s|=|$)")
+CURL_FLAG = re.compile(r"(?:\s|^)(?:-[a-zA-Z]*k[a-zA-Z]*|--insecure|--proxy-insecure)(?:[\s=)`]|$)")
 
 CHECKS = (
     ("wget --no-check-certificate (prefix abbreviations included)",
@@ -124,16 +124,15 @@ SCLIENT = re.compile(r"(?:^|[\s'\"/=`(])openssl\s+s_client\b")
 # (-no-CAfile and friends) DISABLE trust, so they must not satisfy this.
 SCLIENT_VERIFIES = re.compile(r"(?:^|\s)-verify_return_error(?:\s|$)")
 SCLIENT_HELP = re.compile(r"\s-(?:help|h)\b")
-# Piping into `openssl x509` reads a certificate rather than trusting it. Printing an
-# issuer or an expiry date is a legitimate use of an unverified handshake, so it is not
-# flagged; asserting that the handshake proves the certificate is what this catches.
-SCLIENT_INSPECTS = re.compile(r"^\s*openssl\s+x509\b")
+# Chain verification without an identity check binds nothing to the endpoint: it accepts
+# any unexpired certificate that CA signed, for any hostname. self-signed.md says so.
+SCLIENT_BINDS = re.compile(r"(?:^|\s)-verify_(?:hostname|ip|email)(?:\s|$)")
 
 
 def logical_lines(text):
-    """Yield (line_number, joined_command) for every code line in the file.
+    """Yield (line_number, joined_command) for every fenced code line in the file.
 
-    Scans ALL fenced and indented code blocks, not only those under a Verify heading.
+    Scans ALL fenced code blocks, not only those under a Verify heading.
     Section tracking was removed after it produced two demonstrated bugs of its own: a
     nested `### Verify TLS` cleared its own parent section, and a `---` thematic break
     after a closing fence was read as a setext heading. Markdown heading semantics are not
@@ -149,7 +148,7 @@ def logical_lines(text):
         if m and not (fence and m.group(1) != fence):
             fence = None if fence else m.group(1)
             continue
-        if fence is None and not re.match(r"^(\s{4,}|\t)\S", line):
+        if fence is None:
             continue
         code = strip_comment(line).rstrip()
         if not code.strip():
@@ -204,10 +203,11 @@ def findings_for(code):  # noqa: C901
                                     and parts[idx + 1][1] == "|") else ""
         if INSECURE_CURL.search(segment) and CURL_FLAG.search(segment):
             hits.append("curl -k / --insecure")
-        if (SCLIENT.search(segment) and not SCLIENT_VERIFIES.search(segment)
-                and not SCLIENT_HELP.search(segment)
-                and not SCLIENT_INSPECTS.search(nxt)):
-            hits.append("openssl s_client without -verify_return_error: errors are not fatal")
+        if SCLIENT.search(segment) and not SCLIENT_HELP.search(segment):
+            if not SCLIENT_VERIFIES.search(segment):
+                hits.append("openssl s_client without -verify_return_error: errors are not fatal")
+            elif not SCLIENT_BINDS.search(segment):
+                hits.append("openssl s_client verifies the chain but binds no hostname")
         for label, pattern in CHECKS:
             if pattern.search(segment):
                 hits.append(label)
