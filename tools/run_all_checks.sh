@@ -135,6 +135,43 @@ else
   printf '%s\n' "$guide_shape" | sed 's/^/          /'
 fi
 
+echo "== no Verify block disables TLS verification =="
+# Three Verify blocks passed curl -k before anything checked, while three other files in this corpus
+# told the reader not to. A probe that skips certificate verification is satisfied by a substituted
+# certificate as readily as by the right one, so the TLS half of such a check certifies nothing. This
+# gate reads only fenced blocks inside Verify sections, so a guide may still NAME the flag in prose to
+# warn against it.
+if verify_safety=$(python3 tools/check_verify_safety.py 2>&1); then
+  printf '%s\n' "$verify_safety"
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$verify_safety"; then
+  bad "check_verify_safety.py crashed; its findings are incomplete"
+  printf '%s\n' "$verify_safety" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$verify_safety"; then
+  printf '%s\n' "$verify_safety"
+  fail=1
+else
+  bad "check_verify_safety.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$verify_safety" | sed 's/^/          /'
+fi
+
+echo "== prose conventions: Oxford -ize and house placeholders =="
+# A corpus-wide -ize conversion missed a word because its word list was incomplete, and the same word
+# was written into a new guide hours later. A placeholder outside the house set reached the corpus and
+# stayed. Both are closed lists, so this catches what it names and nothing else. Quoted and backticked
+# spans are exempt from the SPELLING check only, so a changelog entry can quote the old spelling.
+if prose_conv=$(python3 tools/check_prose_conventions.py 2>&1); then
+  printf '%s\n' "$prose_conv"
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$prose_conv"; then
+  bad "check_prose_conventions.py crashed; its findings are incomplete"
+  printf '%s\n' "$prose_conv" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$prose_conv"; then
+  printf '%s\n' "$prose_conv"
+  fail=1
+else
+  bad "check_prose_conventions.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$prose_conv" | sed 's/^/          /'
+fi
+
 echo "== local links resolve =="
 # Heading slugs of a Markdown file, using the GitHub transformation: lowercase, drop everything but
 # letters, digits, spaces and hyphens, then spaces to hyphens.

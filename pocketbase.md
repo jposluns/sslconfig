@@ -14,7 +14,7 @@ the server's own startup log. Do not leave a fresh instance open to the network 
 is still unclaimed.
 
 PocketBase has no native TLS listener beyond its own ACME integration: run
-`./pocketbase serve yourdomain.com` and it issues and renews a Let's Encrypt certificate for that
+`./pocketbase serve example.com` and it issues and renews a Let's Encrypt certificate for that
 domain automatically, or put it behind your own reverse proxy per [nginx.md](nginx.md) or
 [caddy.md](caddy.md) and terminate TLS there instead.
 
