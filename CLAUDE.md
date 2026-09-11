@@ -1,4 +1,4 @@
-# AIQT baseline for sslconfig
+# AIQT baseline for secureconfig
 
 This repository operates under the AIQT Guardrails standard. The pack is vendored and pinned; see
 `.aiqt/PIN` for the upstream commit, the vendored paths, and the local patches to re-apply on
@@ -48,7 +48,7 @@ maintainer rather than resolving it silently in favour of progress, speed, or co
 
 ## What this repository is
 
-sslconfig publishes deployment-exposure guides: TLS, authentication, MFA, secret handling, and
+secureconfig publishes deployment-exposure guides: TLS, authentication, MFA, secret handling, and
 network exposure for services that AI-assisted projects commonly run. Everything is public domain
 under CC0. The scope boundary and the requirements for a guide live in `CONTRIBUTING.md` and they
 bind: verified syntax with a linked vendor source, the standard structure, honesty where a tool has

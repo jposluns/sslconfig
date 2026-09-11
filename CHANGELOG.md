@@ -1,12 +1,21 @@
 # Changelog
 
-sslconfig is published continuously and carries no version number: there is no release artifact to
+secureconfig is published continuously and carries no version number: there is no release artifact to
 version, and each guide is dated by its own "Sources (checked <month year>)" section. Entries here
 are grouped by the date the change landed on `main`.
 
 ## 2026-09-11
 
 ### Changed
+
+- The project was renamed from `sslconfig` to `secureconfig`. The GitHub repository is now
+  `jposluns/secureconfig` and the site is served at `secureconfig.ai`; GitHub redirects the old
+  repository path, and `sslconfig.ai` continues to serve until it is retired separately. Every
+  absolute repository and site URL in `site/index.html`, `site/llms.txt`, `site/robots.txt`,
+  `README.md` and `scripts/build-llms-full.sh` was updated, along with the `AIQT_SITE_HOST` gate
+  variable in `tools/run_all_checks.sh` and the patch notes in `.aiqt/PIN`; `site/llms-full.txt` was
+  regenerated. Earlier entries in this changelog keep the old name: they record what shipped under
+  it. (#8)
 
 - The README and the site front page (`site/index.html`) were realigned with the current corpus.
   One canonical description now appears in the README title, the site tagline, and both the meta and

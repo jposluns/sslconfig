@@ -19,10 +19,10 @@
 # LOCAL PATCHES to re-apply on upgrade:
 #   tools/_gen_common.py  is_external_url() reads the site host from the AIQT_SITE_HOST
 #     environment variable, defaulting to the upstream "aiqt.ai". This repo sets
-#     AIQT_SITE_HOST=sslconfig.ai in tools/run_all_checks.sh. Worth proposing upstream so the
+#     AIQT_SITE_HOST=secureconfig.ai in tools/run_all_checks.sh. Worth proposing upstream so the
 #     helper becomes site-agnostic and this patch can be dropped.
 #   tools/check_site.py   SITE_HOSTS is derived from AIQT_SITE_HOST (default aiqt.ai) instead of the
-#     hardcoded {"aiqt.ai", "www.aiqt.ai"}, so absolute https://sslconfig.ai/... self-links in
+#     hardcoded {"aiqt.ai", "www.aiqt.ai"}, so absolute https://secureconfig.ai/... self-links in
 #     site/index.html are classified internal and resolved. Upstream hardcodes the host; worth proposing
 #     upstream alongside the _gen_common.py patch.
 #
