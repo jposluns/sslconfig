@@ -102,14 +102,55 @@ For SSO, the same `SecurityPolicy` takes an `oidc` block (`provider.issuer`, `cl
 - Databases stay `type: ClusterIP` (the default) and never get a route; NetworkPolicies limit which pods reach them, and their guides' TLS and auth still apply inside the cluster ([postgresql.md](postgresql.md), [mysql.md](mysql.md), [redis.md](redis.md), [mongodb.md](mongodb.md)).
 - Store credentials in Secrets (or an external secrets operator), not ConfigMaps or env literals in manifests committed to git ([secrets.md](secrets.md)).
 
+## 5. The control plane is a separate exposure
+
+Sections 1 to 4 cover how traffic reaches your workloads. None of it touches the cluster's own
+management surface, and a reader can apply every one of them while the API server answers the whole
+internet.
+
+**Managed clusters start public.** AWS documents that "by default, this API server endpoint is public to
+the internet" for EKS. Restrict it: EKS supports private endpoint access and CIDR restrictions on the
+public one, GKE calls the same control "authorized networks", and AKS calls it authorized IP ranges.
+Whichever you run, the question to answer is which addresses can reach the API server, and the default
+answer is everyone.
+
+**A kubeconfig is a bearer credential.** Anyone holding one has whatever the certificate or token inside
+it is bound to, with no second factor. Treat it as a secret ([secrets.md](secrets.md)), scope it with
+RBAC rather than handing out cluster-admin, and prefer short-lived credentials from your provider's CLI
+over a long-lived file on a laptop.
+
+**Self-managed clusters expose more ports.** Kubernetes documents the control plane's inbound ports as
+6443 for the API server, 2379 and 2380 for etcd, 10250 for the kubelet API, 10259 for the scheduler and
+10257 for the controller manager. Only 6443 has any business being reachable beyond the cluster, and
+only from addresses you list. etcd holds every Secret in the cluster, in plaintext unless you configure
+encryption at rest.
+
+**The kubelet answers anonymously by default.** Kubernetes states that "requests to the kubelet's HTTPS
+endpoint that are not rejected by other configured authentication methods are treated as anonymous
+requests", given the username `system:anonymous`. Port 10250 runs commands in containers, so set
+`--anonymous-auth=false` and `--authorization-mode=Webhook` on every node, and never expose it.
+
 ## Verify
 
 ```bash
 kubectl get svc -A | grep -E 'NodePort|LoadBalancer'                 # only the Gateway's Service
-kubectl get gateway/eg -o jsonpath='{.status.addresses[0].value}'   # the public address; DNS points here
+kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'
+                                                                     # the API server address your
+                                                                     # kubeconfig points at, to scan below
+kubectl get gateway/eg -o jsonpath='{.status.addresses[0].value}'    # the public address; DNS points here
 kubectl get certificate -A                                           # Ready=True
 curl -sI http://app.example.com/                                     # 301 to https://app.example.com/
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/   # 401 where basic auth is set
+
+# From a machine OUTSIDE any allowed range, against the API server address printed above.
+# You own the cluster; scan only addresses you are authorized to test.
+curl -sS -o /dev/null -w '%{http_code}\n' --max-time 5 https://REPLACE_WITH_API_SERVER:6443/version
+                                                                     # must time out or be refused. A 200
+                                                                     # or a 401 both mean it answered you
+nmap -Pn -p 6443,2379,2380,10250,10257,10259 REPLACE_WITH_A_NODE_ADDRESS
+                                                                     # every one closed or filtered from
+                                                                     # outside. 10250 runs commands in
+                                                                     # containers; 2379 holds every Secret
 ```
 
 ## Sources (checked September 2026)
@@ -120,5 +161,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/   # 401 where
 - Envoy Gateway tasks, secure gateways (TLS listener): https://gateway.envoyproxy.io/docs/tasks/security/secure-gateways/ ; basic auth: https://gateway.envoyproxy.io/docs/tasks/security/basic-auth/ ; OIDC: https://gateway.envoyproxy.io/docs/tasks/security/oidc/ ; external authorization (`extAuth`): https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/ ; HTTP redirect: https://gateway.envoyproxy.io/docs/tasks/traffic/http-redirect/
 - Authelia: proxy integration (the proxy calls the authorization endpoint): https://www.authelia.com/integration/proxies/introduction/ ; Envoy Gateway `SecurityPolicy` example: https://www.authelia.com/integration/kubernetes/envoy/gateway/
 - kubectl JSONPath filter syntax: https://kubernetes.io/docs/reference/kubectl/jsonpath/
+- Kubernetes ports and protocols (6443 API server, 2379 and 2380 etcd, 10250 kubelet, 10259 scheduler, 10257 controller manager): https://kubernetes.io/docs/reference/networking/ports-and-protocols/
+- Kubernetes kubelet authentication and authorization (unrejected requests treated as anonymous, `--anonymous-auth`, `--authorization-mode=Webhook`): https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
+- Amazon EKS cluster endpoint access ("by default, this API server endpoint is public to the internet"): https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html
+- GKE control plane network isolation, including how authorized networks work: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/network-isolation#how_authorized_networks_work
+- AKS API server authorized IP ranges: https://learn.microsoft.com/en-us/azure/aks/api-server-authorized-ip-ranges
 - cert-manager Gateway API usage (enabling support, annotations): https://cert-manager.io/docs/usage/gateway/ ; ACME HTTP-01 `gatewayHTTPRoute` solver: https://cert-manager.io/docs/configuration/acme/http01/
 - Traefik Kubernetes Gateway API provider: https://doc.traefik.io/traefik/reference/install-configuration/providers/kubernetes/kubernetes-gateway/ ; Cilium Gateway API support: https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/
