@@ -113,18 +113,21 @@ sudo nginx -t && sudo systemctl reload nginx
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 200 without -k
 curl -s  https://example.com/api    # expect 401/403 without credentials
-head -c 1M  /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+head -c 9M  /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://example.com/
                                     # positive control: under the limit, must NOT be 413
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
-                                    # 413. Send from a FILE, not a pipe: curl sets Content-Length from a
-                                    # file, so nginx refuses at the headers. Piped stdin is sent chunked
-                                    # with no length, which a backend may reject instead, and a 413 from
-                                    # the backend looks identical here
+                                    # 413. The 9M control is the discriminating half: nginx's default
+                                    # client_max_body_size is 1m, so 9M is refused until `10m` is set,
+                                    # while 11M returns 413 either way. Neither status says WHICH layer
+                                    # refused: a backend with its own limit produces the same codes. To
+                                    # attribute it to nginx, comment the directive out and re-run
 seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://example.com/ | sort | uniq -c
                                     # 503 must appear. Run them CONCURRENTLY: a sequential loop pays a
                                     # TLS handshake per request and can stay under 10r/s, so every
-                                    # request is admitted and the check passes while no limit exists
+                                    # request is admitted and the check passes while no limit exists.
+                                    # `limit_conn` also returns 503, so this shows that one of the two
+                                    # limiters fired, not which. Disable one and re-run to tell them apart
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the app also answers directly on port 3000,

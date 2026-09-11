@@ -74,8 +74,14 @@ not a Caddyfile directive, and rate limiting requires the community `caddy-ratel
 with xcaddy, or a layer in front of Caddy. Do not assume a stock Caddy is rate limited, and do not
 follow a `rate_limit` example without checking that your binary has that module.
 
+Add `request_body` to the site block you already have. Do not replace that block with this one: the
+`basic_auth` directive from section 3 lives there, and a site block without it is a public route.
+
 ```caddy
 app.example.com {
+    basic_auth {                                 # keep the section 3 directive
+        admin $2a$14$REPLACE_WITH_HASH_FROM_caddy_hash-password
+    }
     request_body {
         max_size 10MB
     }
@@ -97,8 +103,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-b
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
                                      # 413. Supply credentials: this site's authentication runs before
                                      # the body handler, so an unauthenticated probe returns 401 and
-                                     # tells you nothing about max_size. Send from a file, not a pipe,
-                                     # so curl sets Content-Length
+                                     # tells you nothing about max_size. A backend with its own limit
+                                     # returns the same code, so remove request_body and re-run to
+                                     # attribute the refusal to Caddy
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which

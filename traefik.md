@@ -86,12 +86,15 @@ Three middlewares, attached to the router alongside the auth middleware from sec
       - traefik.http.middlewares.app-inflight.inflightreq.amount=10
       - traefik.http.middlewares.app-rate.ratelimit.average=10
       - traefik.http.middlewares.app-rate.ratelimit.burst=20
-      - traefik.http.routers.app.middlewares=app-auth,app-body,app-inflight,app-rate
+      - traefik.http.routers.app.middlewares=app-auth,app-rate,app-inflight,app-body
 ```
 
-`buffering` reads the request into memory or disk before forwarding it, so a large
-`maxRequestBodyBytes` trades memory for tolerance. `ratelimit` is per source by default; `inflightreq`
-caps concurrent in-flight requests rather than their rate, and the two bound different failure modes.
+Order matters here. `buffering` reads the request into memory or disk before forwarding it, so it must
+come after the admission controls; placed first, an accepted upload consumes the buffer before
+`ratelimit` or `inflightreq` has considered it. A large `maxRequestBodyBytes` trades memory for
+tolerance either way. `ratelimit` is per source by default, while `inflightreq` caps concurrent
+in-flight requests rather than their rate, and its `sourceCriterion` defaults to the request host rather
+than the client, so set it explicitly if you want a per-client cap.
 
 ## 5. Verify
 
@@ -103,10 +106,13 @@ curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-b
                                      # positive control: under the limit, must NOT be 413
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
                                      # 413. Credentials matter: app-auth is first in the middleware
-                                     # chain, so an unauthenticated probe stops at 401 before buffering
-                                     # sees the body. Send from a file so curl sets Content-Length
+                                     # chain, so an unauthenticated probe stops at 401 before any limit
+                                     # sees the body. A backend with its own limit returns the same
+                                     # code, so disable app-body and re-run to attribute it to Traefik
 seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://app.example.com/ | sort | uniq -c
-                                     # 429 must appear. Concurrently, for the same reason as above
+                                     # 429 must appear. Concurrently, for the same reason as above.
+                                     # inflightreq also returns 429, so this shows one of the two fired,
+                                     # not which; disable one and re-run to tell them apart
 rm -f /tmp/under.bin /tmp/over.bin
 docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
 ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. The TLS and auth

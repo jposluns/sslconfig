@@ -1581,18 +1581,21 @@ sudo nginx -t && sudo systemctl reload nginx
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 200 without -k
 curl -s  https://example.com/api    # expect 401/403 without credentials
-head -c 1M  /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+head -c 9M  /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://example.com/
                                     # positive control: under the limit, must NOT be 413
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
-                                    # 413. Send from a FILE, not a pipe: curl sets Content-Length from a
-                                    # file, so nginx refuses at the headers. Piped stdin is sent chunked
-                                    # with no length, which a backend may reject instead, and a 413 from
-                                    # the backend looks identical here
+                                    # 413. The 9M control is the discriminating half: nginx's default
+                                    # client_max_body_size is 1m, so 9M is refused until `10m` is set,
+                                    # while 11M returns 413 either way. Neither status says WHICH layer
+                                    # refused: a backend with its own limit produces the same codes. To
+                                    # attribute it to nginx, comment the directive out and re-run
 seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://example.com/ | sort | uniq -c
                                     # 503 must appear. Run them CONCURRENTLY: a sequential loop pays a
                                     # TLS handshake per request and can stay under 10r/s, so every
-                                    # request is admitted and the check passes while no limit exists
+                                    # request is admitted and the check passes while no limit exists.
+                                    # `limit_conn` also returns 503, so this shows that one of the two
+                                    # limiters fired, not which. Disable one and re-run to tell them apart
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the app also answers directly on port 3000,
@@ -1790,8 +1793,14 @@ not a Caddyfile directive, and rate limiting requires the community `caddy-ratel
 with xcaddy, or a layer in front of Caddy. Do not assume a stock Caddy is rate limited, and do not
 follow a `rate_limit` example without checking that your binary has that module.
 
+Add `request_body` to the site block you already have. Do not replace that block with this one: the
+`basic_auth` directive from section 3 lives there, and a site block without it is a public route.
+
 ```caddy
 app.example.com {
+    basic_auth {                                 # keep the section 3 directive
+        admin $2a$14$REPLACE_WITH_HASH_FROM_caddy_hash-password
+    }
     request_body {
         max_size 10MB
     }
@@ -1813,8 +1822,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-b
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
                                      # 413. Supply credentials: this site's authentication runs before
                                      # the body handler, so an unauthenticated probe returns 401 and
-                                     # tells you nothing about max_size. Send from a file, not a pipe,
-                                     # so curl sets Content-Length
+                                     # tells you nothing about max_size. A backend with its own limit
+                                     # returns the same code, so remove request_body and re-run to
+                                     # attribute the refusal to Caddy
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which
@@ -1907,11 +1917,12 @@ The timeouts in section 1 are half of this. Add a concurrency cap with `maxconn`
 the maximum per-process concurrent connections and in a frontend caps that frontend.
 
 HAProxy has **no single request-body-size directive**. The rule below uses the `req.body_size` fetch,
-which the manual defines as the *advertised* length of the body, so it reads `Content-Length` and
-refuses at the headers. That is the useful case. It does not cover a chunked request, which advertises
-no length at all: for those, `req.body_len` reads only the *available* buffered bytes, bounded by
-`tune.bufsize`, so a chunked upload is not constrained by this rule. Enforce the real limit at the
-application and treat this as a front-door guard against the common case.
+which the manual defines as the *advertised* length of the body, so for a request carrying
+`Content-Length` it reads that value. Two limits are worth knowing. `option http-buffer-request` makes
+HAProxy wait for the complete body, or for a full request buffer, before the frontend rules run, so this
+does not refuse at the headers and the upload is buffered before it is rejected. And a chunked request
+advertises no length at all, so the fetch falls back to what is available and `tune.bufsize` bounds it.
+Enforce the real limit at the application and treat this as a front-door guard against the common case.
 
 ```haproxy
 global
@@ -1933,9 +1944,10 @@ head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://example.com/
                                     # positive control: under the limit, must NOT be 413
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
-                                    # 413. A file gives curl a Content-Length, which is what
-                                    # req.body_size reads. A piped body is chunked, advertises no
-                                    # length, and this rule will not refuse it
+                                    # 413. req.body_size reads the advertised Content-Length, which curl
+                                    # sets here. A chunked upload advertises none and is not covered.
+                                    # A backend limit returns the same code, so remove the http-request
+                                    # deny line and re-run to attribute the refusal to HAProxy
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the backend also answers directly on port 3000,
@@ -2046,12 +2058,15 @@ Three middlewares, attached to the router alongside the auth middleware from sec
       - traefik.http.middlewares.app-inflight.inflightreq.amount=10
       - traefik.http.middlewares.app-rate.ratelimit.average=10
       - traefik.http.middlewares.app-rate.ratelimit.burst=20
-      - traefik.http.routers.app.middlewares=app-auth,app-body,app-inflight,app-rate
+      - traefik.http.routers.app.middlewares=app-auth,app-rate,app-inflight,app-body
 ```
 
-`buffering` reads the request into memory or disk before forwarding it, so a large
-`maxRequestBodyBytes` trades memory for tolerance. `ratelimit` is per source by default; `inflightreq`
-caps concurrent in-flight requests rather than their rate, and the two bound different failure modes.
+Order matters here. `buffering` reads the request into memory or disk before forwarding it, so it must
+come after the admission controls; placed first, an accepted upload consumes the buffer before
+`ratelimit` or `inflightreq` has considered it. A large `maxRequestBodyBytes` trades memory for
+tolerance either way. `ratelimit` is per source by default, while `inflightreq` caps concurrent
+in-flight requests rather than their rate, and its `sourceCriterion` defaults to the request host rather
+than the client, so set it explicitly if you want a per-client cap.
 
 ## 5. Verify
 
@@ -2063,10 +2078,13 @@ curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-b
                                      # positive control: under the limit, must NOT be 413
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
                                      # 413. Credentials matter: app-auth is first in the middleware
-                                     # chain, so an unauthenticated probe stops at 401 before buffering
-                                     # sees the body. Send from a file so curl sets Content-Length
+                                     # chain, so an unauthenticated probe stops at 401 before any limit
+                                     # sees the body. A backend with its own limit returns the same
+                                     # code, so disable app-body and re-run to attribute it to Traefik
 seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://app.example.com/ | sort | uniq -c
-                                     # 429 must appear. Concurrently, for the same reason as above
+                                     # 429 must appear. Concurrently, for the same reason as above.
+                                     # inflightreq also returns 429, so this shows one of the two fired,
+                                     # not which; disable one and re-run to tell them apart
 rm -f /tmp/under.bin /tmp/over.bin
 docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
 ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. The TLS and auth
