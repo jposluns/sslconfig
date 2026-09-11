@@ -31,6 +31,22 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   check tested the service root, which does not prove any bucket is private, because anonymous policies
   are set per bucket. The OTLP probe sent `{}` with curl's default form encoding, which the Collector
   rejects with 415 on content type before reaching authentication, so the rejection proved nothing.
+- Nine Verify steps that could pass, or fail, for reasons unrelated to what they claim to prove (#13).
+  `container-hardening.md` spliced the database address into a `kubectl --overrides` JSON array unquoted,
+  so the override was not valid JSON, kubectl rejected it, and the guide's only proof that the default-deny
+  NetworkPolicy blocks anything never ran; the same override named its container `probe` while `kubectl
+  run` names the container after the pod, so a strategic merge would have added a container rather than
+  replaced the command. Its read-only filesystem probe wrote to `/x`, which the configured non-root user
+  cannot create on a writable filesystem either. `web-exposure.md` sent grep's errors to `/dev/null` and
+  read empty output as clean, although grep exits 2 and prints nothing against a directory that does not
+  exist, so a reader whose framework built elsewhere was told an unscanned bundle was clean; its ACME
+  check also forbade a 404 on a challenge token it never created, which a correctly exempted directory
+  returns anyway. `devops-uis.md` tested Docker client certificates with a command that does not enable
+  TLS and could inherit a certificate from an export earlier in the same guide. `n8n.md` and `php.md`
+  inferred route protection from a HEAD response and from cookie flags.
+- `egress-metadata.md` verified the metadata services' header requirement rather than the network block
+  the guide itself recommends as the control (#13). Added a probe of the block, sending the header the
+  service requires, which must time out or be refused.
 
 ### Changed
 
