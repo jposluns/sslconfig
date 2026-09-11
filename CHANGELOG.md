@@ -4,6 +4,26 @@ sslconfig is published continuously and carries no version number: there is no r
 version, and each guide is dated by its own "Sources (checked <month year>)" section. Entries here
 are grouped by the date the change landed on `main`.
 
+## 2026-09-10 (gap guides)
+
+### Added
+
+- Nineteen guides from a three-family forward-looking gap review: `fronting-auth.md` (oauth2-proxy,
+  Authelia, Pomerium wiring, which six existing guides already referenced), `web-exposure.md`,
+  `egress-metadata.md`, `realtime-webhooks.md`, `container-hardening.md`, `deployment-lifecycle.md`,
+  `image-gen-uis.md`, `chat-uis.md`, `llm-observability.md`, `workflow-orchestrators.md`,
+  `gpu-clouds.md`, `nats.md`, `search-engines.md`, `bi-dashboards.md`, `pocketbase.md`,
+  `frontend-frameworks.md`, `sqlite.md`, `tunnels.md`, and `surrealdb.md`. Each cites vendor pages
+  fetched in September 2026; unconfirmable details were left out.
+- Sections folded into existing guides: a shared-cache disclosure section in `headers.md`, a
+  fail-closed rule in `cloud-identity-proxies.md`, CAA records in `free-certificates.md`, an
+  expensive-endpoint limit note and an offboarding rule in `authentication.md`, an offboarding check
+  in `mfa.md`, Dozzle, Docker Registry, Filebrowser, and Node-RED in `devops-uis.md`, Hugging Face
+  Spaces in `paas.md`, a Redpanda note in `kafka.md`, and a Valkey note in `redis.md`.
+- README gained an outside-in verification checklist item, a fronting-auth pointer in the
+  authentication rule and decision guide, and index rows for every new guide; the site menu,
+  `site/llms.txt`, the build script, and `.aiqt/gensrc.json` were updated to match.
+
 ## 2026-09-10
 
 ### Added

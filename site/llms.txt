@@ -13,6 +13,7 @@
 - [self-signed](https://raw.githubusercontent.com/jposluns/sslconfig/main/self-signed.md): OpenSSL and mkcert certificates, distributing trust to clients
 - [cloudflare](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloudflare.md): Cloudflare Tunnel and Zero Trust Access, no open inbound ports
 - [tailscale](https://raw.githubusercontent.com/jposluns/sslconfig/main/tailscale.md): tailscale serve (tailnet-only) and funnel (public), automatic TLS
+- [tunnels](https://raw.githubusercontent.com/jposluns/sslconfig/main/tunnels.md): frp and WireGuard, self-hosted tunnels when there is no public IP
 
 ## Authentication and secrets
 
@@ -23,6 +24,7 @@
 - [cloud-identity-proxies](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloud-identity-proxies.md): login in front of the app with no code change: AWS ALB, Google IAP, Azure App Service, Cloudflare Access, ngrok, Vercel
 - [secrets](https://raw.githubusercontent.com/jposluns/sslconfig/main/secrets.md): keeping keys out of repositories, scanning, rotation after a leak
 - [machine-auth](https://raw.githubusercontent.com/jposluns/sslconfig/main/machine-auth.md): machine identity: API keys, client credentials, mutual TLS, workload identity federation, secret managers
+- [fronting-auth](https://raw.githubusercontent.com/jposluns/sslconfig/main/fronting-auth.md): oauth2-proxy, Authelia, Pomerium: login and MFA in front of an app that has none
 
 ## Web servers and proxies
 
@@ -45,12 +47,17 @@
 - [ruby](https://raw.githubusercontent.com/jposluns/sslconfig/main/ruby.md): Rails and Puma: force_ssl, trusted proxies, has_secure_password, credentials
 - [docker](https://raw.githubusercontent.com/jposluns/sslconfig/main/docker.md): safe port publishing, the UFW bypass problem
 - [kubernetes](https://raw.githubusercontent.com/jposluns/sslconfig/main/kubernetes.md): Gateway API, cert-manager, entry-point auth; ingress-nginx retired
+- [frontend-frameworks](https://raw.githubusercontent.com/jposluns/sslconfig/main/frontend-frameworks.md): SvelteKit, Nuxt, Vite: server-route auth, sessions, public-env prefixes
+- [container-hardening](https://raw.githubusercontent.com/jposluns/sslconfig/main/container-hardening.md): non-root, dropped capabilities, read-only root, network segmentation
 
 ## Hosts and platforms
 
 - [host](https://raw.githubusercontent.com/jposluns/sslconfig/main/host.md): SSH hardening, firewall baseline, updates
 - [cloud-firewalls](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloud-firewalls.md): security groups and network rules
 - [paas](https://raw.githubusercontent.com/jposluns/sslconfig/main/paas.md): Render, Fly.io, Vercel, and similar: what stays yours
+- [egress-metadata](https://raw.githubusercontent.com/jposluns/sslconfig/main/egress-metadata.md): egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials
+- [gpu-clouds](https://raw.githubusercontent.com/jposluns/sslconfig/main/gpu-clouds.md): RunPod, Vast.ai, Lambda, Modal: exposed ports and differing firewall and auth defaults per platform
+- [deployment-lifecycle](https://raw.githubusercontent.com/jposluns/sslconfig/main/deployment-lifecycle.md): verify from outside, safe first-run order, previews, and teardown
 
 ## Databases, storage, and messaging
 
@@ -67,6 +74,10 @@
 - [neo4j](https://raw.githubusercontent.com/jposluns/sslconfig/main/neo4j.md): initial password, Bolt and HTTPS TLS, auth stays on
 - [memcached](https://raw.githubusercontent.com/jposluns/sslconfig/main/memcached.md): no auth by default; loopback, SASL and TLS where built in
 - [object-storage](https://raw.githubusercontent.com/jposluns/sslconfig/main/object-storage.md): S3, R2, GCS, Azure Blob, Supabase Storage: private by default, scoped credentials, signed URLs
+- [nats](https://raw.githubusercontent.com/jposluns/sslconfig/main/nats.md): NATS and JetStream, auth, TLS, and the unauthenticated monitoring port
+- [search-engines](https://raw.githubusercontent.com/jposluns/sslconfig/main/search-engines.md): Meilisearch and Typesense, master key, scoped search keys, production mode
+- [sqlite](https://raw.githubusercontent.com/jposluns/sslconfig/main/sqlite.md): SQLite in deployment, the file is the exposure; Turso tokens; Litestream
+- [surrealdb](https://raw.githubusercontent.com/jposluns/sslconfig/main/surrealdb.md): SurrealDB, root credentials, bind address, access levels, TLS
 
 ## AI, data, and dev tools
 
@@ -84,6 +95,10 @@
 - [streamlit](https://raw.githubusercontent.com/jposluns/sslconfig/main/streamlit.md)
 - [n8n](https://raw.githubusercontent.com/jposluns/sslconfig/main/n8n.md)
 - [code-server](https://raw.githubusercontent.com/jposluns/sslconfig/main/code-server.md)
+- [image-gen-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/image-gen-uis.md): ComfyUI, A1111, InvokeAI, Fooocus: keep on loopback and add a login before exposing
+- [chat-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/chat-uis.md): AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login
+- [llm-observability](https://raw.githubusercontent.com/jposluns/sslconfig/main/llm-observability.md): Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys
+- [workflow-orchestrators](https://raw.githubusercontent.com/jposluns/sslconfig/main/workflow-orchestrators.md): Prefect, Dagster, Airflow, Temporal, Flower: keep off the public internet and require auth
 
 ## Web app controls
 
@@ -92,6 +107,10 @@
 - [firebase-supabase](https://raw.githubusercontent.com/jposluns/sslconfig/main/firebase-supabase.md): security rules and row-level security
 - [admin-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/admin-uis.md): phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus
 - [devops-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/devops-uis.md): Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public
+- [web-exposure](https://raw.githubusercontent.com/jposluns/sslconfig/main/web-exposure.md): files a web server must never serve: dotfiles, .git, dumps, client secrets
+- [realtime-webhooks](https://raw.githubusercontent.com/jposluns/sslconfig/main/realtime-webhooks.md): WebSocket, SSE, and webhook authentication
+- [bi-dashboards](https://raw.githubusercontent.com/jposluns/sslconfig/main/bi-dashboards.md): Metabase, Superset, Redash: never public; least-privilege database user
+- [pocketbase](https://raw.githubusercontent.com/jposluns/sslconfig/main/pocketbase.md): PocketBase and Appwrite: the rules are the security; lock the admin console
 
 ## Optional
 

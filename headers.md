@@ -20,6 +20,10 @@ Notes that keep these correct rather than decorative:
 - **frame-ancestors** in CSP supersedes `X-Frame-Options`; sending both keeps older scanners content and costs nothing.
 - Headers belong on every response, including error pages; setting them only on `200 /` is a common proxy misconfiguration (nginx `add_header` inheritance per [nginx.md](nginx.md)).
 
+## Do not cache authenticated responses in a shared cache
+
+A CDN or shared proxy that keys its cache on the URL alone can serve one user's authenticated response to another. Set `Cache-Control: private` on authenticated responses, or `no-store` on the most sensitive ones, and mark cacheable only what is truly public. If a shared cache must hold authenticated content, configure it explicitly to vary on the cookie or the authorization header rather than relying on its default URL-only key.
+
 ## Verify
 
 ```bash
@@ -28,7 +32,10 @@ curl -sI https://example.com/ | grep -iE 'strict-transport|content-security|x-co
 
 Then scan with https://securityheaders.com/ from outside. A CSP that enforces without console errors on every page of the app is the finish line.
 
+For an authenticated route behind a shared cache, request the same URL as user A, then as user B, then anonymously, after warming the cache; each response must reflect only its own caller, never the one before it.
+
 ## Sources (checked September 2026)
 
 - MDN HTTP headers reference: https://developer.mozilla.org/en-US/docs/Web/HTTP
+- MDN Cache-Control: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
 - Security header scanner: https://securityheaders.com/
