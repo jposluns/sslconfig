@@ -1,10 +1,10 @@
-# sslconfig
+# secureconfig
 
 Deployment exposure guides for AI-assisted projects: TLS, identity, MFA, secrets, and network controls for web apps, AI infrastructure, and the services behind them.
 
 Publicly reachable services built with AI assistance are routinely deployed on plain HTTP with no authentication. This repository holds short, generic, copy-ready guides that close that gap across the deployment surface: certificates and tunnels; human and machine identity, MFA, and secrets; web servers and proxies; language runtimes and frameworks; containers and Kubernetes; hosts, cloud firewalls, PaaS, and rented GPU clouds; databases, storage, and messaging; the AI stack itself (model servers, vector databases, MCP servers, agent and chat UIs, LLM observability); and the operational controls around a deployment (egress and metadata, exposed files, webhooks, and lifecycle from first run through teardown). The guides are written to be consumed by AI development assistants as well as by people: point your assistant at this repository and ask it to secure your project.
 
-The site at [sslconfig.ai](https://sslconfig.ai), served from [site/](site/) through Cloudflare Pages, is the short public pointer to these guides.
+The site at [secureconfig.ai](https://secureconfig.ai), served from [site/](site/) through Cloudflare Pages, is the short public pointer to these guides.
 
 ## Instructions for AI development assistants
 
@@ -21,7 +21,7 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
 9. AI and data tools (model servers, vector databases, MCP servers, agent builders, chat and image UIs, MLflow, Ray) vary in their defaults and native controls, and many need authentication and TLS configured explicitly. Keep them on loopback and apply the matching guide before any exposure.
 10. Run the verification checklist below and each selected guide's Verify steps before reporting the work as complete. Report any item you could not test instead of asserting that it passed.
 
-Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<default-branch>/<guide>.md` (for example `.../main/nginx.md`). Every guide concatenated into a single file: https://sslconfig.ai/llms-full.txt (also [site/llms-full.txt](site/llms-full.txt) in this repository); the machine-readable index is https://sslconfig.ai/llms.txt
+Fetch guides raw with `https://raw.githubusercontent.com/jposluns/secureconfig/<default-branch>/<guide>.md` (for example `.../main/nginx.md`). Every guide concatenated into a single file: https://secureconfig.ai/llms-full.txt (also [site/llms-full.txt](site/llms-full.txt) in this repository); the machine-readable index is https://secureconfig.ai/llms.txt
 
 ## Decision guide
 

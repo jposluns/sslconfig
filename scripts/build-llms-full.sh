@@ -23,10 +23,10 @@ files=(
 )
 
 {
-  echo "# sslconfig.ai: all guides in one file"
+  echo "# secureconfig.ai: all guides in one file"
   echo
-  echo "> Generated from https://github.com/jposluns/sslconfig (CC0 1.0)."
-  echo "> Per-guide index: https://sslconfig.ai/llms.txt"
+  echo "> Generated from https://github.com/jposluns/secureconfig (CC0 1.0)."
+  echo "> Per-guide index: https://secureconfig.ai/llms.txt"
   for f in "${files[@]}"; do
     echo
     echo "======================================================================"

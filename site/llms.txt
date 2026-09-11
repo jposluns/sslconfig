@@ -1,118 +1,118 @@
-# sslconfig.ai
+# secureconfig.ai
 
-> TLS, strong authentication, and MFA setup guides for AI development assistants. Start with the README for the decision guide, the full index, and the verification checklist, then fetch the guide matching the stack. Every guide concatenated into one file: https://sslconfig.ai/llms-full.txt . All content is dedicated to the public domain (CC0 1.0).
+> TLS, strong authentication, and MFA setup guides for AI development assistants. Start with the README for the decision guide, the full index, and the verification checklist, then fetch the guide matching the stack. Every guide concatenated into one file: https://secureconfig.ai/llms-full.txt . All content is dedicated to the public domain (CC0 1.0).
 
 ## Start here
 
-- [README](https://raw.githubusercontent.com/jposluns/sslconfig/main/README.md): baseline rules for AI assistants, decision guide, index, verification checklist
-- [common-mistakes](https://raw.githubusercontent.com/jposluns/sslconfig/main/common-mistakes.md): the recurring findings, each linked to its fix
+- [README](https://raw.githubusercontent.com/jposluns/secureconfig/main/README.md): baseline rules for AI assistants, decision guide, index, verification checklist
+- [common-mistakes](https://raw.githubusercontent.com/jposluns/secureconfig/main/common-mistakes.md): the recurring findings, each linked to its fix
 
 ## Certificates and access
 
-- [free-certificates](https://raw.githubusercontent.com/jposluns/sslconfig/main/free-certificates.md): free publicly trusted certificates via ACME (Let's Encrypt, ZeroSSL), automated renewal
-- [self-signed](https://raw.githubusercontent.com/jposluns/sslconfig/main/self-signed.md): OpenSSL and mkcert certificates, distributing trust to clients
-- [cloudflare](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloudflare.md): Cloudflare Tunnel and Zero Trust Access, no open inbound ports
-- [tailscale](https://raw.githubusercontent.com/jposluns/sslconfig/main/tailscale.md): tailscale serve (tailnet-only) and funnel (public), automatic TLS
-- [tunnels](https://raw.githubusercontent.com/jposluns/sslconfig/main/tunnels.md): frp and WireGuard, self-hosted tunnels when there is no public IP
+- [free-certificates](https://raw.githubusercontent.com/jposluns/secureconfig/main/free-certificates.md): free publicly trusted certificates via ACME (Let's Encrypt, ZeroSSL), automated renewal
+- [self-signed](https://raw.githubusercontent.com/jposluns/secureconfig/main/self-signed.md): OpenSSL and mkcert certificates, distributing trust to clients
+- [cloudflare](https://raw.githubusercontent.com/jposluns/secureconfig/main/cloudflare.md): Cloudflare Tunnel and Zero Trust Access, no open inbound ports
+- [tailscale](https://raw.githubusercontent.com/jposluns/secureconfig/main/tailscale.md): tailscale serve (tailnet-only) and funnel (public), automatic TLS
+- [tunnels](https://raw.githubusercontent.com/jposluns/secureconfig/main/tunnels.md): frp and WireGuard, self-hosted tunnels when there is no public IP
 
 ## Authentication and secrets
 
-- [authentication](https://raw.githubusercontent.com/jposluns/sslconfig/main/authentication.md): password storage, sessions, API keys, rate limiting
-- [mfa](https://raw.githubusercontent.com/jposluns/sslconfig/main/mfa.md): MFA options: identity layers with QR-code TOTP enrolment, app libraries, SSH modules, Duo
-- [identity-providers](https://raw.githubusercontent.com/jposluns/sslconfig/main/identity-providers.md): hosted identity and MFA: Entra ID, Google, Okta, Auth0, Cognito, Clerk, WorkOS, Supabase Auth, Duo; free tiers and who each fits
-- [oidc-integration](https://raw.githubusercontent.com/jposluns/sslconfig/main/oidc-integration.md): OIDC login wiring for Google, Microsoft Entra, GitHub, and Okta: PKCE, redirect URIs, token validation, allowlist check
-- [cloud-identity-proxies](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloud-identity-proxies.md): login in front of the app with no code change: AWS ALB, Google IAP, Azure App Service, Cloudflare Access, ngrok, Vercel
-- [secrets](https://raw.githubusercontent.com/jposluns/sslconfig/main/secrets.md): keeping keys out of repositories, scanning, rotation after a leak
-- [machine-auth](https://raw.githubusercontent.com/jposluns/sslconfig/main/machine-auth.md): machine identity: API keys, client credentials, mutual TLS, workload identity federation, secret managers
-- [fronting-auth](https://raw.githubusercontent.com/jposluns/sslconfig/main/fronting-auth.md): oauth2-proxy, Authelia, Pomerium: login and MFA in front of an app that has none
+- [authentication](https://raw.githubusercontent.com/jposluns/secureconfig/main/authentication.md): password storage, sessions, API keys, rate limiting
+- [mfa](https://raw.githubusercontent.com/jposluns/secureconfig/main/mfa.md): MFA options: identity layers with QR-code TOTP enrolment, app libraries, SSH modules, Duo
+- [identity-providers](https://raw.githubusercontent.com/jposluns/secureconfig/main/identity-providers.md): hosted identity and MFA: Entra ID, Google, Okta, Auth0, Cognito, Clerk, WorkOS, Supabase Auth, Duo; free tiers and who each fits
+- [oidc-integration](https://raw.githubusercontent.com/jposluns/secureconfig/main/oidc-integration.md): OIDC login wiring for Google, Microsoft Entra, GitHub, and Okta: PKCE, redirect URIs, token validation, allowlist check
+- [cloud-identity-proxies](https://raw.githubusercontent.com/jposluns/secureconfig/main/cloud-identity-proxies.md): login in front of the app with no code change: AWS ALB, Google IAP, Azure App Service, Cloudflare Access, ngrok, Vercel
+- [secrets](https://raw.githubusercontent.com/jposluns/secureconfig/main/secrets.md): keeping keys out of repositories, scanning, rotation after a leak
+- [machine-auth](https://raw.githubusercontent.com/jposluns/secureconfig/main/machine-auth.md): machine identity: API keys, client credentials, mutual TLS, workload identity federation, secret managers
+- [fronting-auth](https://raw.githubusercontent.com/jposluns/secureconfig/main/fronting-auth.md): oauth2-proxy, Authelia, Pomerium: login and MFA in front of an app that has none
 
 ## Web servers and proxies
 
-- [apache](https://raw.githubusercontent.com/jposluns/sslconfig/main/apache.md)
-- [nginx](https://raw.githubusercontent.com/jposluns/sslconfig/main/nginx.md)
-- [lighttpd](https://raw.githubusercontent.com/jposluns/sslconfig/main/lighttpd.md)
-- [caddy](https://raw.githubusercontent.com/jposluns/sslconfig/main/caddy.md)
-- [haproxy](https://raw.githubusercontent.com/jposluns/sslconfig/main/haproxy.md)
-- [traefik](https://raw.githubusercontent.com/jposluns/sslconfig/main/traefik.md)
+- [apache](https://raw.githubusercontent.com/jposluns/secureconfig/main/apache.md)
+- [nginx](https://raw.githubusercontent.com/jposluns/secureconfig/main/nginx.md)
+- [lighttpd](https://raw.githubusercontent.com/jposluns/secureconfig/main/lighttpd.md)
+- [caddy](https://raw.githubusercontent.com/jposluns/secureconfig/main/caddy.md)
+- [haproxy](https://raw.githubusercontent.com/jposluns/secureconfig/main/haproxy.md)
+- [traefik](https://raw.githubusercontent.com/jposluns/secureconfig/main/traefik.md)
 
 ## Runtimes, containers, and clusters
 
-- [nodejs](https://raw.githubusercontent.com/jposluns/sslconfig/main/nodejs.md): Node.js and Express
-- [python](https://raw.githubusercontent.com/jposluns/sslconfig/main/python.md): Flask, FastAPI/Uvicorn, Gunicorn, Django
-- [nextjs](https://raw.githubusercontent.com/jposluns/sslconfig/main/nextjs.md): Next.js: sessions, Route Handlers, Server Actions, Auth.js and Better Auth, Vercel
-- [go](https://raw.githubusercontent.com/jposluns/sslconfig/main/go.md): Go net/http: TLS, proxy layout, bcrypt, cookies
-- [dotnet](https://raw.githubusercontent.com/jposluns/sslconfig/main/dotnet.md): ASP.NET Core and Kestrel: HTTPS, HSTS, forwarded headers, Identity
-- [java](https://raw.githubusercontent.com/jposluns/sslconfig/main/java.md): Spring Boot: server.ssl, forwarded headers, Spring Security
-- [php](https://raw.githubusercontent.com/jposluns/sslconfig/main/php.md): PHP and Laravel: password_hash, session cookies, trusted proxies, forced HTTPS
-- [ruby](https://raw.githubusercontent.com/jposluns/sslconfig/main/ruby.md): Rails and Puma: force_ssl, trusted proxies, has_secure_password, credentials
-- [docker](https://raw.githubusercontent.com/jposluns/sslconfig/main/docker.md): safe port publishing, the UFW bypass problem
-- [kubernetes](https://raw.githubusercontent.com/jposluns/sslconfig/main/kubernetes.md): Gateway API, cert-manager, entry-point auth; ingress-nginx retired
-- [frontend-frameworks](https://raw.githubusercontent.com/jposluns/sslconfig/main/frontend-frameworks.md): SvelteKit, Nuxt, Vite: server-route auth, sessions, public-env prefixes
-- [container-hardening](https://raw.githubusercontent.com/jposluns/sslconfig/main/container-hardening.md): non-root, dropped capabilities, read-only root, network segmentation
+- [nodejs](https://raw.githubusercontent.com/jposluns/secureconfig/main/nodejs.md): Node.js and Express
+- [python](https://raw.githubusercontent.com/jposluns/secureconfig/main/python.md): Flask, FastAPI/Uvicorn, Gunicorn, Django
+- [nextjs](https://raw.githubusercontent.com/jposluns/secureconfig/main/nextjs.md): Next.js: sessions, Route Handlers, Server Actions, Auth.js and Better Auth, Vercel
+- [go](https://raw.githubusercontent.com/jposluns/secureconfig/main/go.md): Go net/http: TLS, proxy layout, bcrypt, cookies
+- [dotnet](https://raw.githubusercontent.com/jposluns/secureconfig/main/dotnet.md): ASP.NET Core and Kestrel: HTTPS, HSTS, forwarded headers, Identity
+- [java](https://raw.githubusercontent.com/jposluns/secureconfig/main/java.md): Spring Boot: server.ssl, forwarded headers, Spring Security
+- [php](https://raw.githubusercontent.com/jposluns/secureconfig/main/php.md): PHP and Laravel: password_hash, session cookies, trusted proxies, forced HTTPS
+- [ruby](https://raw.githubusercontent.com/jposluns/secureconfig/main/ruby.md): Rails and Puma: force_ssl, trusted proxies, has_secure_password, credentials
+- [docker](https://raw.githubusercontent.com/jposluns/secureconfig/main/docker.md): safe port publishing, the UFW bypass problem
+- [kubernetes](https://raw.githubusercontent.com/jposluns/secureconfig/main/kubernetes.md): Gateway API, cert-manager, entry-point auth; ingress-nginx retired
+- [frontend-frameworks](https://raw.githubusercontent.com/jposluns/secureconfig/main/frontend-frameworks.md): SvelteKit, Nuxt, Vite: server-route auth, sessions, public-env prefixes
+- [container-hardening](https://raw.githubusercontent.com/jposluns/secureconfig/main/container-hardening.md): non-root, dropped capabilities, read-only root, network segmentation
 
 ## Hosts and platforms
 
-- [host](https://raw.githubusercontent.com/jposluns/sslconfig/main/host.md): SSH hardening, firewall baseline, updates
-- [cloud-firewalls](https://raw.githubusercontent.com/jposluns/sslconfig/main/cloud-firewalls.md): security groups and network rules
-- [paas](https://raw.githubusercontent.com/jposluns/sslconfig/main/paas.md): Render, Fly.io, Vercel, and similar: what stays yours
-- [egress-metadata](https://raw.githubusercontent.com/jposluns/sslconfig/main/egress-metadata.md): egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials
-- [gpu-clouds](https://raw.githubusercontent.com/jposluns/sslconfig/main/gpu-clouds.md): RunPod, Vast.ai, Lambda, Modal: exposed ports and differing firewall and auth defaults per platform
-- [deployment-lifecycle](https://raw.githubusercontent.com/jposluns/sslconfig/main/deployment-lifecycle.md): verify from outside, safe first-run order, previews, and teardown
+- [host](https://raw.githubusercontent.com/jposluns/secureconfig/main/host.md): SSH hardening, firewall baseline, updates
+- [cloud-firewalls](https://raw.githubusercontent.com/jposluns/secureconfig/main/cloud-firewalls.md): security groups and network rules
+- [paas](https://raw.githubusercontent.com/jposluns/secureconfig/main/paas.md): Render, Fly.io, Vercel, and similar: what stays yours
+- [egress-metadata](https://raw.githubusercontent.com/jposluns/secureconfig/main/egress-metadata.md): egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials
+- [gpu-clouds](https://raw.githubusercontent.com/jposluns/secureconfig/main/gpu-clouds.md): RunPod, Vast.ai, Lambda, Modal: exposed ports and differing firewall and auth defaults per platform
+- [deployment-lifecycle](https://raw.githubusercontent.com/jposluns/secureconfig/main/deployment-lifecycle.md): verify from outside, safe first-run order, previews, and teardown
 
 ## Databases, storage, and messaging
 
-- [postgresql](https://raw.githubusercontent.com/jposluns/sslconfig/main/postgresql.md)
-- [mysql](https://raw.githubusercontent.com/jposluns/sslconfig/main/mysql.md)
-- [mongodb](https://raw.githubusercontent.com/jposluns/sslconfig/main/mongodb.md)
-- [redis](https://raw.githubusercontent.com/jposluns/sslconfig/main/redis.md)
-- [elasticsearch](https://raw.githubusercontent.com/jposluns/sslconfig/main/elasticsearch.md): Elasticsearch and OpenSearch
-- [minio](https://raw.githubusercontent.com/jposluns/sslconfig/main/minio.md)
-- [rabbitmq](https://raw.githubusercontent.com/jposluns/sslconfig/main/rabbitmq.md)
-- [mosquitto](https://raw.githubusercontent.com/jposluns/sslconfig/main/mosquitto.md): MQTT
-- [kafka](https://raw.githubusercontent.com/jposluns/sslconfig/main/kafka.md): SASL_SSL listeners, SCRAM credentials, ACLs
-- [clickhouse](https://raw.githubusercontent.com/jposluns/sslconfig/main/clickhouse.md): user passwords, secure ports, network restrictions
-- [neo4j](https://raw.githubusercontent.com/jposluns/sslconfig/main/neo4j.md): initial password, Bolt and HTTPS TLS, auth stays on
-- [memcached](https://raw.githubusercontent.com/jposluns/sslconfig/main/memcached.md): no auth by default; loopback, SASL and TLS where built in
-- [object-storage](https://raw.githubusercontent.com/jposluns/sslconfig/main/object-storage.md): S3, R2, GCS, Azure Blob, Supabase Storage: private by default, scoped credentials, signed URLs
-- [nats](https://raw.githubusercontent.com/jposluns/sslconfig/main/nats.md): NATS and JetStream, auth, TLS, and the unauthenticated monitoring port
-- [search-engines](https://raw.githubusercontent.com/jposluns/sslconfig/main/search-engines.md): Meilisearch and Typesense, master key, scoped search keys, production mode
-- [sqlite](https://raw.githubusercontent.com/jposluns/sslconfig/main/sqlite.md): SQLite in deployment, the file is the exposure; Turso tokens; Litestream
-- [surrealdb](https://raw.githubusercontent.com/jposluns/sslconfig/main/surrealdb.md): SurrealDB, root credentials, bind address, access levels, TLS
+- [postgresql](https://raw.githubusercontent.com/jposluns/secureconfig/main/postgresql.md)
+- [mysql](https://raw.githubusercontent.com/jposluns/secureconfig/main/mysql.md)
+- [mongodb](https://raw.githubusercontent.com/jposluns/secureconfig/main/mongodb.md)
+- [redis](https://raw.githubusercontent.com/jposluns/secureconfig/main/redis.md)
+- [elasticsearch](https://raw.githubusercontent.com/jposluns/secureconfig/main/elasticsearch.md): Elasticsearch and OpenSearch
+- [minio](https://raw.githubusercontent.com/jposluns/secureconfig/main/minio.md)
+- [rabbitmq](https://raw.githubusercontent.com/jposluns/secureconfig/main/rabbitmq.md)
+- [mosquitto](https://raw.githubusercontent.com/jposluns/secureconfig/main/mosquitto.md): MQTT
+- [kafka](https://raw.githubusercontent.com/jposluns/secureconfig/main/kafka.md): SASL_SSL listeners, SCRAM credentials, ACLs
+- [clickhouse](https://raw.githubusercontent.com/jposluns/secureconfig/main/clickhouse.md): user passwords, secure ports, network restrictions
+- [neo4j](https://raw.githubusercontent.com/jposluns/secureconfig/main/neo4j.md): initial password, Bolt and HTTPS TLS, auth stays on
+- [memcached](https://raw.githubusercontent.com/jposluns/secureconfig/main/memcached.md): no auth by default; loopback, SASL and TLS where built in
+- [object-storage](https://raw.githubusercontent.com/jposluns/secureconfig/main/object-storage.md): S3, R2, GCS, Azure Blob, Supabase Storage: private by default, scoped credentials, signed URLs
+- [nats](https://raw.githubusercontent.com/jposluns/secureconfig/main/nats.md): NATS and JetStream, auth, TLS, and the unauthenticated monitoring port
+- [search-engines](https://raw.githubusercontent.com/jposluns/secureconfig/main/search-engines.md): Meilisearch and Typesense, master key, scoped search keys, production mode
+- [sqlite](https://raw.githubusercontent.com/jposluns/secureconfig/main/sqlite.md): SQLite in deployment, the file is the exposure; Turso tokens; Litestream
+- [surrealdb](https://raw.githubusercontent.com/jposluns/secureconfig/main/surrealdb.md): SurrealDB, root credentials, bind address, access levels, TLS
 
 ## AI, data, and dev tools
 
-- [jupyter](https://raw.githubusercontent.com/jposluns/sslconfig/main/jupyter.md)
-- [ollama](https://raw.githubusercontent.com/jposluns/sslconfig/main/ollama.md): no built-in auth or TLS; protect with a proxy or tunnel
-- [open-webui](https://raw.githubusercontent.com/jposluns/sslconfig/main/open-webui.md): signup control and fronting TLS
-- [litellm](https://raw.githubusercontent.com/jposluns/sslconfig/main/litellm.md): master key and virtual keys
-- [model-servers](https://raw.githubusercontent.com/jposluns/sslconfig/main/model-servers.md): llama.cpp, vLLM, TGI, SGLang, Triton, LM Studio
-- [vector-databases](https://raw.githubusercontent.com/jposluns/sslconfig/main/vector-databases.md): Qdrant, Weaviate, Milvus, Chroma, pgvector: API keys, TLS, what has no native auth
-- [mcp-servers](https://raw.githubusercontent.com/jposluns/sslconfig/main/mcp-servers.md): stdio versus Streamable HTTP, loopback, Origin checks, OAuth 2.1 or a fronting layer
-- [ray](https://raw.githubusercontent.com/jposluns/sslconfig/main/ray.md): dashboard, Jobs, and Client ports execute code; isolate, token auth, SSH forward
-- [mlflow](https://raw.githubusercontent.com/jposluns/sslconfig/main/mlflow.md): no auth by default; basic-auth app, TLS in front
-- [agent-builders](https://raw.githubusercontent.com/jposluns/sslconfig/main/agent-builders.md): Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS
-- [gradio](https://raw.githubusercontent.com/jposluns/sslconfig/main/gradio.md)
-- [streamlit](https://raw.githubusercontent.com/jposluns/sslconfig/main/streamlit.md)
-- [n8n](https://raw.githubusercontent.com/jposluns/sslconfig/main/n8n.md)
-- [code-server](https://raw.githubusercontent.com/jposluns/sslconfig/main/code-server.md)
-- [image-gen-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/image-gen-uis.md): ComfyUI, A1111, InvokeAI, Fooocus: keep on loopback and add a login before exposing
-- [chat-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/chat-uis.md): AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login
-- [llm-observability](https://raw.githubusercontent.com/jposluns/sslconfig/main/llm-observability.md): Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys
-- [workflow-orchestrators](https://raw.githubusercontent.com/jposluns/sslconfig/main/workflow-orchestrators.md): Prefect, Dagster, Airflow, Temporal, Flower: keep off the public internet and require auth
+- [jupyter](https://raw.githubusercontent.com/jposluns/secureconfig/main/jupyter.md)
+- [ollama](https://raw.githubusercontent.com/jposluns/secureconfig/main/ollama.md): no built-in auth or TLS; protect with a proxy or tunnel
+- [open-webui](https://raw.githubusercontent.com/jposluns/secureconfig/main/open-webui.md): signup control and fronting TLS
+- [litellm](https://raw.githubusercontent.com/jposluns/secureconfig/main/litellm.md): master key and virtual keys
+- [model-servers](https://raw.githubusercontent.com/jposluns/secureconfig/main/model-servers.md): llama.cpp, vLLM, TGI, SGLang, Triton, LM Studio
+- [vector-databases](https://raw.githubusercontent.com/jposluns/secureconfig/main/vector-databases.md): Qdrant, Weaviate, Milvus, Chroma, pgvector: API keys, TLS, what has no native auth
+- [mcp-servers](https://raw.githubusercontent.com/jposluns/secureconfig/main/mcp-servers.md): stdio versus Streamable HTTP, loopback, Origin checks, OAuth 2.1 or a fronting layer
+- [ray](https://raw.githubusercontent.com/jposluns/secureconfig/main/ray.md): dashboard, Jobs, and Client ports execute code; isolate, token auth, SSH forward
+- [mlflow](https://raw.githubusercontent.com/jposluns/secureconfig/main/mlflow.md): no auth by default; basic-auth app, TLS in front
+- [agent-builders](https://raw.githubusercontent.com/jposluns/secureconfig/main/agent-builders.md): Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS
+- [gradio](https://raw.githubusercontent.com/jposluns/secureconfig/main/gradio.md)
+- [streamlit](https://raw.githubusercontent.com/jposluns/secureconfig/main/streamlit.md)
+- [n8n](https://raw.githubusercontent.com/jposluns/secureconfig/main/n8n.md)
+- [code-server](https://raw.githubusercontent.com/jposluns/secureconfig/main/code-server.md)
+- [image-gen-uis](https://raw.githubusercontent.com/jposluns/secureconfig/main/image-gen-uis.md): ComfyUI, A1111, InvokeAI, Fooocus: keep on loopback and add a login before exposing
+- [chat-uis](https://raw.githubusercontent.com/jposluns/secureconfig/main/chat-uis.md): AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login
+- [llm-observability](https://raw.githubusercontent.com/jposluns/secureconfig/main/llm-observability.md): Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys
+- [workflow-orchestrators](https://raw.githubusercontent.com/jposluns/secureconfig/main/workflow-orchestrators.md): Prefect, Dagster, Airflow, Temporal, Flower: keep off the public internet and require auth
 
 ## Web app controls
 
-- [cors](https://raw.githubusercontent.com/jposluns/sslconfig/main/cors.md): allow your origins, not everyone's
-- [headers](https://raw.githubusercontent.com/jposluns/sslconfig/main/headers.md): HSTS, CSP, and companions
-- [firebase-supabase](https://raw.githubusercontent.com/jposluns/sslconfig/main/firebase-supabase.md): security rules and row-level security
-- [admin-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/admin-uis.md): phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus
-- [devops-uis](https://raw.githubusercontent.com/jposluns/sslconfig/main/devops-uis.md): Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public
-- [web-exposure](https://raw.githubusercontent.com/jposluns/sslconfig/main/web-exposure.md): files a web server must never serve: dotfiles, .git, dumps, client secrets
-- [realtime-webhooks](https://raw.githubusercontent.com/jposluns/sslconfig/main/realtime-webhooks.md): WebSocket, SSE, and webhook authentication
-- [bi-dashboards](https://raw.githubusercontent.com/jposluns/sslconfig/main/bi-dashboards.md): Metabase, Superset, Redash: never public; least-privilege database user
-- [pocketbase](https://raw.githubusercontent.com/jposluns/sslconfig/main/pocketbase.md): PocketBase and Appwrite: the rules are the security; lock the admin console
+- [cors](https://raw.githubusercontent.com/jposluns/secureconfig/main/cors.md): allow your origins, not everyone's
+- [headers](https://raw.githubusercontent.com/jposluns/secureconfig/main/headers.md): HSTS, CSP, and companions
+- [firebase-supabase](https://raw.githubusercontent.com/jposluns/secureconfig/main/firebase-supabase.md): security rules and row-level security
+- [admin-uis](https://raw.githubusercontent.com/jposluns/secureconfig/main/admin-uis.md): phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus
+- [devops-uis](https://raw.githubusercontent.com/jposluns/secureconfig/main/devops-uis.md): Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public
+- [web-exposure](https://raw.githubusercontent.com/jposluns/secureconfig/main/web-exposure.md): files a web server must never serve: dotfiles, .git, dumps, client secrets
+- [realtime-webhooks](https://raw.githubusercontent.com/jposluns/secureconfig/main/realtime-webhooks.md): WebSocket, SSE, and webhook authentication
+- [bi-dashboards](https://raw.githubusercontent.com/jposluns/secureconfig/main/bi-dashboards.md): Metabase, Superset, Redash: never public; least-privilege database user
+- [pocketbase](https://raw.githubusercontent.com/jposluns/secureconfig/main/pocketbase.md): PocketBase and Appwrite: the rules are the security; lock the admin console
 
 ## Optional
 
-- [Repository](https://github.com/jposluns/sslconfig): source for all guides and this site
-- [Contributing](https://raw.githubusercontent.com/jposluns/sslconfig/main/CONTRIBUTING.md): scope and the bar for new guides
+- [Repository](https://github.com/jposluns/secureconfig): source for all guides and this site
+- [Contributing](https://raw.githubusercontent.com/jposluns/secureconfig/main/CONTRIBUTING.md): scope and the bar for new guides

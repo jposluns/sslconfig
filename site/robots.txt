@@ -2,6 +2,6 @@ User-agent: *
 Allow: /
 
 # Machine-readable guide index for AI assistants:
-# https://sslconfig.ai/llms.txt
+# https://secureconfig.ai/llms.txt
 # All guides in one file:
-# https://sslconfig.ai/llms-full.txt
+# https://secureconfig.ai/llms-full.txt

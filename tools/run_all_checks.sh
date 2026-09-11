@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Whole-corpus gate suite for sslconfig.
+# Whole-corpus gate suite for secureconfig.
 #
 # Every gate here is deterministic and offline: nothing reaches the network, so
 # a vendor outage or a rate limit can never block a pull request. External link
@@ -60,7 +60,7 @@ for f in *.md; do
   grep -qF " $f" scripts/build-llms-full.sh || { bad "$f is not listed in scripts/build-llms-full.sh"; wired=0; }
   grep -qF "main/$f" site/llms.txt || { bad "$f is not linked from site/llms.txt"; wired=0; }
   [ "$f" = README.md ] || grep -qE "^\| \[$f\]\($f\) \|" <<< "$readme_stripped" || { bad "$f is not indexed in README.md"; wired=0; }
-  grep -qE "<a href=\"https://github.com/jposluns/sslconfig/blob/main/$f\"" <<< "$menu_html" \
+  grep -qE "<a href=\"https://github.com/jposluns/secureconfig/blob/main/$f\"" <<< "$menu_html" \
     || { bad "$f is not linked from the site/index.html menu"; wired=0; }
 done
 [ "$wired" = 1 ] && ok "every guide is listed in the build script, linked from llms.txt, indexed in README.md, and in the site menu"
@@ -312,7 +312,7 @@ PY
 echo "== AIQT baseline =="
 # The vendored gates derive the repo root from their own location, so they operate on this tree.
 # AIQT_SITE_HOST retargets the upstream helper, which hardcodes aiqt.ai; see .aiqt/PIN.
-export AIQT_SITE_HOST=sslconfig.ai
+export AIQT_SITE_HOST=secureconfig.ai
 for gate in check_site check_no_dashes check_newtab; do
   if out=$(python3 "tools/${gate}.py" 2>&1); then
     ok "${gate}"
