@@ -9,12 +9,22 @@ is satisfied by a substituted certificate as readily as by the right one, and on
 those three sent credentials over the unverified connection.
 
 WHAT THIS IS NOT: a shell parser, and not a proof that a Verify block verifies anything.
-It matches text. An adversarial review of the first version of this file demonstrated
-twelve ways past it, which is why the scanning below joins line continuations, strips
-comments without eating URL fragments, follows Markdown section nesting, and accepts
-tilde fences and indented blocks. Those were the bypasses someone found. Others exist.
+It is a TRIPWIRE for the accidental case, and a determined author walks past it. Two
+rounds of adversarial review demonstrated more than twenty bypasses of earlier versions.
+Most are closed. These are known to remain, and are recorded so nobody mistakes a pass
+for a guarantee:
+
+  - A line continuation SPLITTING A TOKEN: a backslash-newline inside a flag name. The
+    shell rejoins it into a working flag; the scanner inserts a space and sees neither
+    half.
+  - A trust anchor that trusts the wrong thing, for example `-CAfile` fed a certificate
+    fetched from the same server. The flags are present and verification passes against
+    an attacker's own certificate.
+  - Any tool outside CHECKS, such as gnutls-cli, and any spelling of a listed flag that
+    the patterns do not name.
+
 Passing this gate is not evidence that a Verify step is correct, that the certificate it
-accepts is the right one, or that some tool or spelling outside CHECKS is absent.
+accepts is the right one, or that the connection is trustworthy.
 
 The openssl check is worth naming, because the first version of this file got it exactly
 backwards. `s_client -verify_return_error` takes no argument, so a pattern matching
@@ -35,21 +45,53 @@ from _walk import walk_files  # noqa: E402  fail-closed tree walk
 SKIP_DIRS = {".git", "node_modules", "__pycache__", "site", "tools", "scripts", ".github", ".aiqt"}
 NOT_A_GUIDE = {"CONTRIBUTING.md", "CLAUDE.md", "AGENTS.md", "CHANGELOG.md", "README.sources.md"}
 
-VERIFY_RE = re.compile(r"^(#{1,6})\s*(.*?)\s*$")
+VERIFY_RE = re.compile(r"^ {0,3}(#{1,6})\s*(.*?)\s*$")
+SETEXT_RE = re.compile(r"^ {0,3}(=+|-+)\s*$")
 VERIFY_TITLE = re.compile(r"\b(verif\w*|quick checks)\b", re.I)
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
 # A command segment ends at a pipe, a separator, or a command substitution, so a flag
 # belonging to a later command is not attributed to curl. This is what stops `sort -k`
 # inside `curl ... -o $(sort -k 2)` from reading as `curl -k`.
-SEGMENT_SPLIT = re.compile(r"\|\||&&|[|;&]|\$\(")
+def split_segments(code):
+    """Split a command line on separators that appear OUTSIDE quotes.
 
-INSECURE_CURL = re.compile(r"(?:^|[\s'\"/=])curl\b")
-CURL_FLAG = re.compile(r"(?:\s|^)(?:-[a-zA-Z]*k[a-zA-Z]*|--insecure)(?:\s|=|$)")
+    A quote-blind split let `curl 'https://x?a=1&b=2' -k` sever the flag from curl, and
+    `curl -H "Bearer $(cat t)" ... -k` do the same. Returns (segment, preceding_separator).
+    """
+    out, buf, quote, sep = [], [], None, ""
+    i = 0
+    while i < len(code):
+        ch = code[i]
+        if quote:
+            if ch == quote:
+                quote = None
+            buf.append(ch)
+        elif ch in "'\"":
+            quote = ch
+            buf.append(ch)
+        elif code.startswith("$(", i):
+            out.append(("".join(buf), sep)); buf, sep = [], "$("
+            i += 2
+            continue
+        elif ch in "|;&":
+            run = ch
+            while i + 1 < len(code) and code[i + 1] in "|&":
+                i += 1
+                run += code[i]
+            out.append(("".join(buf), sep)); buf, sep = [], run
+        else:
+            buf.append(ch)
+        i += 1
+    out.append(("".join(buf), sep))
+    return out
+
+INSECURE_CURL = re.compile(r"(?:^|[\s'\"/=`(])curl\b")
+CURL_FLAG = re.compile(r"(?:\s|^)(?:-[a-zA-Z]*k[a-zA-Z]*|--insecure|--proxy-insecure)(?:\s|=|$)")
 
 CHECKS = (
     ("wget --no-check-certificate (prefix abbreviations included)",
-     re.compile(r"(?:^|[\s'\"/=])wget\b[^\n]*?--no-check-cert\w*")),
+     re.compile(r"(?:^|[\s'\"/=`(])wget\b[^\n]*?--no-check-cert\w*")),
     ("python verify=False or verify=0",
      re.compile(r"\bverify\s*=\s*(?:False|0)\b")),
     ("node rejectUnauthorized false",
@@ -63,7 +105,7 @@ CHECKS = (
 )
 
 # openssl s_client verifies nothing unless one of these appears.
-SCLIENT = re.compile(r"(?:^|[\s'\"/=])openssl\s+s_client\b")
+SCLIENT = re.compile(r"(?:^|[\s'\"/=`(])openssl\s+s_client\b")
 # OpenSSL: "the verify operation continues after errors" unless -verify_return_error is
 # given, so a trust source alone does not make verification fatal. The negative forms
 # (-no-CAfile and friends) DISABLE trust, so they must not satisfy this.
@@ -93,6 +135,15 @@ def logical_lines(text):
             fence = None if fence else m.group(1)
             continue
         if fence is None:
+            # Setext: the UNDERLINE names the heading, so the title is the line above.
+            s = SETEXT_RE.match(line)
+            if s and i >= 2 and lines[i - 2].strip():
+                depth = 1 if s.group(1)[0] == "=" else 2
+                if VERIFY_TITLE.search(lines[i - 2]):
+                    verify_depth = depth
+                elif verify_depth is not None and depth <= verify_depth:
+                    verify_depth = None
+                continue
             h = VERIFY_RE.match(line)
             if h and line.lstrip().startswith("#"):
                 depth = len(h.group(1))
@@ -150,9 +201,12 @@ def findings_for(code):  # noqa: C901
     unrelated `openssl x509` later in the line says nothing about the handshake.
     """
     hits = []
-    segments = SEGMENT_SPLIT.split(code)
-    for idx, segment in enumerate(segments):
-        nxt = segments[idx + 1] if idx + 1 < len(segments) else ""
+    parts = split_segments(code)
+    for idx, (segment, _sep) in enumerate(parts):
+        # Only a PIPE means "piped into". A `;` or `&&` sequenced openssl x509 is a
+        # separate command and says nothing about the handshake before it.
+        nxt = parts[idx + 1][0] if (idx + 1 < len(parts)
+                                    and parts[idx + 1][1] == "|") else ""
         if INSECURE_CURL.search(segment) and CURL_FLAG.search(segment):
             hits.append("curl -k / --insecure")
         if (SCLIENT.search(segment) and not SCLIENT_VERIFIES.search(segment)

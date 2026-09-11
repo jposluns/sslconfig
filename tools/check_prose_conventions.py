@@ -65,9 +65,13 @@ ISE_STEMS = (
     "standardis", "summaris", "utilis", "optimis", "serialis", "deserialis",
     "sanitis", "virtualis", "containeris", "paramateris", "parameteris",
     "tokenis", "anonymis", "pseudonymis", "capitalis", "centralis", "generalis",
-    "localis", "modernis", "specialis", "visualis",
+    "localis", "modernis", "specialis", "visualis", "finalis", "dockeris",
+    "stabilis", "modularis", "operationalis", "containeris",
 )
-ISE_RE = re.compile(r"\b(" + "|".join(ISE_STEMS) + r")(e|es|ed|ing|ation|ations|er|ers)?\b", re.I)
+# No leading \b: `unauthorised` and `reinitialised` carry a listed stem mid-word, and an
+# anchored prefix let both through while claiming to cover `authoris` and `initialis`.
+ISE_RE = re.compile(r"(" + "|".join(ISE_STEMS) +
+                    r")(e|es|ed|ing|ation|ations|er|ers|able|ables|ational)?\b", re.I)
 
 # Placeholders that are not in the house set. Each is a domain someone may actually own.
 BAD_PLACEHOLDERS = re.compile(
@@ -75,7 +79,9 @@ BAD_PLACEHOLDERS = re.compile(
     r"yourserver\.com|mycompany\.com|foo\.com|bar\.com)\b", re.I
 )
 
-QUOTED_RE = re.compile(r"`[^`]*`|\"[^\"]*\"|'[^']*'")
+# Single quotes are NOT treated as a quotation delimiter: an apostrophe pair spanning a
+# contraction ("Don't ... admin's") blanked the prose between them and hid a real finding.
+QUOTED_RE = re.compile(r"`[^`]*`|\"[^\"]*\"")
 # A cited URL may contain a British spelling in its path, and respelling it breaks the
 # link. UK government and vendor documentation routinely does this.
 URL_RE = re.compile(r"https?://\S+")
@@ -112,13 +118,20 @@ def main() -> int:
             if line.lstrip().startswith(("```", "~~~")):
                 in_fence = not in_fence
                 continue
-            # A fenced block holds code, where `serialise` is an identifier and not prose.
-            # A block quotation holds someone else's words, which must not be respelled.
-            if in_fence or line.lstrip().startswith(">"):
-                continue
+            # A fenced block holds code, where `serialise` is an identifier and not prose,
+            # and a block quotation holds someone else's words. Both are exempt from the
+            # SPELLING check only. The placeholder check still reads them, because a fenced
+            # command is the primary thing a reader copies, and exempting it there would
+            # retire the check in the one place it matters.
+            prose = not (in_fence or line.lstrip().startswith(">"))
             # Spelling ignores quoted spans; placeholders do not, since a placeholder
             # inside backticks is the normal case rather than a quotation.
-            m = ISE_RE.search(unquoted(line))
+            # Inside a fence, only a trailing comment is prose. `def serialise(value)` is
+            # an identifier; `# ports are randomised at startup` is a sentence a reader
+            # reads, and the comments in this corpus carry real explanation.
+            spell_target = line if prose else (
+                "#" + line.split("#", 1)[1] if "#" in line else "")
+            m = ISE_RE.search(unquoted(spell_target))
             if m:
                 findings.append(
                     f"{path.relative_to(root)}:{lineno}: British spelling '{m.group(0)}', "
