@@ -1614,7 +1614,7 @@ ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.
 - Core module (`client_max_body_size`): https://nginx.org/en/docs/http/ngx_http_core_module.html
 - Request rate limiting (`limit_req_zone`, `limit_req`, `burst`, `nodelay`): https://nginx.org/en/docs/http/ngx_http_limit_req_module.html
 - Connection limiting (`limit_conn_zone`, `limit_conn`): https://nginx.org/en/docs/http/ngx_http_limit_conn_module.html
-- Proxy module (`proxy_read_timeout`, `proxy_send_timeout`, `proxy_connect_timeout`): https://nginx.org/en/docs/http/ngx_http_proxy_module.html
+- Proxy module (`proxy_read_timeout`, and `proxy_send_timeout` and `proxy_connect_timeout` if you add them): https://nginx.org/en/docs/http/ngx_http_proxy_module.html
 - ngx_http_auth_basic_module: https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
 
