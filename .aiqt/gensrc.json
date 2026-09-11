@@ -87,6 +87,7 @@
         "realtime-webhooks.md",
         "bi-dashboards.md",
         "pocketbase.md",
+        "exposure-index.md",
         "common-mistakes.md"
       ],
       "target": "site/llms-full.txt"
