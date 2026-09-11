@@ -181,6 +181,7 @@ Choose every route that applies; a deployment usually needs both service-specifi
 | [web-exposure.md](web-exposure.md) | Files a web server must never serve: dotfiles, .git, dumps, client secrets |
 | [egress-metadata.md](egress-metadata.md) | Egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials |
 | [deployment-lifecycle.md](deployment-lifecycle.md) | Verify from outside, safe first-run order, previews, and teardown |
+| [exposure-index.md](exposure-index.md) | Narrow an open port to the guides worth reading, then identify the process |
 | [common-mistakes.md](common-mistakes.md) | The recurring findings, each linked to its fix |
 
 ## Verification checklist

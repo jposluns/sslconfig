@@ -19,7 +19,7 @@ files=(
   jupyter.md ollama.md open-webui.md litellm.md model-servers.md
   gradio.md streamlit.md n8n.md code-server.md
   vector-databases.md mcp-servers.md ray.md mlflow.md agent-builders.md image-gen-uis.md chat-uis.md llm-observability.md workflow-orchestrators.md
-  admin-uis.md devops-uis.md cors.md headers.md firebase-supabase.md web-exposure.md realtime-webhooks.md bi-dashboards.md pocketbase.md common-mistakes.md
+  admin-uis.md devops-uis.md cors.md headers.md firebase-supabase.md web-exposure.md realtime-webhooks.md bi-dashboards.md pocketbase.md exposure-index.md common-mistakes.md
 )
 
 {

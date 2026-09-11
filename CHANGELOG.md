@@ -142,6 +142,16 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 
 ### Added
 
+- `exposure-index.md`, a lookup from an observed listening port to the guides worth reading (#19). The
+  corpus routes from a known mistake to its fix in `common-mistakes.md`; this routes from an observed
+  symptom, which is the direction a reader arrives from. It claims deliberately little. A port does not
+  identify a service here: 23 guides mention 3000, 21 mention 443, and six mention 8443, so the table says
+  what may be listening and sends the reader to the owning process. Its Verify section is stated as a
+  baseline inventory that cannot establish completeness, because a container on a bridge network
+  publishes no host port and one on routed IPv6 answers on its own address whatever the host publishes.
+  It took four cross-family review rounds: the first two returned DO NOT SHIP from both families, one
+  for the false premise and one for a Verify section that certified an exposed application through an
+  outbound tunnel and through endpoints no linked guide enumerates.
 - A gate, `tools/check_guide_shape.py`, requiring every guide to carry a Verify section with a
   non-empty body and a `Sources (checked <month year>)` heading whose date names a real month, is not
   in the future, and cites at least one absolute URL with a hostname. It is deterministic and offline
