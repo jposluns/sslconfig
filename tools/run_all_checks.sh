@@ -65,6 +65,49 @@ for f in *.md; do
 done
 [ "$wired" = 1 ] && ok "every guide is listed in the build script, linked from llms.txt, indexed in README.md, and in the site menu"
 
+echo "== README guide-index categories match the site menu =="
+# The README's "## Guide index" section and the site's left-hand menu are two hand-maintained
+# copies of the same category list; nothing else in this suite catches them drifting apart.
+if cat_diff=$(python3 - <<'PY'
+import re, sys
+
+readme = open("README.md", encoding="utf-8").read()
+readme = re.sub(r"<!--.*?-->", "", readme, flags=re.S)
+m = re.search(r"^## Guide index[ \t]*$", readme, re.M)
+if not m:
+    print("README.md has no '## Guide index' section")
+    sys.exit(1)
+rest = readme[m.end():]
+m2 = re.search(r"^## ", rest, re.M)
+section = rest[:m2.start()] if m2 else rest
+readme_cats = re.findall(r"^### (.+?)[ \t]*$", section, re.M)
+
+html = open("site/index.html", encoding="utf-8").read()
+html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+excluded = {"On this page", "Reference"}
+site_cats = [c for c in re.findall(r'<p class="sidenav-h">([^<]*)</p>', html) if c not in excluded]
+
+if readme_cats == site_cats:
+    sys.exit(0)
+
+print("README guide-index categories: " + repr(readme_cats))
+print("site menu categories:          " + repr(site_cats))
+for i, (a, b) in enumerate(zip(readme_cats, site_cats)):
+    if a != b:
+        print(f"first difference at position {i}: README={a!r} site={b!r}")
+        break
+else:
+    print("one list is a prefix of the other; lengths differ "
+          f"({len(readme_cats)} vs {len(site_cats)})")
+sys.exit(1)
+PY
+); then
+  ok "README guide-index categories match the site menu categories"
+else
+  bad "README guide-index categories do not match the site menu categories"
+  printf '%s\n' "$cat_diff" | sed 's/^/          /'
+fi
+
 echo "== local links resolve =="
 # Heading slugs of a Markdown file, using the GitHub transformation: lowercase, drop everything but
 # letters, digits, spaces and hyphens, then spaces to hyphens.
