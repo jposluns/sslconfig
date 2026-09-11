@@ -75,24 +75,20 @@ denial of wallet when the endpoint costs GPU time ([authentication.md](authentic
 zones in the `http` block and apply the limits per location.
 
 ```nginx
-# http block, alongside the other http-level directives
+# add to the http block
 limit_req_zone  $binary_remote_addr zone=api:10m rate=10r/s;
 limit_conn_zone $binary_remote_addr zone=apiconn:10m;
 
-# merge these into the SAME server block from section 1, not a new one
-server {
-    client_max_body_size 10m;                   # 413 above this; the default is 1m
+# add to the server block from section 1
+client_max_body_size 10m;                   # 413 above this; the default is 1m
 
-    location / {
-        auth_basic           "Restricted";      # keep the section 3 directives here
-        auth_basic_user_file /etc/nginx/.htpasswd;
-
-        limit_req  zone=api burst=20 nodelay;   # 503 once the burst is spent
-        limit_conn apiconn 10;                  # concurrent connections per client address
-        proxy_read_timeout 60s;
-        proxy_pass http://127.0.0.1:3000;
-    }
-}
+# add INSIDE the existing `location /` from sections 1 and 3. Do not paste a new
+# location block: this one already carries auth_basic and the proxy_set_header
+# directives, and a location without them is unauthenticated and loses the
+# forwarded headers. A sibling location does not inherit either.
+limit_req  zone=api burst=20 nodelay;       # 503 once the burst is spent
+limit_conn apiconn 10;                      # concurrent connections per client address
+proxy_read_timeout 60s;
 ```
 
 Put the limits in the location that already carries authentication. nginx selects the single most
@@ -121,13 +117,18 @@ curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-b
                                     # client_max_body_size is 1m, so 9M is refused until `10m` is set,
                                     # while 11M returns 413 either way. Neither status says WHICH layer
                                     # refused: a backend with its own limit produces the same codes. To
-                                    # attribute it to nginx, comment the directive out and re-run
+                                    # attribute it to nginx, set `client_max_body_size 0` in an isolated
+                                    # environment, which disables the check entirely; commenting the
+                                    # directive out only restores the 1m default and still returns 413
 seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://example.com/ | sort | uniq -c
-                                    # 503 must appear. Run them CONCURRENTLY: a sequential loop pays a
+                                    # Run them CONCURRENTLY: a sequential loop pays a
                                     # TLS handshake per request and can stay under 10r/s, so every
                                     # request is admitted and the check passes while no limit exists.
-                                    # `limit_conn` also returns 503, so this shows that one of the two
-                                    # limiters fired, not which. Disable one and re-run to tell them apart
+                                    # A 503 appeared. That is all this shows. `limit_conn` also returns
+                                    # 503, and an upstream under load returns it too, so this does not
+                                    # establish that either nginx limiter fired. Attributing it needs an
+                                    # isolated environment with both limiters disabled as a baseline,
+                                    # then each enabled alone, with the arrival rate actually measured
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the app also answers directly on port 3000,

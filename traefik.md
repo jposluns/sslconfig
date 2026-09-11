@@ -81,18 +81,24 @@ basicAuth is single-factor. For human-facing sites, add MFA with the `forwardAut
 Three middlewares, attached to the router alongside the auth middleware from section 3.
 
 ```yaml
+    # ADD these to the labels you already have. Do not replace that list:
+    # section 2 carries the router rule, entrypoints, certresolver and service
+    # port, and section 3 carries basicauth.users. A labels block without them
+    # breaks routing and authentication.
     labels:
       - traefik.http.middlewares.app-body.buffering.maxRequestBodyBytes=10485760
       - traefik.http.middlewares.app-inflight.inflightreq.amount=10
       - traefik.http.middlewares.app-rate.ratelimit.average=10
       - traefik.http.middlewares.app-rate.ratelimit.burst=20
+      # replace the section 3 middlewares= line with this one
       - traefik.http.routers.app.middlewares=app-auth,app-rate,app-inflight,app-body
 ```
 
 Order matters here. `buffering` reads the request into memory or disk before forwarding it, so it must
 come after the admission controls; placed first, an accepted upload consumes the buffer before
-`ratelimit` or `inflightreq` has considered it. A large `maxRequestBodyBytes` trades memory for
-tolerance either way. `ratelimit` is per source by default, while `inflightreq` caps concurrent
+`ratelimit` or `inflightreq` has considered it. `maxRequestBodyBytes` sets the largest body accepted;
+`memRequestBodyBytes`, which defaults to 1048576, is the separate threshold at which buffering moves
+from memory to disk. Raising the first increases what you will buffer, not where that buffer lives. `ratelimit` is per source by default, while `inflightreq` caps concurrent
 in-flight requests rather than their rate, and its `sourceCriterion` defaults to the request host rather
 than the client, so set it explicitly if you want a per-client cap.
 
@@ -108,11 +114,14 @@ curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-b
                                      # 413. Credentials matter: app-auth is first in the middleware
                                      # chain, so an unauthenticated probe stops at 401 before any limit
                                      # sees the body. A backend with its own limit returns the same
-                                     # code, so disable app-body and re-run to attribute it to Traefik
+                                     # code, so attributing the refusal needs an isolated environment
+                                     # with app-body removed
 seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://app.example.com/ | sort | uniq -c
-                                     # 429 must appear. Concurrently, for the same reason as above.
-                                     # inflightreq also returns 429, so this shows one of the two fired,
-                                     # not which; disable one and re-run to tell them apart
+                                     # A 429 appeared. That is all this shows. inflightreq also returns
+                                     # 429, and an upstream under load can too, so this does not
+                                     # establish that ratelimit fired. Attributing it needs an isolated
+                                     # environment with both disabled as a baseline, then each enabled
+                                     # alone, with the arrival rate actually measured
 rm -f /tmp/under.bin /tmp/over.bin
 docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
 ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. The TLS and auth

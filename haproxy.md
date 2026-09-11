@@ -65,20 +65,22 @@ the maximum per-process concurrent connections and in a frontend caps that front
 
 HAProxy has **no single request-body-size directive**. The rule below uses the `req.body_size` fetch,
 which the manual defines as the *advertised* length of the body, so for a request carrying
-`Content-Length` it reads that value. Two limits are worth knowing. `option http-buffer-request` makes
-HAProxy wait for the complete body, or for a full request buffer, before the frontend rules run, so this
-does not refuse at the headers and the upload is buffered before it is rejected. And a chunked request
-advertises no length at all, so the fetch falls back to what is available and `tune.bufsize` bounds it.
-Enforce the real limit at the application and treat this as a front-door guard against the common case.
+`Content-Length` it reads that value and refuses before the body arrives. Two limits are worth knowing.
+It needs no request buffering; do not add `option http-buffer-request` for it, because the manual says
+that option waits until either the whole body is received or the request buffer is full, which buffers
+the upload you are trying to refuse. And for a chunked request, which advertises no length, the manual
+says the fetch returns the size of the available data instead, which without buffering is only what has
+arrived so far, so this rule does not meaningfully bound a chunked upload. Enforce the real limit at the
+application and treat this as a front-door guard against the common case.
 
 ```haproxy
-global
-    maxconn 4096
+# add to the existing global section
+maxconn 4096
 
-frontend web
-    maxconn 2000
-    option  http-buffer-request
-    http-request deny deny_status 413 if { req.body_size gt 10485760 }
+# add to `frontend web` from section 1. Do not paste a new frontend: that one
+# carries bind, the HTTPS redirect, the HSTS header and default_backend.
+maxconn 2000
+http-request deny deny_status 413 if { req.body_size gt 10485760 }
 ```
 
 ## 4. Verify
@@ -93,8 +95,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-b
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://example.com/
                                     # 413. req.body_size reads the advertised Content-Length, which curl
                                     # sets here. A chunked upload advertises none and is not covered.
-                                    # A backend limit returns the same code, so remove the http-request
-                                    # deny line and re-run to attribute the refusal to HAProxy
+                                    # A backend limit returns the same code, so attributing the refusal
+                                    # needs an isolated environment with the http-request deny line
+                                    # removed
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the backend also answers directly on port 3000,

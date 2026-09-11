@@ -74,18 +74,15 @@ not a Caddyfile directive, and rate limiting requires the community `caddy-ratel
 with xcaddy, or a layer in front of Caddy. Do not assume a stock Caddy is rate limited, and do not
 follow a `rate_limit` example without checking that your binary has that module.
 
-Add `request_body` to the site block you already have. Do not replace that block with this one: the
-`basic_auth` directive from section 3 lives there, and a site block without it is a public route.
+Add `request_body` to the site block you already have, rather than pasting a fresh one: the `basic_auth`
+directive from section 3 lives in that block, and a site block without it is a public route.
 
 ```caddy
-app.example.com {
-    basic_auth {                                 # keep the section 3 directive
-        admin $2a$14$REPLACE_WITH_HASH_FROM_caddy_hash-password
-    }
-    request_body {
-        max_size 10MB
-    }
-    reverse_proxy 127.0.0.1:3000
+# add to the existing app.example.com site block from sections 1 and 3.
+# Do not replace that block: basic_auth lives there, and a site block
+# without it is a public route.
+request_body {
+    max_size 10MB
 }
 ```
 
@@ -101,11 +98,13 @@ head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://app.example.com/
                                      # positive control: under the limit, must NOT be 413
 curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
-                                     # 413. Supply credentials: this site's authentication runs before
-                                     # the body handler, so an unauthenticated probe returns 401 and
-                                     # tells you nothing about max_size. A backend with its own limit
-                                     # returns the same code, so remove request_body and re-run to
-                                     # attribute the refusal to Caddy
+                                     # 413. Supply credentials: an unauthenticated probe returns 401 and
+                                     # tells you nothing about max_size. Caddy's default order puts
+                                     # request_body ahead of basic_auth, but the limit is enforced when a
+                                     # later handler reads past it, and authentication stops the proxy
+                                     # handler reading at all. A backend with its own limit returns the
+                                     # same code, so attributing the refusal needs an isolated
+                                     # environment with request_body removed
 rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which
