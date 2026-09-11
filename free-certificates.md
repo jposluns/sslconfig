@@ -73,6 +73,10 @@ Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day sho
 
 Let's Encrypt enforces per-domain issuance limits. Test against the staging environment (`certbot --staging` or `--test-cert`) until the configuration works, then issue the real certificate. Current limits: https://letsencrypt.org/docs/rate-limits/
 
+## CAA records
+
+A CAA DNS record restricts which certificate authorities may issue for your domain, limiting mis-issuance. Set it to the CA you use, for example `example.com. CAA 0 issue "letsencrypt.org"` for Let's Encrypt. Certificate-transparency monitoring detects mis-issuance after the fact; CAA constrains it beforehand, so treat the two as complementary, not as alternatives.
+
 ## Alternatives
 
 - **ZeroSSL**: free certificates over ACME. Some clients need External Account Binding (EAB) credentials from the ZeroSSL dashboard; the acme.sh client registers with ZeroSSL by default.
@@ -100,3 +104,4 @@ A certificate alone does not protect anything: continue with the server guide fo
 - Let's Encrypt certificate lifetimes: https://letsencrypt.org/docs/cert-lifetimes/
 - Let's Encrypt lifetime reduction schedule: https://letsencrypt.org/2025/12/02/from-90-to-45
 - Let's Encrypt OCSP end of life: https://letsencrypt.org/2025/08/06/ocsp-service-has-reached-end-of-life
+- Let's Encrypt CAA requirements: https://letsencrypt.org/docs/caa/

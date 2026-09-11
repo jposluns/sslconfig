@@ -6,20 +6,20 @@ set -euo pipefail
 out="site/llms-full.txt"
 files=(
   README.md
-  free-certificates.md self-signed.md cloudflare.md tailscale.md
+  free-certificates.md self-signed.md cloudflare.md tailscale.md tunnels.md
   authentication.md mfa.md secrets.md
-  identity-providers.md oidc-integration.md cloud-identity-proxies.md machine-auth.md
+  identity-providers.md oidc-integration.md cloud-identity-proxies.md machine-auth.md fronting-auth.md
   apache.md nginx.md lighttpd.md caddy.md haproxy.md traefik.md
-  nodejs.md python.md docker.md kubernetes.md
+  nodejs.md python.md docker.md kubernetes.md frontend-frameworks.md container-hardening.md
   nextjs.md go.md dotnet.md java.md php.md ruby.md
-  host.md cloud-firewalls.md paas.md
+  host.md cloud-firewalls.md paas.md egress-metadata.md gpu-clouds.md deployment-lifecycle.md
   postgresql.md mysql.md mongodb.md redis.md elasticsearch.md minio.md
   rabbitmq.md mosquitto.md
-  kafka.md clickhouse.md neo4j.md memcached.md object-storage.md
+  kafka.md clickhouse.md neo4j.md memcached.md object-storage.md nats.md search-engines.md sqlite.md surrealdb.md
   jupyter.md ollama.md open-webui.md litellm.md model-servers.md
   gradio.md streamlit.md n8n.md code-server.md
-  vector-databases.md mcp-servers.md ray.md mlflow.md agent-builders.md
-  admin-uis.md devops-uis.md cors.md headers.md firebase-supabase.md common-mistakes.md
+  vector-databases.md mcp-servers.md ray.md mlflow.md agent-builders.md image-gen-uis.md chat-uis.md llm-observability.md workflow-orchestrators.md
+  admin-uis.md devops-uis.md cors.md headers.md firebase-supabase.md web-exposure.md realtime-webhooks.md bi-dashboards.md pocketbase.md common-mistakes.md
 )
 
 {

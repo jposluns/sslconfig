@@ -68,6 +68,30 @@ export DOCKER_HOST=tcp://$HOST:2376 DOCKER_TLS_VERIFY=1 DOCKER_CERT_PATH=~/.dock
 
 Without `--tlsverify` the daemon does not check client certificates. Firewall 2376 to the operator addresses even with TLS ([docker.md](docker.md)).
 
+## Dozzle
+
+- Dozzle reads the Docker socket to show logs, the same host-level access the Docker API section above describes ([docker.md](docker.md)); a Dozzle login is a login to the host.
+- Authentication is off unless configured. Set `DOZZLE_AUTH_PROVIDER=simple` with a generated `users.yml` (`docker run -it --rm amir20/dozzle generate <username> --password <password>`), or `DOZZLE_AUTH_PROVIDER=forward-proxy` to delegate login to a fronting proxy such as Authelia, Authentik, or Cloudflare Access.
+- Container actions (start, stop, recreate) and shell access into a running container can be turned on; leave both off unless a specific workflow needs them, since either turns a log viewer into remote command execution on the host.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer, like every panel above.
+
+## Docker Registry (`registry:2`)
+
+- The reference registry image ships with no authentication at all: anyone who reaches the port can push and pull every image, and TLS must be configured before any authentication scheme works, since credentials would otherwise cross the wire in clear text.
+- Put a proxy in front with htpasswd basic authentication (bcrypt only; `htpasswd -B`, since the registry rejects any other hash format) or a token server, or run a registry distribution that has its own authentication built in.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer.
+
+## Filebrowser
+
+- Ships with a default administrator account created on first run (historically `admin`/`admin`; some current packagings instead default to or auto-generate `admin`/`admin123`, shown once). Change it immediately, before the instance is reachable by anyone else. The project's own repository (archived, unmaintained as of August 2026) says not to expose it directly to the internet.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer; never publish a file-serving admin panel.
+
+## Node-RED
+
+- The editor and admin API on `1880` have no authentication at all by default; anyone who reaches the port can view, deploy, and modify flows.
+- Set `adminAuth` in `settings.js` with bcrypt-hashed user passwords (`node-red admin hash-pw` generates the hash), and set `credentialSecret` to a value you control, since Node-RED otherwise generates one for you and stored credentials are only as protected as that secret.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer; the editor is equivalent to a shell on whatever the flows can reach.
+
 ## Verify
 
 ```bash
@@ -93,3 +117,7 @@ From outside the network, every panel URL is unreachable or shows a login; a pag
 - Gitea config cheat sheet and MFA: https://docs.gitea.com/administration/config-cheat-sheet and https://docs.gitea.com/usage/user-setting/multi-factor-authentication/
 - Uptime Kuma README and reverse proxy wiki: https://github.com/louislam/uptime-kuma and https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy
 - Docker: protect the daemon socket https://docs.docker.com/engine/security/protect-access/ and remote access https://docs.docker.com/engine/daemon/remote-access/
+- Dozzle authentication (DOZZLE_AUTH_PROVIDER, users.yml, actions and shell): https://dozzle.dev/guide/authentication
+- Docker Registry deployment (default authentication, TLS requirement): https://distribution.github.io/distribution/about/deploying/
+- Filebrowser: https://filebrowser.org/
+- Node-RED securing the runtime (adminAuth, credentialSecret): https://nodered.org/docs/user-guide/runtime/securing-node-red

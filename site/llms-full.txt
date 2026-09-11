@@ -26,7 +26,7 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
    - No domain at all: use [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
    - Internal or development use only: use [self-signed.md](self-signed.md).
 3. Apply the guide that matches the stack (index below). If the stack has no guide, place it behind a reverse proxy configured per [nginx.md](nginx.md) or [caddy.md](caddy.md) and keep the application itself on loopback.
-4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md).
+4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md). A tool with no native login goes behind a login layer per [fronting-auth.md](fronting-auth.md).
 5. When login comes from a provider (Google, Microsoft Entra, GitHub, Okta, or a hosted customer-identity service), check the returned identity against an allowlist (tenant, domain, group, or users) before granting access; a successful login is not authorisation. Choose the provider per [identity-providers.md](identity-providers.md) and wire it per [oidc-integration.md](oidc-integration.md), or place login in front of the app per [cloud-identity-proxies.md](cloud-identity-proxies.md).
 6. Redirect HTTP to HTTPS, or do not listen on HTTP at all.
 7. Run the verification checklist below before reporting the work as complete. Report any item you could not test instead of asserting that it passed.
@@ -54,12 +54,14 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [nodejs.md](nodejs.md) | Node.js and Express: HTTPS server, security headers, sessions, password hashing |
 | [python.md](python.md) | Flask, FastAPI/Uvicorn, Gunicorn, Django: TLS options and secure settings |
 | [nextjs.md](nextjs.md) | Next.js: sessions, Route Handlers, Server Actions, Auth.js and Better Auth, Vercel |
+| [frontend-frameworks.md](frontend-frameworks.md) | SvelteKit, Nuxt, Vite: server-route auth, sessions, public-env prefixes |
 | [go.md](go.md) | Go net/http: TLS, proxy layout, bcrypt, cookies, client TLS discipline |
 | [dotnet.md](dotnet.md) | ASP.NET Core and Kestrel: HTTPS, HSTS, forwarded headers, Identity, cookies |
 | [java.md](java.md) | Spring Boot: server.ssl, forwarded headers, Spring Security, session cookies |
 | [php.md](php.md) | PHP and Laravel: password_hash, session cookies, trusted proxies, forced HTTPS |
 | [ruby.md](ruby.md) | Rails and Puma: force_ssl, trusted proxies, has_secure_password, credentials |
 | [docker.md](docker.md) | Docker and Compose: safe port publishing, the UFW bypass problem, TLS termination |
+| [container-hardening.md](container-hardening.md) | Non-root, dropped capabilities, read-only root, network segmentation |
 | [postgresql.md](postgresql.md) | PostgreSQL: server TLS, SCRAM authentication, pg_hba rules, verified client connections |
 | [mysql.md](mysql.md) | MySQL and MariaDB: required TLS transport, per-user TLS, modern auth plugins |
 | [mongodb.md](mongodb.md) | MongoDB: requireTLS, authorization, admin user creation, bind address |
@@ -69,11 +71,16 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [gradio.md](gradio.md) | Gradio: launch() auth and TLS parameters, share link risks |
 | [streamlit.md](streamlit.md) | Streamlit: TLS options, native OIDC login, reverse proxy deployment |
 | [tailscale.md](tailscale.md) | Tailscale serve (tailnet-only) and funnel (public) with automatic TLS |
+| [tunnels.md](tunnels.md) | frp and WireGuard, self-hosted tunnels when there is no public IP |
 | [host.md](host.md) | Host baseline: SSH hardening, firewall default-deny, brute-force protection, updates |
 | [secrets.md](secrets.md) | Secrets: repository hygiene, scanning, rotation after a leak, sops/age |
 | [machine-auth.md](machine-auth.md) | Machine identity: API keys, client credentials, mutual TLS, workload identity federation, secret managers |
+| [fronting-auth.md](fronting-auth.md) | oauth2-proxy, Authelia, Pomerium: login and MFA in front of an app that has none |
 | [cloud-firewalls.md](cloud-firewalls.md) | Security groups and VPC rules: no 0.0.0.0/0 on databases, SSH posture |
 | [paas.md](paas.md) | Render, Fly.io, Vercel, and similar: platform TLS, your auth and secrets |
+| [egress-metadata.md](egress-metadata.md) | Egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials |
+| [gpu-clouds.md](gpu-clouds.md) | RunPod, Vast.ai, Lambda, Modal: rented GPUs have no default-deny firewall |
+| [deployment-lifecycle.md](deployment-lifecycle.md) | Verify from outside, safe first-run order, previews, and teardown |
 | [kubernetes.md](kubernetes.md) | Gateway API with a maintained controller, cert-manager TLS, entry-point authentication; ingress-nginx is retired |
 | [elasticsearch.md](elasticsearch.md) | Elasticsearch and OpenSearch: keep the built-in security on |
 | [minio.md](minio.md) | MinIO: root credentials, certs directory TLS, scoped access keys |
@@ -83,6 +90,10 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [clickhouse.md](clickhouse.md) | ClickHouse: user passwords, secure ports, network restrictions |
 | [neo4j.md](neo4j.md) | Neo4j: initial password, Bolt and HTTPS TLS, auth stays on |
 | [memcached.md](memcached.md) | Memcached: no auth by default; loopback, SASL and TLS where built in |
+| [nats.md](nats.md) | NATS and JetStream, auth, TLS, and the unauthenticated monitoring port |
+| [search-engines.md](search-engines.md) | Meilisearch and Typesense, master key, scoped search keys, production mode |
+| [sqlite.md](sqlite.md) | SQLite in deployment, the file is the exposure; Turso tokens; Litestream |
+| [surrealdb.md](surrealdb.md) | SurrealDB, root credentials, bind address, access levels, TLS |
 | [open-webui.md](open-webui.md) | Open WebUI: signup control, pending role, fronting TLS |
 | [litellm.md](litellm.md) | LiteLLM proxy: master key, per-app virtual keys |
 | [model-servers.md](model-servers.md) | llama.cpp, vLLM, TGI, SGLang, Triton, LM Studio: loopback, API keys, TLS in front |
@@ -93,12 +104,20 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [agent-builders.md](agent-builders.md) | Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS |
 | [n8n.md](n8n.md) | n8n: listen address, native TLS, owner setup, MFA enforcement |
 | [code-server.md](code-server.md) | code-server: SSH forwarding first, password auth, TLS |
+| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: no native auth; loopback and a proxy |
+| [chat-uis.md](chat-uis.md) | AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login |
+| [llm-observability.md](llm-observability.md) | Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys |
+| [workflow-orchestrators.md](workflow-orchestrators.md) | Prefect, Dagster, Airflow, Temporal, Flower: no auth by default |
 | [admin-uis.md](admin-uis.md) | phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus: never public |
 | [devops-uis.md](devops-uis.md) | Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public |
+| [bi-dashboards.md](bi-dashboards.md) | Metabase, Superset, Redash: never public; least-privilege database user |
+| [pocketbase.md](pocketbase.md) | PocketBase and Appwrite: the rules are the security; lock the admin console |
 | [object-storage.md](object-storage.md) | S3, R2, GCS, Azure Blob, Supabase Storage: private by default, scoped credentials, signed URLs |
 | [firebase-supabase.md](firebase-supabase.md) | Firebase rules and Supabase RLS: the rules are the security |
 | [cors.md](cors.md) | CORS: exact origins, never * with credentials |
 | [headers.md](headers.md) | Security headers: HSTS, CSP, and companions for your app |
+| [web-exposure.md](web-exposure.md) | Files a web server must never serve: dotfiles, .git, dumps, client secrets |
+| [realtime-webhooks.md](realtime-webhooks.md) | WebSocket, SSE, and webhook authentication |
 | [common-mistakes.md](common-mistakes.md) | The recurring findings, each linked to its fix |
 
 ## Decision guide
@@ -108,6 +127,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 - App on a home server or behind NAT, with a domain you can put on Cloudflare: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. With no domain at all: [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
 - Internal tool, staging, or local development: [self-signed.md](self-signed.md), with authentication still enabled.
 - Databases and model servers (PostgreSQL, MySQL, MongoDB, Redis, Ollama): keep them off public interfaces entirely where possible; the per-tool guides cover TLS and authentication for the cases where network exposure is unavoidable.
+- Tool with no native authentication: put it behind a login layer per [fronting-auth.md](fronting-auth.md).
 
 ## Verification checklist
 
@@ -122,6 +142,7 @@ Run these after configuration. All must pass before the service is considered pr
 7. Renewal is automated where ACME is used: `sudo certbot renew --dry-run` passes, or the server (Caddy, Traefik) manages renewal itself.
 8. Public endpoints have been scanned with the [Qualys SSL Labs test](https://www.ssllabs.com/ssltest/) or [testssl.sh](https://github.com/drwetter/testssl.sh).
 9. Human-facing logins carry a second factor where the stack supports one; [mfa.md](mfa.md) lists the options, and the per-tool guides state what is viable.
+10. Probe from outside the deployment network (a second host, or check your public IP on Shodan or Censys): cloud-firewall and Docker-publishing mistakes only show from outside. See [deployment-lifecycle.md](deployment-lifecycle.md).
 
 ## Scope and currency
 
@@ -212,6 +233,10 @@ Lifetimes are getting shorter. Per Let's Encrypt as of September 2026: 6-day sho
 
 Let's Encrypt enforces per-domain issuance limits. Test against the staging environment (`certbot --staging` or `--test-cert`) until the configuration works, then issue the real certificate. Current limits: https://letsencrypt.org/docs/rate-limits/
 
+## CAA records
+
+A CAA DNS record restricts which certificate authorities may issue for your domain, limiting mis-issuance. Set it to the CA you use, for example `example.com. CAA 0 issue "letsencrypt.org"` for Let's Encrypt. Certificate-transparency monitoring detects mis-issuance after the fact; CAA constrains it beforehand, so treat the two as complementary, not as alternatives.
+
 ## Alternatives
 
 - **ZeroSSL**: free certificates over ACME. Some clients need External Account Binding (EAB) credentials from the ZeroSSL dashboard; the acme.sh client registers with ZeroSSL by default.
@@ -239,6 +264,7 @@ A certificate alone does not protect anything: continue with the server guide fo
 - Let's Encrypt certificate lifetimes: https://letsencrypt.org/docs/cert-lifetimes/
 - Let's Encrypt lifetime reduction schedule: https://letsencrypt.org/2025/12/02/from-90-to-45
 - Let's Encrypt OCSP end of life: https://letsencrypt.org/2025/08/06/ocsp-service-has-reached-end-of-life
+- Let's Encrypt CAA requirements: https://letsencrypt.org/docs/caa/
 
 ======================================================================
 ==> self-signed.md
@@ -468,6 +494,74 @@ curl -sI https://<machine>.<tailnet>.ts.net/     # from a tailnet device: works
 - Tailscale funnel: https://tailscale.com/kb/1223/funnel
 
 ======================================================================
+==> tunnels.md
+======================================================================
+
+# Self-hosted tunnels: frp and WireGuard
+
+Both expose a private host to the internet without a public IP, the same job [cloudflare.md](cloudflare.md) and [tailscale.md](tailscale.md) do, but with no vendor edge: you run and secure both ends yourself, on a host still hardened per [host.md](host.md). frp with a weak or absent token lets anyone bind proxies through your server; WireGuard has no login at all, only key pairs and the traffic scoping you configure.
+
+## frp
+
+`frps` (the server) listens for client connections on `bindPort`, default `7000`. Authentication is token-based by default: set the identical `auth.token` in `frps.toml` and every `frpc.toml`, since "client needs to set the same value to pass authentication":
+
+```toml
+# frps.toml
+bindPort = 7000
+auth.token = "REPLACE_WITH_LONG_RANDOM_VALUE"
+```
+
+```toml
+# frpc.toml
+serverAddr = "203.0.113.10"
+serverPort = 7000
+auth.token = "REPLACE_WITH_LONG_RANDOM_VALUE"
+```
+
+frp also supports `auth.method = "oidc"`, authenticating both sides against an OIDC provider's Client Credentials Grant instead of a shared token, useful for centralizing frp auth behind an identity provider.
+
+Enable TLS between `frpc` and `frps` and set `tls.force = true` on the server so it only accepts TLS-enabled client connections; without it, the token and all tunneled traffic cross the network in the clear.
+
+The `auth` block is schema-optional, and the frp documentation does not state what a server does when it is left out entirely. Treat an unconfigured token as an open door rather than assuming a safe default: always set `auth.token` (or OIDC) before exposing `bindPort` to the internet, and never rely on frp for anything without one.
+
+## WireGuard
+
+WireGuard has no username or password; identity is a base64-encoded key pair, generated per peer:
+
+```bash
+wg genkey | tee privatekey | wg pubkey > publickey
+```
+
+The private key never leaves the peer that generated it; only the public key goes into the other side's configuration. A peer is added to an interface with its public key, an endpoint, and `AllowedIPs`:
+
+```bash
+wg set wg0 listen-port 51820 private-key /path/to/private-key peer "REPLACE_WITH_PEER_PUBLIC_KEY" allowed-ips 192.168.88.0/24 endpoint 203.0.113.10:51820
+```
+
+`AllowedIPs` is dual-purpose "Cryptokey Routing": on the sending side it "behaves as a sort of routing table," picking which peer a destination IP goes to; on the receiving side it "behaves as a sort of access control list," dropping a decrypted packet whose source IP does not match that peer's `AllowedIPs`. Scope it to exactly the address or subnet a peer should reach or be reached from, never `0.0.0.0/0` unless that peer is genuinely meant to be a full-tunnel gateway.
+
+By default WireGuard "tries to be as silent as possible when not being used," so the only inbound port a firewall needs to open is the single WireGuard UDP `ListenPort`; everything else on the host stays closed per [host.md](host.md).
+
+## Verify
+
+```bash
+# frp: a client with the wrong token is rejected, not connected
+frpc -c frpc-wrongtoken.toml   # expect an authentication failure, no proxy registered
+
+ss -ulnp | grep 51820          # WireGuard: only the one UDP port listening
+sudo ufw status verbose        # no other inbound rule added for the tunneled service
+ping -c1 203.0.113.20   # from that peer, an address outside its AllowedIPs: unreachable
+```
+
+## Sources (checked September 2026)
+
+- frp documentation (setup, server reference): https://gofrp.org/en/docs/
+- frp server configuration reference (`bindPort`, `auth.token`, `tls.force`): https://gofrp.org/en/docs/reference/server-configures/
+- frp authentication (`auth.token`, `auth.method = "oidc"`): https://gofrp.org/en/docs/features/common/authentication/
+- WireGuard quickstart (`wg genkey`, `wg pubkey`, `wg set`, silent-protocol behavior): https://www.wireguard.com/quickstart/
+- WireGuard Cryptokey Routing (`AllowedIPs` on send and receive): https://www.wireguard.com/
+
+======================================================================
 ==> authentication.md
 ======================================================================
 
@@ -493,13 +587,14 @@ TLS without authentication leaves a service open to the whole internet over an e
 6. **Prefer SSO/OIDC over local accounts** where the product supports it, and enable MFA wherever available. [Cloudflare Access](cloudflare.md) puts SSO or one-time-PIN login in front of any web app without changing the app. Where no native MFA exists, add it with an identity layer, an app-level TOTP library, or a hosted service, per [mfa.md](mfa.md).
 7. **Scope machine access.** API clients get their own tokens with the least privilege the task needs, not an admin password. Support and exercise rotation; set expiry where the platform allows it.
 8. **Harden sessions.** Set cookies `Secure`, `HttpOnly`, and `SameSite` (`Lax` or `Strict`), sign them with a strong random secret, and expire them. Invalidate sessions on password change.
-9. **Rate-limit authentication endpoints** and lock or delay after repeated failures. Log authentication successes and failures with source address and account, and keep the logs long enough to investigate an incident. fail2ban is a low-effort control for SSH and login panels on Linux hosts.
+9. **Rate-limit authentication endpoints** and lock or delay after repeated failures. Log authentication successes and failures with source address and account, and keep the logs long enough to investigate an incident. fail2ban is a low-effort control for SSH and login panels on Linux hosts. Bound expensive endpoints too: inference, uploads, and job submission need request-size, concurrency, and timeout limits in addition to per-client rate limits, because an exposed AI endpoint left without them can burn GPU time and money even while correctly rejecting bad credentials, a failure mode known as denial of wallet. [realtime-webhooks.md](realtime-webhooks.md) covers the streaming and webhook transports these limits also apply to.
 10. **Least privilege everywhere.** Separate admin from daily-use accounts, and give database and OS service accounts only the rights the application uses.
 11. **Federated login is authentication, not authorisation.** After Google, Microsoft, GitHub, or any provider returns an identity, check it against an allowlist (tenant, hosted domain from the verified token claim, organisation or group membership, or explicit users) before granting access. Any Google account is not "staff", and Microsoft's multi-tenant `common` endpoint admits every Microsoft account unless the app validates the issuer and tenant. [oidc-integration.md](oidc-integration.md) has the checks; [identity-providers.md](identity-providers.md) has the providers.
 12. **OIDC and OAuth hygiene.** Authorization code flow with PKCE; exact-match redirect URIs; `state` and `nonce` verified; ID tokens validated for signature (keys from the provider's JWKS, algorithm pinned, never `none`), issuer, audience, and expiry; short-lived access tokens with refresh-token rotation; tokens never in URLs. Prefer a server-side session in an `HttpOnly` cookie to tokens in browser storage. Link accounts by issuer plus subject, never by email alone.
 13. **Enforce MFA where access is granted, not only where it is enrolled.** A user who enrolled a second factor but can still act with a password-only session is not protected. Require the factor in provider policy or in the app, and test it.
 14. **Protect the control plane.** MFA on the Git host, the cloud account, the DNS registrar, the deployment platform, the secret manager, and the identity provider's administrator account. A takeover there bypasses every control inside the app.
 15. **Authenticate every transport.** WebSockets, server-sent events, GraphQL, gRPC, webhooks (verify the sender's signature and reject replays), inference endpoints, and management APIs each need their own check. A login on the HTML pages protects none of them. Machine credentials follow [machine-auth.md](machine-auth.md).
+16. **Offboard promptly.** When a person leaves, revoke their provider membership, proxy sessions, application sessions, and personal tokens. Know your maximum time-to-revoke for each system where immediate revocation is not available, and treat that number as something to shrink, not a fact to accept. [deployment-lifecycle.md](deployment-lifecycle.md) has the lifecycle checks; [mfa.md](mfa.md) covers revoking the second factor along with the account.
 
 ## Quick checks
 
@@ -579,6 +674,7 @@ Machine protocols (database wire protocols, model-server APIs) have no interacti
 - Repeated wrong codes hit a rate limit or lockout.
 - Submitting the same valid TOTP code a second time within its time step is refused.
 - No TOTP secret or recovery code appears in the repository or its history.
+- A departed user's second factor, active sessions, and app-level access are revoked, not only their password changed. Enforcing MFA is not the end; offboarding belongs in the access lifecycle too, and [deployment-lifecycle.md](deployment-lifecycle.md) has the checklist.
 
 ## Standards and sources (checked September 2026)
 
@@ -846,6 +942,7 @@ An identity-aware proxy puts a login page in front of an application without cha
 2. **The app never trusts a plain identity header.** Where the proxy provides a signed assertion (AWS, Google Cloud, Cloudflare), verify its signature, issuer, audience, and expiry before using any claim. Where the platform documents that clients cannot set the identity headers (Azure), that guarantee holds only for requests that arrived through the platform.
 3. **MFA comes from the identity provider behind the proxy.** None of these proxies adds a second factor of its own; enforce it at the IdP and the proxy inherits it ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)).
 4. Authorization is still yours: the proxy proves who the user is, and the app or the proxy policy decides what they may do ([authentication.md](authentication.md)).
+5. **Fail closed.** An auth layer must deny when it cannot decide: missing auth configuration, an unreachable authorization service, and an unmatched route must never fall through to the app unauthenticated. Test this both at startup and across a proxy reload.
 
 ## 2. AWS Application Load Balancer
 
@@ -920,6 +1017,8 @@ curl -s -H "x-amzn-oidc-identity: admin" \
 ```
 
 After logging in, confirm that the app's own identity check reads the signed assertion (`x-amzn-oidc-data`, `x-goog-iap-jwt-assertion`, `Cf-Access-Jwt-Assertion`) and rejects a request carrying a tampered one.
+
+- With the identity provider or the proxy's own auth service stopped, a request to a protected route is denied, not passed through to the app.
 
 ## Common mistakes
 
@@ -1029,6 +1128,120 @@ API keys, client secrets, and client-certificate keys that cannot be federated a
 - SPIFFE and SPIRE: https://spiffe.io/ and https://spiffe.io/docs/latest/spire-about/
 - RFC 5280 (certificate revocation): https://www.rfc-editor.org/rfc/rfc5280
 - Secret manager vendor pages: linked inline in section 5.
+
+======================================================================
+==> fronting-auth.md
+======================================================================
+
+# Fronting auth: putting login and MFA in front of an app that has none (oauth2-proxy, Authelia, Pomerium)
+
+Many self-hosted apps (internal tools, dashboards, webhook receivers) ship with no login at all. The fix is the same shape every time: the app binds to loopback, a proxy in front does authentication and MFA, and it passes the app a verified identity, which the app must not accept from anywhere else. This guide is what [mfa.md](mfa.md), [nginx.md](nginx.md), [traefik.md](traefik.md), and [caddy.md](caddy.md) point at.
+
+## 1. The pattern
+
+1. **Bind the app to loopback**, `127.0.0.1`, never `0.0.0.0` or `::`. If the app also answers directly, the login page in front of it is decorative.
+2. **A proxy authenticates first**: oauth2-proxy, Authelia, or Pomerium checks the session before the request reaches the app; an unauthenticated request never gets there.
+3. **The proxy passes identity in a header** (`X-Auth-Request-User`, `Remote-User`, and similar); the app reads the header instead of running its own login.
+4. **The app must reject a client-supplied identity header.** Network isolation, only the proxy can reach the app, is the baseline; without it, anyone who reaches the app's port can set `X-Auth-Request-User: admin` directly. The managed-cloud version of this same bypass risk is in [cloud-identity-proxies.md](cloud-identity-proxies.md).
+
+## 2. oauth2-proxy: auth in front of an OIDC/OAuth2 provider
+
+Core flags (env vars use the `OAUTH2_PROXY_` prefix): `--provider` (`oidc`, `google`, `github`, and others), `--client-id`/`--client-secret` from the IdP, `--email-domain` (a domain, or `*` for any authenticated user), `--upstream` (the app address, or `static://202` when a forward-auth proxy handles the actual proxying), and `--cookie-secret`, which must be exactly 16, 24, or 32 bytes, optionally base64-encoded: `openssl rand -base64 32 | tr -- '+/' '-_'`.
+
+nginx uses `auth_request`:
+
+```nginx
+location / {
+    auth_request /oauth2/auth;
+    error_page 401 = @oauth2_signin;
+    auth_request_set $user $upstream_http_x_auth_request_user;
+    proxy_set_header X-User $user;
+    proxy_pass http://127.0.0.1:3000;
+}
+location @oauth2_signin {
+    return 302 /oauth2/sign_in?rd=$scheme://$host$request_uri;
+}
+```
+
+Traefik uses a `forwardAuth` middleware at oauth2-proxy's `/oauth2/auth`, with `--upstream=static://202` and `--reverse-proxy=true` set on oauth2-proxy:
+
+```yaml
+http:
+  middlewares:
+    oauth-auth:
+      forwardAuth:
+        address: "http://oauth2-proxy:4180/oauth2/auth"
+        trustForwardHeader: true
+        authResponseHeaders: [X-Auth-Request-Access-Token, Authorization]
+```
+
+## 3. Authelia: a portal that does the second factor
+
+Authelia is a login portal with built-in TOTP and WebAuthn, sitting behind the proxy rather than replacing it. Per its support page, nginx, Traefik, Caddy (2.5.1+), HAProxy (via a Lua module), Envoy, Skipper, NGINX Proxy Manager, and SWAG are supported; Apache and IIS are documented as having no compatible module and are not supported.
+
+nginx calls a dedicated `auth-request` endpoint (its `auth_request` module cannot forward the method and body the way the others' forward-auth middlewares do):
+
+```nginx
+auth_request /internal/authelia/authz;      # proxies to http://authelia:9091/api/authz/auth-request
+auth_request_set $redirection_url $upstream_http_location;
+error_page 401 =302 $redirection_url;
+```
+
+Traefik and Caddy call `/api/authz/forward-auth` instead:
+
+```yaml
+- traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/authz/forward-auth
+- traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Email,Remote-Name
+```
+
+```caddyfile
+forward_auth authelia:9091 {
+    uri /api/authz/forward-auth
+    copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+}
+```
+
+Authelia needs its own random session secret and access-control rules (which paths need `one_factor` vs `two_factor`); its second factor is TOTP, WebAuthn/passkeys, or Duo mobile push.
+
+## 4. Pomerium: the proxy is the access layer
+
+Pomerium is an identity-aware proxy rather than a sidecar to nginx: it terminates the connection, authenticates the user, and enforces policy in one process. An IdP goes under `idp_provider`, `idp_provider_url`, `idp_client_id`, and `idp_client_secret`; each app is a route carrying its own `policy` (which users, domains, or claims may reach it), rather than a shared middleware bolted onto an existing proxy. Choose Pomerium over the two above when you want routing, TLS, and access control in one process instead of an auth check layered in front of nginx, Traefik, or Caddy.
+
+## 5. MFA and identity source
+
+oauth2-proxy's MFA is whatever its OIDC/OAuth provider enforces; Pomerium's is whatever its `idp_provider` enforces; only Authelia enforces a second factor itself. See [mfa.md](mfa.md) (enrolment is not enforcement) and [identity-providers.md](identity-providers.md) for which hosted providers' tiers include MFA.
+
+## Verify
+
+```bash
+ss -tlnp | grep 3000                          # app on 127.0.0.1 only
+curl -sI http://203.0.113.10:3000/            # from another host: connection refused
+curl -sI https://app.example.com/             # no session: redirected to the sign-in page
+curl -sI -H 'X-Auth-Request-User: admin' https://app.example.com/    # forged header dropped en route
+```
+
+After a real login, confirm the app-side log shows the identity header the proxy set. A forged header sent straight at the app's own bound address must never be treated as authentication; that is why the app must be unreachable except through the proxy.
+
+## Common mistakes
+
+- The app also listens on a public interface next to the proxy, so a direct request skips authentication entirely.
+- The app trusts `X-Auth-Request-User` or `Remote-User` from any caller, not only from the proxy.
+- oauth2-proxy's `--cookie-secret` reused across environments or committed to the repository.
+- Deploying Authelia behind Apache or IIS, which it does not support.
+
+## Sources (checked September 2026)
+
+- oauth2-proxy configuration overview (flags, cookie-secret length): https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview
+- oauth2-proxy nginx integration: https://oauth2-proxy.github.io/oauth2-proxy/configuration/integrations/nginx/
+- oauth2-proxy Traefik integration: https://oauth2-proxy.github.io/oauth2-proxy/configuration/integrations/traefik/
+- Authelia proxy integration introduction: https://www.authelia.com/integration/proxies/introduction/
+- Authelia proxy support matrix (Apache and IIS unsupported): https://www.authelia.com/integration/proxies/support/
+- Authelia nginx integration: https://www.authelia.com/integration/proxies/nginx/
+- Authelia Traefik integration: https://www.authelia.com/integration/proxies/traefik/
+- Authelia Caddy integration: https://www.authelia.com/integration/proxies/caddy/
+- Authelia second-factor introduction: https://www.authelia.com/configuration/second-factor/introduction/
+- Pomerium identity provider settings: https://www.pomerium.com/docs/reference/identity-provider-settings
+- Pomerium documentation: https://www.pomerium.com/docs
 
 ======================================================================
 ==> apache.md
@@ -2023,6 +2236,172 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/   # 401 where
 - Traefik Kubernetes Gateway API provider: https://doc.traefik.io/traefik/reference/install-configuration/providers/kubernetes/kubernetes-gateway/ ; Cilium Gateway API support: https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/
 
 ======================================================================
+==> frontend-frameworks.md
+======================================================================
+
+# Full-stack JS frameworks: SvelteKit, Nuxt, Vite
+
+SvelteKit, Nuxt, and Vite-based apps built by AI assistants inherit the same traps as [nextjs.md](nextjs.md): a server bind that defaults wide open, a proxy that has to be explicitly trusted before secure cookies and correct origins work, and a public-env prefix that ships anything given it straight to the browser. Each framework also has more than one server entry point (endpoints, server routes, load functions), and a check placed in only one of them leaves the others open, exactly as with Next.js layouts versus Server Actions.
+
+## SvelteKit (`adapter-node`)
+
+The built server "will accept connections on `0.0.0.0` using port 3000" by default; override with `HOST` and `PORT`:
+
+```bash
+HOST=127.0.0.1 PORT=3000 node build
+```
+
+Behind a reverse proxy, set `ORIGIN` (for example `ORIGIN=https://app.example.com`) so SvelteKit computes the correct origin for redirects and cookies. `PROTOCOL_HEADER` and `HOST_HEADER` (for example `x-forwarded-proto` and `x-forwarded-host`) let it read the real scheme and host from the proxy; the docs caution to set these only behind a trusted reverse proxy, since an untrusted client could otherwise spoof them. `ADDRESS_HEADER` and `XFF_DEPTH` do the same for the client's real IP.
+
+CSRF: `csrf.checkOrigin` (default `true`) rejects a POST, PUT, PATCH, or DELETE whose `Origin` header does not match, with "Cross-site POST form submissions are forbidden."
+
+Public env: only variables prefixed `PUBLIC_` (`env.publicPrefix`) are "statically injected into your bundle at build time" and reachable from `$env/static/public`; anything else throws if imported from client code. Keep secrets in modules SvelteKit treats as server-only, either `$env/static/private` / `$env/dynamic/private`, a `.server.js` filename, or anything under `$lib/server/` ([secrets.md](secrets.md)); SvelteKit statically traces import chains and fails the build if client code imports one, even through a dynamic `import()`.
+
+None of this gates a request for you: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a proxy-layer redirect alone.
+
+## Nuxt (Nitro server routes)
+
+Files under `server/api/`, `server/routes/`, and `server/middleware/` are auto-registered Nitro handlers exported with `defineEventHandler()`. Nuxt ships no built-in authentication: a middleware handler can attach `event.context.auth`, but every handler that reads it still has to check it itself, since middleware alone does not stop the request:
+
+```ts
+// server/api/admin.ts: the route checks for itself; the middleware only sets event.context.auth
+export default defineEventHandler((event) => {
+  if (!event.context.auth?.user) {
+    event.node.res.statusCode = 401
+    return { message: 'Not authenticated' }
+  }
+})
+```
+
+`runtimeConfig` splits the same way as Next's env prefix: keys directly on `runtimeConfig` are "only available within server-side"; keys under `runtimeConfig.public` are "also exposed to the client-side." Environment variables override both, using an uppercase `NUXT_` prefix with underscores between key segments: private keys just need `NUXT_` (for example `NUXT_API_SECRET`), public keys need `NUXT_PUBLIC_` (for example `NUXT_PUBLIC_API_BASE`). The docs warn not to "expose runtime config keys to the client-side by either rendering them or passing them to `useState`" even when they are private on the server.
+
+## Vite (dev and preview servers)
+
+Both are development tooling, not a production server: the `vite preview` docs say plainly "do not use this as a production server as it's not designed for it." Deploy the built `dist/` behind a real server, CDN, or your platform's hosting per [paas.md](paas.md) instead.
+
+`server.host` defaults to `'localhost'`; setting it to `true` or `0.0.0.0` makes the dev server listen on all addresses, including the LAN, which is fine for testing from a phone on a trusted network but should not be left on elsewhere. `server.allowedHosts` defaults to `[]`, which still auto-permits localhost, `.localhost`, and IP addresses; setting it to `true` disables the check entirely, and the docs warn this "allows any website to send requests to your dev server and download your source code and content" (DNS rebinding). Prefer an explicit hostname allowlist over `true`.
+
+## Verify
+
+```bash
+curl -si https://app.example.com/api/private | head -1   # 401 with no session cookie, on all three frameworks
+grep -rl "REPLACE_WITH_LONG_RANDOM_VALUE" build dist .output 2>/dev/null   # no output: no private value in the client build
+curl -si https://app.example.com/ -H "Host: evil.example.com" | head -1   # a spoofed Host is not trusted
+```
+
+Behind a reverse proxy, confirm cookies still carry `Secure` and redirects use an `https://` `Location` once `ORIGIN` (SvelteKit) or `NUXT_PUBLIC_` (Nuxt) values are set; without them, the app often builds an `http://` URL even though the browser connection is TLS.
+
+## Common mistakes
+
+- Checking auth only in a SvelteKit `hooks.server.js` redirect or a Nuxt `server/middleware/`, while the `+server.js` endpoint or `server/api/` route trusts that it already happened.
+- Leaving `server.allowedHosts` at `true`, or `server.host` wide open, past a local demo.
+- Naming a secret `PUBLIC_...` or `NUXT_PUBLIC_...` out of habit from a genuinely public value.
+
+## Sources (checked September 2026)
+
+- SvelteKit adapter-node: https://svelte.dev/docs/kit/adapter-node
+- SvelteKit server-only modules: https://svelte.dev/docs/kit/server-only-modules
+- SvelteKit `$env/static/public`: https://svelte.dev/docs/kit/$env-static-public
+- SvelteKit configuration (`csrf.checkOrigin`, `env.publicPrefix`): https://svelte.dev/docs/kit/configuration
+- Nuxt runtime config: https://nuxt.com/docs/4.x/guide/going-further/runtime-config
+- Nuxt server directory structure: https://nuxt.com/docs/4.x/directory-structure/server
+- Vite server options (`server.host`, `server.allowedHosts`): https://vite.dev/config/server-options
+- Vite CLI (`vite preview`): https://vite.dev/guide/cli
+
+======================================================================
+==> container-hardening.md
+======================================================================
+
+# Containers: non-root, dropped capabilities, read-only root, and network segmentation
+
+A model server, chat UI, or proxy is the thing most likely to face untrusted input, so treat its container as compromised eventually and limit what that gets an attacker: not root, not the host's capabilities, not a writable filesystem, and not a route to the rest of the network.
+
+## Docker and Compose
+
+- **Run as non-root.** `USER <user>[:<group>]` in the Dockerfile sets the default user for later `RUN` instructions and for `ENTRYPOINT`/`CMD` at runtime (per the Dockerfile reference); a user with no primary group runs with the `root` group, so set both. Compose's `user:` overrides that per service; unset in both places, the container runs as root (per the Compose file reference).
+- **Read-only root filesystem.** `read_only: true` on a Compose service creates it with a read-only root filesystem; mount a small `tmpfs` for any path the process must write to.
+- **Drop capabilities.** `cap_drop: [ALL]` removes every Linux capability; add back only the specific one a service needs with `cap_add`.
+- **No privilege escalation.** `security_opt: [no-new-privileges:true]` (the Compose reference treats `no-new-privileges`, `no-new-privileges=true`, and `no-new-privileges:true` as equivalent) stops a `setuid` binary from gaining more privilege than the process already has.
+- **Never mount the Docker socket into a container.** `/var/run/docker.sock` is root-equivalent access to the host; a container holding it can start a privileged sibling and escape.
+
+```yaml
+services:
+  app:
+    build: .
+    user: "10001:10001"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+```
+
+## Kubernetes securityContext
+
+The same controls, per-Pod or per-container, in the Kubernetes securityContext documentation:
+
+```yaml
+spec:
+  containers:
+    - name: app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+        seccompProfile:
+          type: RuntimeDefault
+```
+
+`runAsNonRoot: true` refuses to start the container if its effective user is root; pin `runAsUser` too. `seccompProfile.type: RuntimeDefault` applies the runtime's default syscall filter instead of running unconfined.
+
+Enforce this cluster-wide with Pod Security Admission's `restricted` level, set as the namespace label `pod-security.kubernetes.io/enforce: restricted` (per the Pod Security Standards documentation). `restricted` requires, among its controls: no privileged containers, no host namespaces or host ports, non-root execution, a read-only root filesystem, all capabilities dropped, and a seccomp profile that is not `Unconfined`. A Pod violating any of these is rejected at admission, not merely flagged.
+
+## Network segmentation
+
+A NetworkPolicy is additive and does nothing without an enforcing CNI (per the Kubernetes NetworkPolicy documentation; confirm yours enforces it before relying on this). Start default-deny, then allow only the specific path the app needs:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny-all }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-app-to-db }
+spec:
+  podSelector: { matchLabels: { role: db } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { role: app } } }]
+      ports: [{ protocol: TCP, port: 5432 }]
+```
+
+With both applied, the database pod accepts connections only from pods labeled `role: app` on port 5432; everything else is refused. Databases still need their own TLS and auth on top ([postgresql.md](postgresql.md), [mysql.md](mysql.md), [mongodb.md](mongodb.md), [redis.md](redis.md)); a NetworkPolicy is a layer, not a substitute.
+
+## Verify
+
+```bash
+docker exec app id                                  # uid is not 0
+docker exec app sh -c 'touch /x'                    # read-only fs: fails
+kubectl get pod app -o jsonpath='{.spec.containers[0].securityContext}'
+kubectl run probe --rm -it --image=busybox --restart=Never -- \
+  wget -T 3 -qO- db:5432                             # from outside the allowlist: times out
+```
+
+## Sources (checked September 2026)
+
+- Docker Dockerfile reference (`USER`): https://docs.docker.com/reference/dockerfile/
+- Docker Compose file reference (`user`, `read_only`, `cap_add`, `cap_drop`, `security_opt`): https://docs.docker.com/compose/compose-file/
+- Kubernetes: Configure a security context for a Pod or Container: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+- Kubernetes: Pod Security Standards (`restricted` level, Pod Security Admission labels): https://kubernetes.io/docs/concepts/security/pod-security-standards/
+- Kubernetes: Network Policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+
+======================================================================
 ==> nextjs.md
 ======================================================================
 
@@ -2785,7 +3164,11 @@ Each platform provides environment/secret configuration. Set secrets there; neve
 
 Managed databases from these platforms come with TLS endpoints; require verified TLS in the connection string per the database guides ([postgresql.md](postgresql.md), [mysql.md](mysql.md)) and keep the credentials in the platform's secret store. Databases you run yourself elsewhere follow their own guides plus [cloud-firewalls.md](cloud-firewalls.md).
 
-## 5. Verify
+## 5. Hugging Face Spaces
+
+A new Space is public by default: anyone can view the source and reach the running app. Visibility can be changed to "protected" (the source stays private to the owner and collaborators, but the running app is still public through its embed URL or custom domain) or "private" (both the source and the running app are restricted to the owner and collaborators). Space secrets belong in the Settings tab's secrets store, never in the repository or its README metadata; anything set as a "variable" instead of a "secret" is still publicly readable. Dev Mode opens an SSH and VS Code endpoint straight into the running container, which is materially more access than the app itself, so treat an unattended Dev Mode session the same as any other exposed admin path. For serverless GPU platforms, see [gpu-clouds.md](gpu-clouds.md).
+
+## 6. Verify
 
 ```bash
 curl -sI http://app.example.com/          # platform redirects to https
@@ -2797,6 +3180,226 @@ curl -s  https://app.example.com/api/...  # 401/403 without credentials
 
 - Render: https://render.com/docs ; Fly.io: https://fly.io/docs ; Vercel: https://vercel.com/docs (each documents managed TLS and environment configuration; consult your platform's pages for the exact toggles)
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
+- Hugging Face Spaces: https://huggingface.co/docs/hub/spaces-overview and https://huggingface.co/docs/hub/spaces-config-reference
+
+======================================================================
+==> egress-metadata.md
+======================================================================
+
+# Egress control and cloud metadata: keeping an agent from exfiltrating credentials
+
+An AI agent, RAG fetcher, or webhook handler that retrieves URLs can be steered by a prompt injection into requesting the cloud metadata endpoint or an internal service instead of the URL it was meant to fetch. Making the fetcher refuse that request is application security; this guide covers the deployment-side backstop, metadata hardening so the endpoint rejects an unqualified request, plus default-deny egress so the request never leaves the workload at all.
+
+## AWS: require IMDSv2 and cap the hop limit
+
+The instance metadata service listens on `169.254.169.254`. IMDSv2 requires a session token obtained with a
+`PUT` before any `GET` succeeds, and by default the token's response has a hop limit of 1 at the IP protocol
+level, so a request relayed through a proxy will not reach it. Enforce IMDSv2 and keep the hop limit at 1:
+
+```bash
+aws ec2 modify-instance-metadata-options \
+  --instance-id i-0123456789abcdef0 \
+  --http-tokens required \
+  --http-put-response-hop-limit 1 \
+  --http-endpoint enabled
+```
+
+With `--http-tokens required`, a request without a valid token receives a 401 from the service itself.
+
+## GCP and Azure: a required header, but block the address anyway
+
+GCP's metadata server answers at `metadata.google.internal` or `169.254.169.254` and requires a `Metadata-Flavor: Google` header on every request; Google states the request and response never leave the physical host. Azure's Instance Metadata Service listens at the same non-routable address, `169.254.169.254`, reachable only from within the VM, and requires a `Metadata: true` header, rejecting any request that also carries an `X-Forwarded-For` header. Both header checks stop a naive `curl`, but neither stops a fetch that has been steered into adding the header, so block `169.254.169.254` from workloads that have no legitimate reason to reach it, the same as any other internal address.
+
+## Default-deny egress
+
+- **Cloud firewall / security group egress rules** (the inbound side of the same tools is in
+  [cloud-firewalls.md](cloud-firewalls.md)): default outbound rules on most providers allow everything out;
+  add explicit egress rules that permit only DNS and the specific provider APIs the application calls, and
+  deny the rest.
+- **Kubernetes NetworkPolicy egress**: a pod is unrestricted for egress until a `NetworkPolicy` with `Egress`
+  in its `policyTypes` selects it, after which only listed destinations are reachable. This has no effect
+  unless the cluster's network plugin (CNI) implements `NetworkPolicy`; confirm enforcement before relying
+  on it.
+
+  ```yaml
+  apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    name: agent-egress
+  spec:
+    podSelector: {matchLabels: {app: agent}}
+    policyTypes: [Egress]
+    egress:
+      - to: [{ipBlock: {cidr: 203.0.113.0/24}}]
+        ports: [{protocol: TCP, port: 443}]
+  ```
+- **Docker network isolation**: an internal network has no default route out, and Docker's own firewall
+  rules drop traffic leaving it, while containers on the network still reach each other:
+  `docker network create --internal agent-net`.
+
+## Scope boundary
+
+Steering a fetcher into requesting the metadata address or an internal host is server-side request forgery,
+an application-security defect belonging to the code doing the fetching, not to this guide. IMDSv2, the
+header requirements above, and egress rules are deployment-side controls: they do not prevent the request
+from being attempted, they make the attempt fail.
+
+## Verify
+
+```bash
+# AWS, no token supplied: with --http-tokens required this returns 401
+curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/latest/meta-data/
+# GCP, no Metadata-Flavor header: must fail, must not return metadata
+curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/computeMetadata/v1/instance/
+# Azure, no Metadata: true header: must fail, must not return metadata
+curl -s -o /dev/null -w '%{http_code}\n' 'http://169.254.169.254/metadata/instance?api-version=2025-04-07'
+# from the workload, to a host not on the egress allow list: must fail or time out
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://an-unlisted-host.example.com/ \
+  || echo "blocked or timed out"
+# confirm the metadata options actually took effect
+aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
+  --query 'Reservations[].Instances[].MetadataOptions'
+# expect HttpTokens: required, HttpPutResponseHopLimit: 1
+```
+
+## Sources (checked September 2026)
+
+- AWS EC2 instance metadata service configuration: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
+- AWS CLI `modify-instance-metadata-options`: https://docs.aws.amazon.com/cli/latest/reference/ec2/modify-instance-metadata-options.html
+- GCP metadata server overview: https://cloud.google.com/compute/docs/metadata/overview
+- Azure Instance Metadata Service: https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-service
+- Kubernetes NetworkPolicy: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+- Docker network create (`--internal`): https://docs.docker.com/reference/cli/docker/network/create/
+
+======================================================================
+==> gpu-clouds.md
+======================================================================
+
+# Rented GPUs: RunPod, Vast.ai, Lambda, Modal
+
+Unlike the major clouds, most rented-GPU platforms hand you a box (or a serverless function) without a default-deny firewall in front of it. Whatever port a template or container binds, SSH, a Jupyter notebook, a model server, is reachable the moment it listens, and serverless GPU platforms differ in what counts as public by default. Treat every listener the same way you would on your own hardware: bind it privately or authenticate it, per [ollama.md](ollama.md) and [model-servers.md](model-servers.md).
+
+## RunPod
+
+Exposed HTTP ports (the "Expose HTTP Ports" pod setting) go through RunPod's proxy at `https://[POD_ID]-[INTERNAL_PORT].proxy.runpod.net`; the proxy terminates HTTPS automatically, "All connections are secured with HTTPS, even if your internal service uses HTTP," but the resulting URL is publicly reachable by anyone who has it, so a bare Jupyter server or model API on an exposed HTTP port still needs its own authentication.
+
+Exposed TCP ports get "direct TCP forwarding with a public IP address" instead, and TLS is not automatic there: RunPod's own docs say to "implement TLS in your application when handling sensitive data over TCP." Secure every template listener, including notebooks, before exposing its port; a notebook exposed as raw TCP with no application-level password is fully open.
+
+A "symmetrical port mapping" option lets a template request a specific external port above 70000 so the internal and external port numbers match, with the assignment readable from the pod's environment (for example `$RUNPOD_TCP_PORT_70000`); that is a convenience for the pod's own scripts, not a security boundary, and the port is still public once mapped.
+
+## Vast.ai
+
+Rented instances open ports per launch mode (port 22 for SSH mode, port 22 plus 8080 for Jupyter mode by default); each internal port maps to a random external port on a shared public IP, and once a port is mapped it is reachable from the internet with no firewall step described in Vast.ai's docs.
+
+The Instance Portal fronts web apps on the instance with a reverse proxy (Caddy) when the external and internal ports differ, and secures access with a token rather than a login: "a secure token is appended to the link to prevent unauthorised access to your applications," configured through the `PORTAL_CONFIG` environment variable. Do not strip that token off a shared link, and do not assume an app is private just because it sits behind the portal's port remapping.
+
+## Lambda
+
+Lambda's Public Cloud firewall is deny-by-default for inbound traffic with two exceptions: "By default, Lambda allows only incoming ICMP traffic or TCP traffic on port 22 (SSH)." Everything else, a Jupyter notebook, a model server port, needs an explicit firewall rule (global, workspace-wide rules, or a per-instance ruleset attached at launch); Lambda's own guidance is blunt about the tradeoff: "Each port you open increases the attack surface of your instances."
+
+Opening a rule makes the port reachable from whatever source range you allow, with no authentication of its own, so pair the rule with the listener's native auth or a proxy in front, not the firewall rule alone.
+
+## Modal
+
+Modal's serverless constructs default differently depending on shape. Endpoints and Servers "require authentication by default" and need an explicit `--unauthenticated` flag to go public. Web Functions are the opposite: they are "publicly available by default," and stay that way until the function sets `requires_proxy_auth=True`.
+
+Where proxy auth is enabled, callers authenticate with a Token ID and Token Secret pair, either as separate `Modal-Key` and `Modal-Secret` headers or combined as `Authorization: Bearer <token_id>.<token_secret>` (Modal notes this mirrors "the same scheme the OpenAI API uses"). A protected endpoint called without credentials returns 401 with "missing credentials for proxy authorization." Check which default your construct uses before deploying; do not assume a Web Function is private.
+
+## The pattern, whatever the platform
+
+The platform's own controls (RunPod's proxy TLS, Vast.ai's portal token, Lambda's firewall rules, Modal's proxy auth) are necessary but not sufficient on their own. Keep the model server itself on loopback behind the platform's proxy or firewall, and require the server's own API key on top, exactly as [ollama.md](ollama.md) and [model-servers.md](model-servers.md) describe. A platform-level control that goes away later, a firewall rule deleted, a template rebuilt without a flag, should not be the only thing standing between the listener and the internet.
+
+MFA: none of these platforms add a second factor to the workload itself. The account you log into RunPod, Vast.ai, Lambda, or Modal with should have MFA enabled ([mfa.md](mfa.md)); an API key or proxy-auth token secures a machine client, and is a separate control from your platform login.
+
+## Verify
+
+```bash
+ss -tlnp                                   # enumerate every listening port on the box
+curl -s http://127.0.0.1:8888/             # notebook: 403/redirect without its token in the URL/header
+curl -s https://<pod-or-endpoint-host>/    # 401 without credentials, once auth is configured
+```
+
+Every port `ss` shows listening should be either closed (not exposed at the platform layer) or authenticated (the listener itself demands a key, token, or login). A Jupyter server that answers without its token is a finding, whichever of these platforms it runs on.
+
+## Common mistakes
+
+- Assuming a rented box has a default-deny firewall like a major cloud's security group; most rented-GPU platforms do not.
+- Treating a template's HTTPS proxy URL as proof the underlying service is authenticated; the proxy secures transport, not access.
+- Leaving a Modal Web Function without `requires_proxy_auth=True` because Endpoints and Servers are private by default and it is easy to assume Web Functions are too.
+- Reusing a rented box's platform login (RunPod/Vast.ai/Lambda/Modal account) as if it were the same thing as the workload's own authentication; they are separate controls.
+
+## Sources (checked September 2026)
+
+- RunPod expose ports (proxy HTTPS, TCP forwarding): https://docs.runpod.io/pods/configuration/expose-ports
+- Vast.ai networking and ports (default ports, port mapping): https://docs.vast.ai/documentation/instances/connect/networking
+- Vast.ai Instance Portal (PORTAL_CONFIG, Caddy reverse proxy, secure-token links): https://docs.vast.ai/instance-portal
+- Lambda Cloud firewalls (default-deny inbound, SSH/ICMP exception, rule types): https://docs.lambda.ai/public-cloud/firewalls/
+- Modal proxy auth for web endpoints (Endpoints/Servers vs Web Functions defaults, headers): https://modal.com/docs/guide/webhook-proxy-auth
+
+======================================================================
+==> deployment-lifecycle.md
+======================================================================
+
+# Deploying safely over time: verify from outside, safe order, previews, teardown
+
+This repository's per-service guides check TLS, binding, and authentication from inside the host and at the moment you set them up. Real exposure is judged from outside the host, and it drifts: a preview URL, a restored backup, or an upgrade can reopen something already closed. This guide is the lifecycle layer around the per-service checks.
+
+## 1. Verify from outside, not just from the host
+
+A `curl` or `ss -tlnp` run on the host itself cannot see a firewall the host does not know about, or a platform-level bypass like Docker's iptables rules ([docker.md](docker.md)). Verify from a second network: a phone hotspot, a cloud shell, or a second VM.
+
+- Port-by-port: `for p in 22 80 443 3000 5432 6379 27017; do nc -vz -w 3 203.0.113.10 "$p"; done`, or a full sweep, `nmap -p- 203.0.113.10` (per the nmap reference, which documents `-p-` and `-p 1-65535` as equivalent port-range syntax; only scan hosts you own or are authorized to test).
+- Check every address the service actually has, not just the one you remember configuring: the public IPv4 address, the public IPv6 address if the host has one, and any platform-assigned URL alongside your custom domain (a PaaS default subdomain, per [paas.md](paas.md), often stays reachable even when the custom domain is fronted). A scan of one address that misses the others is not a clean result, it is an incomplete one.
+- Cross-reference what is already indexed about your IP with a passive internet-wide scanner such as Shodan or Censys; both build a continuously updated index of internet-connected hosts and services, so a stale exposure can show up there before you find it yourself ([cloud-firewalls.md](cloud-firewalls.md) covers the firewall rules this is checking).
+
+## 2. Safe initialization order
+
+Sequence a first deployment so nothing is reachable before it is safe to reach:
+
+1. Create the owner or admin account's credentials and any signing secrets (session, JWT, or cookie-signing keys) per [authentication.md](authentication.md).
+2. Set the registration policy (disable open self-registration, or restrict it to an allowlisted domain) before the service is reachable.
+3. Put the fronting gate in place, TLS and any proxy-level authentication, per [free-certificates.md](free-certificates.md) and the fronting-layer guides.
+4. Only then open network access.
+
+The common failure this order prevents: an unclaimed setup wizard is a race to become admin, open to whoever reaches it first. After that, confirm the setup route itself is closed: restart the service and try hitting the initial-setup URL again; it must refuse to mint a second admin, not silently succeed.
+
+## 3. Previews and clones get production posture
+
+A preview deployment or a database clone is not lower stakes just because it is temporary. Vercel's Deployment Protection illustrates the gap: Standard Protection, available on every plan, gates preview and generated deployment URLs but leaves the production domain open by default; protecting production too needs the All Deployments scope (Pro and Enterprise) ([paas.md](paas.md); as of September 2026, per Vercel's Deployment Protection docs). Where the platform's own gate does not cover a hostname, front it the same way as production, for example a Cloudflare Access policy scoped to that preview hostname. Either way, treat a clone's data the same as the original: rotate any credential a clone inherited if the clone is less trusted than the source.
+
+## 4. Teardown: DNS before the app, then revoke the rest
+
+Retiring a deployment in the wrong order leaves a dangling DNS record pointing at a resource someone else can now claim (a subdomain takeover). Delete the DNS record (the `CNAME` or `A`/`AAAA`) before you delete or release the underlying app, load balancer, or IP. Then revoke what pointed at it: access policies (Cloudflare Access or equivalent), API tokens and service credentials scoped to that deployment ([machine-auth.md](machine-auth.md)), and database users created only for it.
+
+## 5. Re-verify after anything changes
+
+Rerun the outside-in checks in section 1 and the negative auth tests from [authentication.md](authentication.md) after an upgrade, a backup restore (which can reintroduce a default account or reset a feature flag), or any change to network policy or auth configuration. Monitor certificate expiry from outside the host too: a renewal cron can silently fail while the host's own view still looks fine, so an external check (a scheduled `openssl s_client` from another machine, or a third-party uptime/certificate monitor) catches what a local `certbot renew --dry-run` cannot.
+
+## Common mistakes
+
+- Verifying only the custom domain and forgetting the platform's own generated URL, which is often still reachable and unauthenticated.
+- Deleting the app first and the DNS record later, leaving exactly the dangling-CNAME window a takeover needs.
+- Trusting a local `certbot renew --dry-run` as proof that production certificates are actually renewing; it proves the client works, not that the last real renewal succeeded.
+
+## Verify
+
+```bash
+# From a second network, not the host itself:
+nmap -p- 203.0.113.10                                  # only the intended ports answer
+nmap -p- 2001:db8::10                                  # same, over the public IPv6 address
+curl -sI https://retired-preview.example.com/          # expect DNS failure or connection error
+dig +short retired-preview.example.com                 # expect no record, not a dangling CNAME
+openssl s_client -connect app.example.com:443 -servername app.example.com </dev/null \
+  | openssl x509 -noout -enddate                        # run from outside on a schedule
+```
+
+## Sources (checked September 2026)
+
+- nmap reference guide (port scanning syntax): https://nmap.org/book/man-briefoptions.html
+- Shodan: https://www.shodan.io/
+- Censys: https://censys.com/
+- Vercel Deployment Protection (Standard Protection versus All Deployments scope): https://vercel.com/docs/deployment-protection
+- Cloudflare Access policies: https://developers.cloudflare.com/cloudflare-one/policies/access/
 
 ======================================================================
 ==> postgresql.md
@@ -3121,12 +3724,17 @@ redis-cli --tls --cacert ca.crt -h redis.example.com ping   # NOAUTH error until
 - One `requirepass` value shared across environments and committed to the repository.
 - TLS enabled but the plaintext `port` left open alongside it; set `port 0`.
 
+## Valkey
+
+Valkey, the community fork of Redis, uses the same `requirepass`, ACL, and TLS configuration described above without changes; apply this guide's steps directly. See [valkey.io](https://valkey.io/).
+
 ## Sources (checked September 2026)
 
 - Redis documentation (security, TLS, and ACL pages): https://redis.io/docs/latest/
 - redis.conf self-documented example in the Redis source distribution: https://github.com/redis/redis
 - Redis configuration (directive format `keyword argument1 argument2 ... argumentN`): https://redis.io/docs/latest/operate/oss_and_stack/management/config/
 - PING command reference (ACL categories `@fast`, `@connection`): https://redis.io/docs/latest/commands/ping/
+- Valkey: https://valkey.io/
 
 ======================================================================
 ==> elasticsearch.md
@@ -3403,6 +4011,10 @@ ssl.keystore.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 ```
 
+## 6. Redpanda (and other Kafka-API-compatible systems)
+
+Redpanda implements the Kafka wire protocol, so the SASL_SSL listener, SCRAM credentials, and ACL configuration above apply to a Redpanda cluster unchanged; the same fronting rules apply too. Redpanda Console, its bundled web UI, ships without its own login screen: it only gains one once you configure OIDC or basic authentication, so until then anyone who reaches Console reaches the cluster behind it. Front Console the same way as any other admin panel: never public, reached through SSH forwarding, a tailnet, or an access proxy, with MFA at that layer. See the [Redpanda security documentation](https://docs.redpanda.com/current/manage/security/).
+
 ## Verify
 
 ```bash
@@ -3430,6 +4042,7 @@ bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config adm
 - Authorization and ACLs (source): https://raw.githubusercontent.com/apache/kafka/trunk/docs/security/authorization-and-acls.md
 - Broker configuration reference (defaults for `listeners`, `sasl.enabled.mechanisms`): https://kafka.apache.org/40/generated/kafka_config.html
 - SSL client authentication on `SASL_SSL` listeners needs the listener prefix (source, `ChannelBuilders.java`): https://raw.githubusercontent.com/apache/kafka/trunk/clients/src/main/java/org/apache/kafka/common/network/ChannelBuilders.java
+- Redpanda security documentation: https://docs.redpanda.com/current/manage/security/
 
 ======================================================================
 ==> clickhouse.md
@@ -3761,6 +4374,282 @@ sleep 61; curl -sS -o /dev/null -w '%{http_code}\n' "$URL"    # 403 once the min
 - Google Cloud Storage uniform bucket-level access, public access prevention, signed URLs, `gcloud storage sign-url`: https://docs.cloud.google.com/storage/docs/uniform-bucket-level-access , https://docs.cloud.google.com/storage/docs/using-uniform-bucket-level-access , https://docs.cloud.google.com/storage/docs/public-access-prevention , https://docs.cloud.google.com/storage/docs/access-control/signed-urls , https://docs.cloud.google.com/sdk/gcloud/reference/storage/sign-url
 - Azure Blob anonymous access remediation and SAS overview: https://learn.microsoft.com/en-us/azure/storage/blobs/anonymous-read-access-prevent and https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview
 - Supabase Storage buckets, access control, and downloads: https://supabase.com/docs/guides/storage/buckets/fundamentals , https://supabase.com/docs/guides/storage/security/access-control , https://supabase.com/docs/guides/storage/serving/downloads
+
+======================================================================
+==> nats.md
+======================================================================
+
+# NATS and JetStream: authentication, TLS, and the monitoring port
+
+NATS accepts client connections on 4222 with no authentication configured by default, and a separately enabled HTTP monitoring endpoint (conventionally 8222) that reveals connected clients, subjects, and traffic with no login of its own. Both need explicit configuration. JetStream (the persistence layer for streams and consumers) is a feature of the same server process: it adds no listening port of its own, and its state surfaces through the same monitoring endpoint (`/jsz`) rather than a dedicated one.
+
+## 1. Require authentication
+
+Inside an `authorization { }` block in the server config, pick one mechanism: a shared token, per-user password, or NKEYS (public-key identity, no password on the wire):
+
+```
+authorization {
+  users: [
+    { user: app, password: "REPLACE_WITH_LONG_RANDOM_PASSWORD" }
+    { nkey: UAPZQH4MNJCOVEJFERB3NFSIROQ5RE7CGBEPKAZSB6QB7IQHBKXHZPVP }
+  ]
+}
+```
+
+Decentralized JWT-based auth (accounts and users signed by an operator, for multi-tenant deployments) is documented separately. Do not set `no_auth_user`, which names a user that unauthenticated connections are admitted as, unless an anonymous path is deliberate; it is easy to leave in place after testing and forget it grants access.
+
+## 2. Scope what each user can do
+
+A user with no `permissions` block is unrestricted. Give each identity subject-level allow lists so a compromised credential cannot publish or subscribe everywhere:
+
+```
+authorization {
+  users: [
+    {
+      user: order-svc
+      password: "REPLACE_WITH_LONG_RANDOM_PASSWORD"
+      permissions: {
+        publish:   { allow: ["orders.>"] }
+        subscribe: { allow: ["_INBOX.>"] }
+      }
+    }
+  ]
+}
+```
+
+The moment a `permissions` block writes an `allow` list, every subject not on it is denied; `deny` entries take precedence over `allow` when both are present.
+
+## 3. Enable TLS
+
+```
+tls {
+  cert_file: "/etc/nats/certs/server-cert.pem"
+  key_file:  "/etc/nats/certs/server-key.pem"
+  ca_file:   "/etc/nats/certs/ca.pem"
+  verify: true
+}
+```
+
+Certificates per [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md). `verify: true` requires and verifies a client certificate against `ca_file` (mutual TLS). `verify_and_map: true` does the same and also derives the connecting user's identity from the certificate (email, DNS, or URI SANs, or the distinguished name); use one or the other, not both.
+
+## 4. Keep the monitoring port private
+
+The HTTP monitoring endpoint is off unless configured (`http_port: 8222` in the config file, or `-m 8222` on the command line; `https_port` serves the same data over TLS). It answers `/varz`, `/connz`, `/routez`, and, with JetStream enabled, `/jsz`, as JSON, and the documentation is direct about the risk: "anyone who can reach `:8222` can read `/connz` and see your users, subjects, and traffic." Bind it to loopback or a private network, or place it behind an authenticating proxy; do not publish it.
+
+## Verify
+
+```bash
+ss -tlnp | grep -E ':(4222|8222) '                       # 4222 as intended, 8222 loopback/private only
+nats pub test.subject hello                              # fails without valid credentials
+nats pub test.subject hello --creds REPLACE_WITH_CREDS_FILE  # succeeds once authenticated
+curl -s http://monitor.example.com:8222/connz             # connection refused/timeout from outside
+```
+
+## Common mistakes
+
+- Leaving `no_auth_user` set after testing, which quietly readmits anonymous clients.
+- Exposing 8222 (or `https_port`) on a public interface because it "is just monitoring."
+- A user with no `permissions` block, which is unrestricted rather than denied.
+
+## Sources (checked September 2026)
+
+- Securing NATS overview: https://docs.nats.io/running-a-nats-service/configuration/securing_nats
+- Authentication basics (token, user/password, nkeys, no_auth_user): https://docs.nats.io/learn/security/authentication-basics
+- Authorization (subject permissions, allow/deny) and Encryption/TLS (tls block): https://docs.nats.io/learn/security/authorization and https://docs.nats.io/learn/security/encryption
+- TLS Authentication (verify vs verify_and_map): https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tls_mutual_auth
+- Monitoring (http_port/https_port, /varz, /connz, /routez, /jsz): https://docs.nats.io/running-a-nats-service/configuration/monitoring
+- JetStream concepts: https://docs.nats.io/nats-concepts/jetstream
+
+======================================================================
+==> search-engines.md
+======================================================================
+
+# Search engines for RAG: Meilisearch and Typesense
+
+Both back RAG pipelines and site search, both ship a keyless dev mode meant for a laptop, and both hand out one bootstrap key that is full admin over every index. Ship that dev-mode instance or leak that bootstrap key and the whole corpus, every document your RAG pipeline embedded, is readable and writable by whoever has it.
+
+## Meilisearch
+
+Meilisearch runs in two modes. In development mode it answers without a key at all. Production mode requires setting `MEILI_MASTER_KEY` (at least 16 bytes) and launching with `--env production`; the master key is the credential everything else derives from.
+
+From it, Meilisearch generates two default API keys, an admin key (full control, including index and settings management) and a search key (search only), and it also supports scoped API keys you create yourself and tenant tokens: "short-lived, client-side tokens derived from API keys" for per-end-user search restrictions without shipping a standing key to each user. Use the default (or a scoped) search key in front-end code; never the admin key or the master key.
+
+Meilisearch does not terminate HTTPS itself in the typical deployment, so put a reverse proxy or your platform's TLS in front ([nginx.md](nginx.md), [caddy.md](caddy.md), [cloudflare.md](cloudflare.md)) and restrict network access with firewall rules as an additional layer ([cloud-firewalls.md](cloud-firewalls.md)).
+
+## Typesense
+
+Typesense starts from a bootstrap key set with the `--api-key` server parameter; that key has "admin permissions on all endpoints and data." Use it only to create a permanent admin key through the `/keys` API, then stop using the bootstrap key day to day so it can be rotated without a restart-time outage.
+
+For anything that runs in a browser, generate a scoped, search-only key through the same `/keys` endpoint:
+
+```json
+{
+  "actions": ["documents:search"],
+  "collections": ["*"]
+}
+```
+
+Narrow `collections` to a name or regex to limit a key to specific collections, embed a `filter_by` clause in a scoped key to restrict it to specific documents (Typesense: "Users will not be able to override the filter embedded inside the scoped API Key"), and use `include_fields`/`exclude_fields` to hide sensitive fields such as billing data from a given key. Typesense's own guidance is direct: "Never expose your Admin API Key or Bootstrap API Key to your frontend application as anyone with access to it will be able to write data into your collection." Set `expires_at` on browser-facing keys so a leaked one has a shelf life.
+
+Typesense's cloud offering terminates TLS for you; a self-managed cluster needs the same reverse-proxy or platform TLS pattern as Meilisearch above.
+
+## The pattern, either engine
+
+The credential that goes into a browser must be search-only and, ideally, scoped to what that specific user or page needs (a tenant token in Meilisearch, a scoped key with `filter_by` in Typesense). The admin or bootstrap key stays server-side, in the platform's secret store, never in client bundles or repository history ([secrets.md](secrets.md)).
+
+## Verify
+
+```bash
+curl -s http://search.example.com:7700/indexes                 # Meilisearch, no key: fails in production mode
+curl -s http://search.example.com:7700/indexes -H "Authorization: Bearer REPLACE_WITH_SEARCH_KEY"  # search works
+curl -s http://search.example.com:7700/indexes -X POST -H "Authorization: Bearer REPLACE_WITH_SEARCH_KEY"  # write: denied
+
+curl -s http://search.example.com:8108/collections               # Typesense, no key: fails
+curl -s http://search.example.com:8108/collections -H "X-TYPESENSE-API-KEY: REPLACE_WITH_SEARCH_ONLY_KEY"  # search works
+curl -s http://search.example.com:8108/collections -X POST -H "X-TYPESENSE-API-KEY: REPLACE_WITH_SEARCH_ONLY_KEY"  # write: denied
+```
+
+Grep the client bundle and repository history for the admin/master/bootstrap key; it should never appear outside the server-side secret store.
+
+## Common mistakes
+
+- Shipping a Meilisearch instance without `MEILI_MASTER_KEY` and `--env production` because dev mode "worked fine" in testing.
+- Putting the Typesense bootstrap key or Meilisearch admin key straight into front-end JavaScript instead of minting a scoped search key.
+- A scoped key with no `filter_by` or `collections` restriction, which searches everything the admin key can see.
+
+## Sources (checked September 2026)
+
+- Meilisearch security overview (MEILI_MASTER_KEY, --env production, default admin/search keys, tenant tokens): https://www.meilisearch.com/docs/resources/self_hosting/security/overview
+- Typesense data access control (bootstrap api-key, /keys, actions, collections, filter_by, include_fields/exclude_fields, expires_at): https://typesense.org/docs/guide/data-access-control.html
+
+======================================================================
+==> sqlite.md
+======================================================================
+
+# SQLite in deployment: the file is the exposure (plus Turso and Litestream)
+
+SQLite has no server process, no network listener, and no built-in authentication: its documented security model rests entirely on the filesystem, warning that "any database file which might have ever been writable by an agent in a different security domain should be treated as suspect." In deployment this means the exposure is never SQLite itself, it is wherever the `.db` file ends up: under a web root, inside a git repository, world-readable, or replicated to a public bucket.
+
+## 1. Keep the file out of anything that serves it
+
+A `.db` or `.sqlite` file inside a directory a web server or static host points at is downloadable by URL like any other file under the web root; treat it with the same deny rules as backups and dumps ([web-exposure.md](web-exposure.md)). Keep the database path outside the document root entirely, for example `/var/lib/myapp/app.db`, never `public/app.db` or `static/app.db`.
+
+## 2. Keep the file out of git
+
+A committed `.db` file ships every row to anyone who clones the repository, permanently, even after a later commit deletes it. Add `*.db`, `*.sqlite`, `*.sqlite3`, and the WAL/SHM sidecar files (`*.db-wal`, `*.db-shm`) to `.gitignore` before the first commit, and scan for a copy that already leaked per [secrets.md](secrets.md).
+
+## 3. File permissions
+
+Restrict the database file and its containing directory to the app's own user (for example `chmod 600` on the file, `chmod 700` on the directory); any other local account or process on the host can otherwise open the file directly and read or write it, since there is no SQLite-side access control to stop it.
+
+## 4. libSQL and Turso: the file becomes an HTTP endpoint
+
+Turso serves libSQL databases over HTTP, replacing the local file with a network service authenticated by a bearer token against a URL of the form `https://[databaseName]-[organizationSlug].turso.io`. Applications read `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` from the environment; the token is a secret exactly like an API key, never in the client bundle, never committed ([secrets.md](secrets.md)).
+
+```bash
+turso db tokens create example-db --read-only --expiration 7d
+```
+
+`turso db tokens create` supports `-r`/`--read-only` to scope a token away from writes, and `-e`/`--expiration` to give it a lifetime (`never`, or a duration such as `7d3h`); issue a scoped, expiring token for anything that does not need full write access rather than reusing one long-lived full-access token everywhere.
+
+## 5. Litestream and LiteFS: the replica destination is now part of the exposure
+
+Litestream continuously replicates the SQLite file to S3, Google Cloud Storage, Azure Blob Storage, and other supported destinations, authenticating to S3 the same way any AWS client does, with `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in the environment. Litestream's own S3 guide scopes the IAM policy to the one bucket and prefix it needs rather than granting broad S3 access, which limits the damage if the credential leaks. The replica bucket needs the same private-by-default posture as any other bucket: see [object-storage.md](object-storage.md) for keeping it non-public and restoring through scoped credentials rather than a public URL.
+
+LiteFS replicates a SQLite file across a cluster's nodes rather than to object storage directly; its docs note the project is pre-1.0 and recommend regular off-site backups as a separate measure, and that backup destination should get the same bucket-privacy treatment as a Litestream replica.
+
+## Verify
+
+```bash
+curl -sI https://app.example.com/app.db      # 404, never 200
+git check-ignore -v app.db                    # prints a matching .gitignore rule
+stat -c '%a %U' /var/lib/myapp/app.db         # 600, owned by the app user, not world-readable
+grep -rl "TURSO_AUTH_TOKEN\|turso://" build dist .next/static 2>/dev/null   # no output: token never reached a client bundle
+```
+
+## Sources (checked September 2026)
+
+- SQLite security: https://www.sqlite.org/security.html
+- Turso HTTP API quickstart (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`): https://docs.turso.tech/sdk/http/quickstart
+- Turso CLI `db tokens create` (`--read-only`, `--expiration`): https://docs.turso.tech/cli/db/tokens/create
+- Litestream guides (supported replica destinations): https://litestream.io/guides/
+- Litestream S3 guide (credentials, scoped IAM policy): https://litestream.io/guides/s3/
+- LiteFS overview (cluster replication, pre-1.0 status, backup recommendation): https://fly.io/docs/litefs/
+
+======================================================================
+==> surrealdb.md
+======================================================================
+
+# SurrealDB: authentication and TLS
+
+The quickest ways to start SurrealDB skip authentication or bind it to every interface, fine for a
+laptop demo and a real exposure the moment the same command runs on a routable server.
+
+## 1. Root user and authenticated mode
+
+`surreal start` takes `--user`/`-u` and `--pass`/`-p` (also `SURREAL_USER`/`SURREAL_PASS`) to set
+"the initial database root user, applied only if no other root user exists":
+
+```bash
+surreal start --user root --pass REPLACE_WITH_LONG_RANDOM_VALUE rocksdb:/data/mydb.db
+```
+
+The `--unauthenticated` flag (`SURREAL_UNAUTHENTICATED`) allows unauthenticated access instead; a
+guest connecting under it gets permissions equivalent to the `OWNER` role. Do not run it, or carry it
+from a local demo, on anything reachable beyond your own machine.
+
+## 2. Bind privately
+
+`--bind`/`-b` (`SURREAL_BIND`) sets the listening address and defaults to `127.0.0.1:8000`, loopback
+only. Widen it deliberately, and only to a private address, for example `--bind 10.0.0.5:8000`; never
+bind an unauthenticated or root-only instance to `0.0.0.0`. SurrealDB's own security guidance says
+that if the database should only be reachable by other internal services, "expose SurrealDB
+exclusively to the internal network instead of deploying the service with a publicly addressable
+network interface."
+
+## 3. User levels and access control
+
+System users (`DEFINE USER`) exist at three levels: root (visibility across every namespace and
+database), namespace, and database, each assigned a role of `OWNER`, `EDITOR`, or `VIEWER`. The docs
+warn plainly that "a root system user is not restricted by permissions at all, so it is the wrong
+credential to put in an application"; give an application its own namespace or database level user
+scoped to what it needs.
+
+Record users are different: they are rows in your own tables, authenticated through
+`DEFINE ACCESS ... TYPE RECORD` with custom `SIGNUP` and `SIGNIN` logic, and they "have no
+permissions" beyond what a `PERMISSIONS` clause on a table or field grants them, the same
+rules-are-the-security model as Firebase and Supabase ([firebase-supabase.md](firebase-supabase.md)):
+a table with no `PERMISSIONS` clause for a record user grants nothing by default. `DEFINE ACCESS`
+also supports `TYPE JWT` (trusting an external identity provider's tokens) and `TYPE BEARER`
+(per-client keys) for system-to-system authentication.
+
+## 4. TLS
+
+`--web-crt` and `--web-key` serve SurrealDB's own interfaces over HTTPS directly. SurrealDB's own
+guidance also endorses delegating TLS termination to a load balancer or reverse proxy, per
+[nginx.md](nginx.md) or [caddy.md](caddy.md), or reaching the instance only over a tailnet
+([tailscale.md](tailscale.md)).
+
+## Verify
+
+```bash
+ss -tlnp | grep 8000                          # loopback or private address only, never 0.0.0.0
+curl -sI http://127.0.0.1:8000/health          # process is up
+surreal sql --endpoint http://127.0.0.1:8000 --namespace test --database test
+```
+
+The last command, run with no `--username`/`--password` against an instance started without
+`--unauthenticated`, must be refused rather than dropping into a session. A connection from outside
+the bound address must fail at the network layer, not just the application layer, and `curl -vI
+https://` should show a valid certificate chain wherever TLS terminates.
+
+## Sources (checked September 2026)
+
+- SurrealDB CLI, `surreal start`: https://surrealdb.com/docs/surrealdb/cli/start
+- SurrealDB CLI, `surreal sql`: https://surrealdb.com/docs/surrealdb/cli/sql
+- SurrealDB security overview: https://surrealdb.com/docs/surrealdb/security
+- SurrealDB authentication overview: https://surrealdb.com/docs/learn/security/authentication/overview
+- SurrealDB security best practices: https://surrealdb.com/docs/learn/security/best-practices/security-best-practices
 
 ======================================================================
 ==> jupyter.md
@@ -4837,6 +5726,371 @@ curl -s -o /dev/null -w '%{http_code}\n' https://dify.example.com/v1/parameters 
 - LibreChat v0.7.7 changelog (two-factor authentication): https://www.librechat.ai/changelog/v0.7.7
 
 ======================================================================
+==> image-gen-uis.md
+======================================================================
+
+# Image-generation UIs: ComfyUI, Stable Diffusion WebUI, InvokeAI, Fooocus
+
+None of these tools ships real authentication by default, and each accepts arbitrary Python through custom nodes or extensions. **Binding one to a public interface is host compromise, not just data exposure.** Keep every instance on loopback and reach it only through a tunnel or an authenticated TLS proxy: [fronting-auth.md](fronting-auth.md), [cloudflare.md](cloudflare.md), [tailscale.md](tailscale.md), or a reverse proxy per [nginx.md](nginx.md)/[caddy.md](caddy.md).
+
+If you run any of these in a container, do not stop at the network boundary: a compromised custom node or extension can still reach whatever the container can reach, so apply [container-hardening.md](container-hardening.md) (a non-root user, a read-only filesystem where the tool allows it, no unnecessary mounts) as a second layer, not a substitute for keeping the port off the network.
+
+## ComfyUI
+
+`--listen` with no argument binds to `0.0.0.0,::` (every IPv4 and IPv6 interface); given an address it binds only there. The default with the flag absent is `127.0.0.1`, and the default port is `8188`. There is no built-in login: the server accepts any workflow from anyone who can reach it.
+
+Custom nodes are the bigger risk. They run as plain Python with the same privileges as the server process; ComfyUI's own security update warns that `eval`/`exec` calls in a node are "direct attack vectors" for remote code execution. ComfyUI-Manager (the default node installer) had its own unauthenticated-RCE advisory, CVE-2025-67303: versions before v3.38 left the manager's data and configuration directories insufficiently protected by ComfyUI's web API access control, letting an attacker upload arbitrary files for full system compromise with no credentials at all. Keep ComfyUI-Manager at v3.38 or later, and only install nodes you trust regardless.
+
+```bash
+python main.py --listen 127.0.0.1 --port 8188
+```
+
+Front it with a TLS proxy that adds login before anything reaches port 8188. If you must run untrusted workflows, `--disable-all-custom-nodes` starts the server with none of them loaded, and `--whitelist-custom-nodes FOLDER...` re-allows specific folders despite that flag; neither is a substitute for keeping the port off the network.
+
+## AUTOMATIC1111 Stable Diffusion WebUI
+
+`--listen` launches gradio bound to `0.0.0.0` (default `False`, i.e. loopback); `--port` defaults to `7860`. `--gradio-auth user:pass` (comma-delimited for multiple users) or `--gradio-auth-path /path/to/file` requires a login before the UI loads; `--api-auth` does the same for the API. `--share` registers a public `*.gradio.live` relay URL, documented as intended for Colab, not a deployment mechanism, and it bypasses your network boundary entirely. `--enable-insecure-extension-access` reopens the extensions tab regardless of other flags and should stay off on anything reachable beyond loopback.
+
+```bash
+python launch.py --listen --port 7860 --gradio-auth "admin:REPLACE_WITH_LONG_RANDOM_VALUE"
+```
+
+Even with `--gradio-auth` set, put TLS in front; the flag alone only gates plaintext HTTP. `--server-name` sets an explicit hostname if you bind somewhere other than the default.
+
+## InvokeAI
+
+The `Web Server` section of `invokeai.yaml` sets `host` (default `127.0.0.1`) and `port` (default `9090`); setting `host: 0.0.0.0` serves the local network with no login at all in the default single-user mode. `INVOKEAI_HOST` and `INVOKEAI_PORT` override the same settings from the environment.
+
+An experimental multi-user mode exists: add `multiuser: true` to `invokeai.yaml` to require per-user login (username and password, stateless JWT sessions), and `strict_password_checking: true` to enforce a minimum password (8+ characters, upper, lower, and a digit) rather than just warning on a weak one. Restarting the server logs every user out. Outside multi-user mode, treat InvokeAI as having no login and keep it on loopback regardless.
+
+```yaml
+InvokeAI:
+  Web Server:
+    host: 127.0.0.1
+    port: 9090
+  multiuser: true
+  strict_password_checking: true
+```
+
+## Fooocus
+
+`--listen` exposes the UI to the network (optionally to a specific address); `--port` sets the port; `--share` registers a public `*.gradio.live` endpoint, same relay mechanism and same caution as above. Fooocus's own README states access is unauthenticated by default. Optional basic auth comes from an `auth.json` file with `user`/`pass` entries (no dedicated command-line auth flag exists); use it, but still keep the instance off any public interface.
+
+```json
+[
+  {"user": "admin", "pass": "REPLACE_WITH_LONG_RANDOM_VALUE"}
+]
+```
+
+## Verify
+
+```bash
+ss -tlnp | grep -E '8188|7860|9090'                 # each service on 127.0.0.1 only
+curl -s http://203.0.113.10:8188/                    # ComfyUI from another host: connection refused
+curl -s http://203.0.113.10:7860/                    # Stable Diffusion WebUI: connection refused
+curl -s http://203.0.113.10:9090/                    # InvokeAI: connection refused
+curl -sI https://imagegen.example.com/                # via the proxy: TLS, and a login prompt
+                                                       # or 401 without credentials, before the UI loads
+```
+
+## Common mistakes
+
+- Adding `--listen`/`host: 0.0.0.0` "just to test from my phone" and forgetting it is still set a week later.
+- Treating `--share` (Stable Diffusion WebUI, Fooocus) as a deployment option instead of a short-lived demo link.
+- Installing a custom node or extension without reading it, on the assumption that "it's just a UI".
+- Relying on `--gradio-auth` or Fooocus's `auth.json` alone: single-factor credentials over plain HTTP still leak on the wire without a TLS proxy in front.
+- Assuming InvokeAI's multi-user mode is on by default; the base install has no login at all, so loopback binding still carries the whole burden.
+
+## Sources (checked September 2026)
+
+- ComfyUI Startup Flags (`--listen`, `--port` defaults): https://docs.comfy.org/development/comfyui-server/startup-flags
+- ComfyUI custom node security standards (eval/exec prohibited): https://docs.comfy.org/registry/standards
+- ComfyUI 2025 Jan Security Update (custom node code-execution risk): https://blog.comfy.org/p/comfyui-2025-jan-security-update
+- AUTOMATIC1111 Command Line Arguments and Settings wiki: https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Command-Line-Arguments-and-Settings
+- InvokeAI YAML Config (host/port defaults): https://invoke.ai/configuration/invokeai-yaml/
+- InvokeAI Multi-User Administrator Guide: http://invoke.ai/features/multi-user-mode/admin-guide/
+- Fooocus repository README (`--listen`, `--share`, auth.json): https://github.com/lllyasviel/Fooocus
+
+======================================================================
+==> chat-uis.md
+======================================================================
+
+# Self-hosted chat and agent UIs: AnythingLLM, LobeChat, Chainlit, OpenHands
+
+These tools hold provider API keys and full conversation history, and several are wide open the moment they start. Bind every one to loopback, front it with TLS and a login ([caddy.md](caddy.md)/[nginx.md](nginx.md), [free-certificates.md](free-certificates.md)), and turn on the tool's own authentication as a second layer, never as a substitute for the network boundary. See also [open-webui.md](open-webui.md) for the Open WebUI case, [secrets.md](secrets.md) for the provider keys these apps store, and [fronting-auth.md](fronting-auth.md)/[mfa.md](mfa.md) for the identity layer in front.
+
+## AnythingLLM
+
+Security features apply to the Docker deployment. Single-user mode offers an optional "Password Protect Instance" toggle: once set, anyone with that one password can use the instance, change any setting, and read every chat, so treat it as a screen door, not a real access-control boundary. Multi-user mode is the documented preferred setup: it adds Admin (full access including logs and analytics), Manager (all workspaces, no LLM/embedder/vector-database settings), and Default (only explicitly assigned workspaces) roles, each requiring its own login. Multi-user mode cannot be reverted to single-user once enabled, so decide before turning it on.
+
+```bash
+docker run -d -p 127.0.0.1:3001:3001 mintplexlabs/anythingllm
+```
+
+Keep it on loopback regardless of which mode you choose, and put the proxy's own TLS and login in front.
+
+## LobeChat
+
+`KEY_VAULTS_SECRET` is documented as the password that gates access to the deployment (it also encrypts stored provider credentials, so once set, never change it or previously encrypted data becomes unreadable). For real per-user accounts, LobeChat's Better Auth service takes over: `AUTH_SECRET` (required) signs sessions, `AUTH_SSO_PROVIDERS` lists enabled SSO providers (for example `google,github,microsoft`), and `AUTH_DISABLE_EMAIL_PASSWORD=1` forces SSO-only login, hiding the password form entirely. `AUTH_ALLOWED_EMAILS` restricts registration to specific addresses or domains.
+
+```bash
+docker run -d -p 127.0.0.1:3210:3210 \
+  -e KEY_VAULTS_SECRET=REPLACE_WITH_LONG_RANDOM_VALUE \
+  -e AUTH_SECRET=REPLACE_WITH_LONG_RANDOM_VALUE \
+  -e AUTH_DISABLE_EMAIL_PASSWORD=1 \
+  -e AUTH_SSO_PROVIDERS=google \
+  lobehub/lobe-chat
+```
+
+MFA: enforce it at whichever SSO provider you list in `AUTH_SSO_PROVIDERS`; LobeChat's own login has no second factor of its own.
+
+## Chainlit
+
+Chainlit applications are public by default: no login, no gate, anyone who reaches the port gets the chat. Set `CHAINLIT_AUTH_SECRET` (generate one with `chainlit create-secret`; changing it logs out every user) and implement at least one auth callback: password authentication, OAuth, or header-based authentication. A callback that returns `None` refuses the login. There is no built-in MFA; put it behind an identity provider that enforces a second factor, or an [Authelia](https://www.authelia.com/)-fronted proxy.
+
+```python
+import chainlit as cl
+
+@cl.password_auth_callback
+def auth_callback(username: str, password: str):
+    if username == "admin" and password == "REPLACE_WITH_LONG_RANDOM_VALUE":
+        return cl.User(identifier="admin")
+    return None
+```
+
+## OpenHands
+
+OpenHands is built for a single user on their own workstation: the project's own FAQ states there is no built-in authentication, isolation, or scalability for shared use, and the open-source build authorizes API access with one shared key rather than per-user identity. It also executes agent-generated code against your workspace, with the isolation depending entirely on your deployment choice (a local process backend runs with your user's permissions; container backends can be weakened by broad mounts, privileged mode, or Docker-socket access). Do not expose it to anyone you would not hand a shell to. The project documents a Hardened Docker Installation guide for deployments that must sit on a shared network; multi-tenant use is an enterprise offering, not something the open-source build supports.
+
+The documented quickstart itself runs `docker run ... -p 3000:3000 ... openhands/openhands`, which maps every interface, not loopback; change that to `-p 127.0.0.1:3000:3000` before anything else. Reach it only through an authenticated tunnel; there is no login screen to add in front of it, so identity has to come entirely from the proxy or tunnel layer.
+
+## Verify
+
+```bash
+ss -tlnp | grep -E '3001|3210|3000'                    # each UI on 127.0.0.1 only
+curl -s http://203.0.113.10:3210/                       # from another host: connection refused
+curl -s https://chat.example.com/api/some-endpoint      # without a key/token: 401
+curl -sI https://chat.example.com/                      # via the proxy: TLS, login required
+```
+
+## Common mistakes
+
+- Leaving Chainlit unauthenticated because "it's just for testing"; public by default means public the moment it is reachable.
+- Treating AnythingLLM's single instance password as equivalent to per-user accounts; it grants full admin to whoever has it.
+- Running OpenHands with a shared, long-lived API key exposed on the same network as untrusted users.
+- Rotating LobeChat's `KEY_VAULTS_SECRET` after data has been encrypted with it, which makes that data unreadable.
+
+## Sources (checked September 2026)
+
+- AnythingLLM security and access documentation: https://docs.anythingllm.com/features/security-and-access
+- LobeHub environment variables (KEY_VAULTS_SECRET): https://lobehub.com/docs/self-hosting/environment-variables/basic
+- LobeHub authentication service environment variables (Better Auth): https://lobehub.com/docs/self-hosting/environment-variables/auth
+- Chainlit authentication overview: https://docs.chainlit.io/authentication/overview
+- Chainlit password authentication (`@cl.password_auth_callback` signature and example): https://docs.chainlit.io/authentication/password
+- OpenHands FAQs (single-user design, no built-in auth, sandboxing, hardened deployment): https://docs.openhands.dev/openhands/usage/faqs
+- OpenHands local setup (default docker port mapping): https://docs.openhands.dev/openhands/usage/run-openhands/local-setup
+
+======================================================================
+==> llm-observability.md
+======================================================================
+
+# LLM tracing and observability: Langfuse, Phoenix, Helicone, OpenTelemetry Collector
+
+These tools store full prompts, completions, and often the provider API keys used to generate them, so an
+exposed dashboard leaks your most sensitive data at once. Several ship with authentication off or with open
+signup enabled, so the default install is not safe to expose.
+
+## Langfuse (self-hosted)
+
+Email/password authentication is enabled by default: anyone who can reach the URL can register their own
+account unless you turn signup off. Set `AUTH_DISABLE_SIGNUP=true` to block new registrations, including a
+user accepting a project invite without an existing account; set `AUTH_DISABLE_USERNAME_PASSWORD=true` to
+require SSO instead of a password entirely. SSO runs through Auth.js against Google, GitHub, GitLab, Azure
+AD/Entra ID, Okta, Auth0, Keycloak, or a custom OIDC provider; `NEXTAUTH_URL` must be set correctly for any
+method other than email/password. `AUTH_SESSION_MAX_AGE` sets the session lifetime in minutes (default
+43200, thirty days; five minutes is the enforced floor). The ingestion and public API are authenticated
+separately from the UI session: a project's public key (username) and secret key (password) are sent as HTTP
+Basic Auth, issued from Project Settings, and unrelated to a user's login credentials. Put MFA at the
+identity provider per [mfa.md](mfa.md); Langfuse's own login has none.
+
+## Arize Phoenix (self-hosted)
+
+Authentication is disabled by default, "as you may be just trying Phoenix for the very first time or have
+Phoenix deployed in a VPC" in the vendor's own words: anyone who reaches the UI has full read and write
+access with no login at all. Set `PHOENIX_ENABLE_AUTH=True` and `PHOENIX_SECRET` (a long random value used to
+sign session tokens) to turn it on. Enabling auth on a running instance stops trace collection and blocks all
+API access until API keys exist, so provision keys before or immediately after the flip, not after. Once auth
+is on, a system key (admin-created, acts for the whole instance) or a user key authenticates every request
+via `PHOENIX_API_KEY` sent as an `Authorization: Bearer` header; collectors and SDKs need one to keep sending
+traces. Phoenix has no native MFA; add an identity-aware proxy in front per [mfa.md](mfa.md).
+
+## Helicone (self-hosted)
+
+The manual self-host guide's default login is `test@helicone.ai` / `password`, documented as a local trial
+credential; the fetched setup and manual-deployment pages do not cover changing it for production, disabling
+signup, or any hardening steps for exposing the dashboard beyond a laptop, so treat that gap as unverified
+rather than assuming a safe default exists. Do not expose this UI without your own layer in front. Ingestion
+runs through the separate AI Gateway component and provider keys configured in its environment, not through
+the web session; store those keys per [secrets.md](secrets.md), never in the repository. Keep both the
+dashboard and the gateway on a private network or behind an identity-aware fronting layer
+([fronting-auth.md](fronting-auth.md), [nginx.md](nginx.md), [caddy.md](caddy.md)) with MFA ([mfa.md](mfa.md)).
+
+## OpenTelemetry Collector
+
+The Collector is the pipe these tools (and others) receive traces through, and it ships with no security
+applied until you configure it. The project's own hardening guidance: bind receivers to a specific interface
+or `localhost` (for example `127.0.0.1:4317`), never the default all-interfaces listener, unless a proxy or
+mesh in front needs the wider bind; require TLS on every receiver and exporter; and attach an authenticator
+extension, such as `basicauth` (htpasswd-style credentials, or a static `client_auth` username/password for
+outgoing calls) or `bearertokenauth` (a static or file-backed token sent as an `Authorization` header), to any
+receiver that accepts data from outside the host. An extension is wired to a receiver with an `auth.authenticator`
+key naming the extension. Build or run only the receivers, processors, and exporters you use, since every
+enabled component is attack surface, and run the process as a non-root user.
+
+## Verify
+
+```bash
+ss -tlnp | grep -E ':(3000|6006|4317|4318) '                          # loopback or private only, never 0.0.0.0
+curl -sI --max-time 5 http://langfuse.example.com/api/public/health   # dashboard: a login page or 401, never data
+curl -sS -o /dev/null -w '%{http_code}\n' https://langfuse.example.com/api/public/projects
+                                                                        # 401 without -u public-key:secret-key
+curl -sS -o /dev/null -w '%{http_code}\n' http://otel-collector.internal:4318/v1/traces -d '{}'
+                                                                        # rejected without the configured auth header
+```
+
+A dashboard that renders traces, prompts, or provider keys without a login is a finding; so is an OTLP port
+that accepts spans with no credential at all.
+
+## Common mistakes
+
+- Leaving Phoenix's or Helicone's auth off "because it's just internal" on a host with a public IP.
+- Enabling `PHOENIX_ENABLE_AUTH` without creating an API key first, which locks out collectors mid-flight.
+- Publishing the OTLP gRPC/HTTP ports (4317/4318) to `0.0.0.0` because a docker-compose example did.
+- Assuming an ingestion key protects the UI, or a UI login protects the ingestion endpoint; they are
+  separate credentials in Langfuse and Phoenix alike.
+
+## Sources (checked September 2026)
+
+- Langfuse, authentication and SSO (signup default, `AUTH_DISABLE_SIGNUP`, `AUTH_DISABLE_USERNAME_PASSWORD`,
+  SSO providers, `AUTH_SESSION_MAX_AGE`, `NEXTAUTH_URL`): https://langfuse.com/self-hosting/security/authentication-and-sso
+- Langfuse, public API authentication (Basic Auth with project public/secret key): https://langfuse.com/docs/api-and-data-platform/features/public-api
+- Arize Phoenix, authentication (`PHOENIX_ENABLE_AUTH`, `PHOENIX_SECRET`, system and user API keys, `PHOENIX_API_KEY`): https://arize.com/docs/phoenix/self-hosting/features/authentication
+- Helicone, self-hosted deployment (default `test@helicone.ai` / `password` login): https://docs.helicone.ai/getting-started/self-deploy and https://docs.helicone.ai/getting-started/self-host/manual
+- OpenTelemetry, Collector security best practices (bind addresses, TLS, authenticator extensions, minimal
+  components, non-root): https://opentelemetry.io/docs/security/config-best-practices/
+- OpenTelemetry Collector Contrib, `basicauthextension` (htpasswd, `client_auth`, `auth.authenticator` wiring): https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/basicauthextension
+
+======================================================================
+==> workflow-orchestrators.md
+======================================================================
+
+# Workflow and agent orchestrators: Prefect, Dagster, Airflow, Temporal, Flower
+
+These webservers and UIs schedule and trigger arbitrary code execution across your infrastructure, and most
+ship with no authentication at all. Keep every one of them off the public internet and add auth before
+anyone but you can reach the port.
+
+## Prefect (self-hosted server)
+
+There is no default authentication; `prefect server start` accepts unauthenticated API calls until you set
+one up. Basic Auth is a single administrator/password string, set on the server with
+`PREFECT_SERVER_API_AUTH_STRING` (or the `server.api.auth_string` setting) and the identical value on every
+client with `PREFECT_API_AUTH_STRING` (`api.auth_string`); the UI prompts for the string on first load. This
+is unrelated to Prefect Cloud: `PREFECT_API_KEY` authenticates only to Prefect Cloud, and if it happens to be
+set alongside `PREFECT_API_AUTH_STRING` on a client talking to a self-hosted server, the key takes precedence
+and the request fails with 401. Store the auth string in a secret manager or a private `.env` file, never in
+the repository ([secrets.md](secrets.md)).
+
+## Dagster (OSS)
+
+The `dagster-webserver` (reachable by default around port 3000 in local dev) has no built-in authentication
+or access control; the documentation for the open-source webserver does not describe a login of any kind.
+Put it entirely behind an identity-aware fronting layer ([fronting-auth.md](fronting-auth.md)) or your own
+reverse proxy with its own authentication ([nginx.md](nginx.md), [caddy.md](caddy.md)) plus MFA
+([mfa.md](mfa.md)), and never publish the port directly.
+
+## Apache Airflow
+
+Airflow's own security model states it plainly: "Airflow doesn't support unauthenticated users by default"
+and "Airflow is not designed to be exposed to untrusted users on the public internet"; every user of the UI
+and API is assumed to be authenticated and known, and keeping it off the public internet is the deployment
+manager's responsibility, not something the software enforces for you. Access is governed by a pluggable
+"auth manager". The default is the Simple Auth Manager, which the documentation marks for development and
+testing only: it prints a warning banner on login, and its users and roles (`viewer`, `user`, `op`, `admin`)
+come from `simple_auth_manager_users` in `[core]` (for example `bob:admin,peter:viewer`), with a password
+auto-generated per user and printed to the webserver logs unless you set your own. For production, configure
+the FAB auth manager (`[fab] auth_backends`) against LDAP, OAuth, or another real identity backend instead,
+and put MFA at that identity provider ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)).
+
+## Temporal (self-hosted)
+
+With no authorizer configured, the server runs the default `noopAuthorizer`, which the documentation says
+"allows every API request, with no authentication or access control" at all, including administrative
+operations. Configure an `Authorizer` together with a `ClaimMapper` (`temporal.WithAuthorizer()`,
+`temporal.WithClaimMapper()`, or the equivalent `config.Global.Authorization` keys) so every gRPC call to the
+Temporal Service is checked against a mapped claim before anything runs. This is entirely separate from Web
+UI login: the UI's own config reference documents an `auth.providers` block with `enabled`, `type: oidc`,
+`providerUrl`, `issuerUrl`, `clientId`, `clientSecret`, `callbackUrl`, and `scopes` for OIDC SSO into the
+dashboard, but that only gates the UI, not the server API a worker or CLI talks to directly. mTLS secures
+internode and frontend traffic separately again. Set up both layers; MFA comes from whichever identity
+provider the UI's OIDC settings point at.
+
+## Flower (for Celery)
+
+Flower binds every interface by default (`--address` is empty, meaning all interfaces; `--port` defaults to
+5555) with authentication disabled unless you configure it. `--basic-auth="user1:password1,user2:password2"`
+turns on HTTP Basic Auth with a comma-separated credential list; OAuth 2.0 login against Google, GitHub,
+GitLab, or Okta is enabled by setting `--auth_provider` to the provider's handler class plus `--oauth2_key`,
+`--oauth2_secret`, `--oauth2_redirect_uri`, and an `--auth` regular expression of the email addresses allowed
+to sign in. Prefer OAuth against a provider that enforces MFA over Basic Auth alone ([mfa.md](mfa.md)), and
+bind `--address=127.0.0.1` behind a proxy rather than relying on Basic Auth as the only control.
+
+## Verify
+
+```bash
+ss -tlnp | grep -E ':(4200|3000|8080|7233|8233|5555) '                 # loopback or private only, never 0.0.0.0
+curl -sS -o /dev/null -w '%{http_code}\n' http://prefect.internal:4200/api/health
+                                                                        # 401 without the auth string once configured
+curl -sS -o /dev/null -w '%{http_code}\n' -u '' http://dagster.internal:3000/
+                                                                        # must be blocked at the proxy, not Dagster itself
+curl -sSI https://airflow.example.com/                                 # login redirect, never the DAG list
+curl -sS -o /dev/null -w '%{http_code}\n' http://flower.internal:5555/
+                                                                        # 401 once --basic-auth or OAuth is set
+```
+
+A DAG list, flow run, task graph, or worker pool that renders without a credential is a finding; so is a
+Temporal Service that accepts a gRPC call with no claim behind it, since the UI login does not cover that
+path.
+
+## Common mistakes
+
+- Assuming Airflow's Simple Auth Manager, meant for development, is acceptable in production because it
+  technically requires a password.
+- Configuring Temporal's UI SSO and believing the server API is now protected too; they are independent.
+- Setting `PREFECT_API_KEY` on a client that should be using `PREFECT_API_AUTH_STRING` against a self-hosted
+  server, then debugging the resulting 401 as a server problem.
+- Publishing Flower's `5555` or Dagster's `3000` straight to the internet "for the team" with no proxy.
+
+## Sources (checked September 2026)
+
+- Prefect, security settings (`PREFECT_SERVER_API_AUTH_STRING`, `PREFECT_API_AUTH_STRING`, Cloud API keys
+  taking precedence and causing 401): https://docs.prefect.io/v3/advanced/security-settings
+- Prefect, self-hosted server on Windows (default port 4200): https://docs.prefect.io/v3/how-to-guides/self-hosted/server-windows
+- Dagster, webserver and UI (default local port, no documented built-in auth): https://docs.dagster.io/guides/operate/webserver
+- Apache Airflow, security overview: https://airflow.apache.org/docs/apache-airflow/stable/security/
+- Apache Airflow, quickstart (default port 8080): https://airflow.apache.org/docs/apache-airflow/stable/start.html
+- Apache Airflow, security model ("doesn't support unauthenticated users", "not designed to be exposed... to
+  untrusted users on the public internet"): https://airflow.apache.org/docs/apache-airflow/stable/security/security_model.html
+- Apache Airflow, Simple auth manager (default, dev/test only, `simple_auth_manager_users`, generated
+  passwords): https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/auth-manager/simple/index.html
+- Temporal, self-hosted security (`noopAuthorizer` default, `Authorizer`, `ClaimMapper`): https://docs.temporal.io/self-hosted-guide/security
+- Temporal, Web UI configuration reference (`auth.providers`, `enabled`, `type: oidc`, `providerUrl`,
+  `clientId`, `clientSecret`, `callbackUrl`, `scopes`): https://docs.temporal.io/references/web-ui-configuration
+- Temporal, CLI server reference (default frontend gRPC port 7233, Web UI port 8233): https://docs.temporal.io/cli/server
+- Flower, configuration (`--address`, `--port` 5555 default, `--basic-auth`, `--auth_provider`, `--oauth2_key`,
+  `--oauth2_secret`, `--oauth2_redirect_uri`, `--auth`): https://flower.readthedocs.io/en/latest/config.html
+
+======================================================================
 ==> admin-uis.md
 ======================================================================
 
@@ -4977,6 +6231,30 @@ export DOCKER_HOST=tcp://$HOST:2376 DOCKER_TLS_VERIFY=1 DOCKER_CERT_PATH=~/.dock
 
 Without `--tlsverify` the daemon does not check client certificates. Firewall 2376 to the operator addresses even with TLS ([docker.md](docker.md)).
 
+## Dozzle
+
+- Dozzle reads the Docker socket to show logs, the same host-level access the Docker API section above describes ([docker.md](docker.md)); a Dozzle login is a login to the host.
+- Authentication is off unless configured. Set `DOZZLE_AUTH_PROVIDER=simple` with a generated `users.yml` (`docker run -it --rm amir20/dozzle generate <username> --password <password>`), or `DOZZLE_AUTH_PROVIDER=forward-proxy` to delegate login to a fronting proxy such as Authelia, Authentik, or Cloudflare Access.
+- Container actions (start, stop, recreate) and shell access into a running container can be turned on; leave both off unless a specific workflow needs them, since either turns a log viewer into remote command execution on the host.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer, like every panel above.
+
+## Docker Registry (`registry:2`)
+
+- The reference registry image ships with no authentication at all: anyone who reaches the port can push and pull every image, and TLS must be configured before any authentication scheme works, since credentials would otherwise cross the wire in clear text.
+- Put a proxy in front with htpasswd basic authentication (bcrypt only; `htpasswd -B`, since the registry rejects any other hash format) or a token server, or run a registry distribution that has its own authentication built in.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer.
+
+## Filebrowser
+
+- Ships with a default administrator account created on first run (historically `admin`/`admin`; some current packagings instead default to or auto-generate `admin`/`admin123`, shown once). Change it immediately, before the instance is reachable by anyone else. The project's own repository (archived, unmaintained as of August 2026) says not to expose it directly to the internet.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer; never publish a file-serving admin panel.
+
+## Node-RED
+
+- The editor and admin API on `1880` have no authentication at all by default; anyone who reaches the port can view, deploy, and modify flows.
+- Set `adminAuth` in `settings.js` with bcrypt-hashed user passwords (`node-red admin hash-pw` generates the hash), and set `credentialSecret` to a value you control, since Node-RED otherwise generates one for you and stored credentials are only as protected as that secret.
+- Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer; the editor is equivalent to a shell on whatever the flows can reach.
+
 ## Verify
 
 ```bash
@@ -5002,6 +6280,10 @@ From outside the network, every panel URL is unreachable or shows a login; a pag
 - Gitea config cheat sheet and MFA: https://docs.gitea.com/administration/config-cheat-sheet and https://docs.gitea.com/usage/user-setting/multi-factor-authentication/
 - Uptime Kuma README and reverse proxy wiki: https://github.com/louislam/uptime-kuma and https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy
 - Docker: protect the daemon socket https://docs.docker.com/engine/security/protect-access/ and remote access https://docs.docker.com/engine/daemon/remote-access/
+- Dozzle authentication (DOZZLE_AUTH_PROVIDER, users.yml, actions and shell): https://dozzle.dev/guide/authentication
+- Docker Registry deployment (default authentication, TLS requirement): https://distribution.github.io/distribution/about/deploying/
+- Filebrowser: https://filebrowser.org/
+- Node-RED securing the runtime (adminAuth, credentialSecret): https://nodered.org/docs/user-guide/runtime/securing-node-red
 
 ======================================================================
 ==> cors.md
@@ -5084,6 +6366,10 @@ Notes that keep these correct rather than decorative:
 - **frame-ancestors** in CSP supersedes `X-Frame-Options`; sending both keeps older scanners content and costs nothing.
 - Headers belong on every response, including error pages; setting them only on `200 /` is a common proxy misconfiguration (nginx `add_header` inheritance per [nginx.md](nginx.md)).
 
+## Do not cache authenticated responses in a shared cache
+
+A CDN or shared proxy that keys its cache on the URL alone can serve one user's authenticated response to another. Set `Cache-Control: private` on authenticated responses, or `no-store` on the most sensitive ones, and mark cacheable only what is truly public. If a shared cache must hold authenticated content, configure it explicitly to vary on the cookie or the authorization header rather than relying on its default URL-only key.
+
 ## Verify
 
 ```bash
@@ -5092,9 +6378,12 @@ curl -sI https://example.com/ | grep -iE 'strict-transport|content-security|x-co
 
 Then scan with https://securityheaders.com/ from outside. A CSP that enforces without console errors on every page of the app is the finish line.
 
+For an authenticated route behind a shared cache, request the same URL as user A, then as user B, then anonymously, after warming the cache; each response must reflect only its own caller, never the one before it.
+
 ## Sources (checked September 2026)
 
 - MDN HTTP headers reference: https://developer.mozilla.org/en-US/docs/Web/HTTP
+- MDN Cache-Control: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
 - Security header scanner: https://securityheaders.com/
 
 ======================================================================
@@ -5154,6 +6443,313 @@ using ((select auth.jwt()->>'aal') = 'aal2');
 - Firebase security rules: https://firebase.google.com/docs/rules
 - Supabase row level security: https://supabase.com/docs/guides/database/postgres/row-level-security
 - Supabase multi-factor authentication (aal1, aal2, enforcement policy): https://supabase.com/docs/guides/auth/auth-mfa
+
+======================================================================
+==> web-exposure.md
+======================================================================
+
+# Files a web server must never serve: dotfiles, .git, dumps, backups, and client secrets
+
+Scanners request `/.env`, `/.git/config`, `/config.php.bak`, and `/db.sql` continuously, and any of these
+under a web root hands over credentials or source regardless of what the application itself authenticates.
+Anything a deploy step leaves inside the document root is served too, unless the server is told otherwise.
+
+## nginx
+
+Deny dotfiles by regex location, with the ACME challenge path carved out first, because `.well-known` also
+starts with a dot:
+
+```nginx
+location ^~ /.well-known/acme-challenge/ {
+    allow all;
+}
+
+location ~ /\. {
+    deny all;
+}
+```
+
+Once nginx picks the `^~` location as the longest matching prefix, it skips regex locations entirely, so the
+challenge path is served before the dotfile deny is reached (`allow`/`deny`: `ngx_http_access_module`;
+`location` order and `^~`: `ngx_http_core_module`).
+
+## Apache
+
+```apache
+<FilesMatch "(^\.|\.git$|\.sql$|\.dump$|\.bak$)">
+    Require all denied
+</FilesMatch>
+```
+
+`<FilesMatch>` matches the request's filename, not its full path, so `/.well-known/acme-challenge/TOKEN` is
+not caught by the leading `^\.` (the matched name is the token, not the directory); no exception is needed.
+
+## Caddy
+
+```caddyfile
+respond /.git/* 404
+respond /.env 404
+respond /.env.* 404
+```
+
+If a broader matcher replaces this list, carve out `/.well-known/*` first: legitimate things live there
+(ACME challenges, `security.txt`), and Caddy already serves its own ACME challenges outside the file server.
+
+## Keep dumps and backups out of the served directory
+
+`.sql`, `.dump`, and backup archives should never land inside a directory a web root points at; the deny rules above are a backstop, not the control. Write exports and backups outside the document root, or to object storage ([object-storage.md](object-storage.md)), never `/var/www/html`.
+
+## Client bundles: secrets compiled into the browser
+
+`NEXT_PUBLIC_`-prefixed variables in Next.js and `VITE_`-prefixed variables in Vite are inlined into the
+browser JavaScript at build time; Create React App's `REACT_APP_` prefix does the same (Create React App is
+deprecated as of this writing, but the convention persists in older projects). An LLM provider key pasted
+into frontend code under one of these prefixes ships to every visitor's browser, not just your server. Only
+genuinely public values belong behind these prefixes; call the provider from a backend route and keep the
+key server-side. See [secrets.md](secrets.md) and [paas.md](paas.md) for the platform version of this. A
+production source map (`.map` files, or an inline `//# sourceMappingURL` comment) reconstructs original
+source too; do not ship one to a public origin for code not already meant to be public.
+
+## Verify
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.env
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.git/config
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/config.php.bak
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/db.sql
+# each line above must print 403 or 404, never the file's content
+
+grep -rn "sk-\|AKIA\|-----BEGIN" .next/static build dist 2>/dev/null
+# must print nothing when run against the built client bundle, not the source;
+# a variable that never compiled in cannot leak
+```
+
+Any backup path known to have existed on the server should also 404 at the deployed URL.
+
+## Sources (checked September 2026)
+
+- nginx core module (`location`, `^~` modifier, matching order): https://nginx.org/en/docs/http/ngx_http_core_module.html
+- nginx access module (`allow`, `deny`): https://nginx.org/en/docs/http/ngx_http_access_module.html
+- Apache mod_authz_core (`Require all denied`): https://httpd.apache.org/docs/2.4/mod/mod_authz_core.html
+- Apache core module (`<FilesMatch>`): https://httpd.apache.org/docs/2.4/mod/core.html#filesmatch
+- Caddy `respond` directive: https://caddyserver.com/docs/caddyfile/directives/respond
+- Caddy matchers: https://caddyserver.com/docs/caddyfile/matchers
+- Next.js environment variables (`NEXT_PUBLIC_`): https://nextjs.org/docs/pages/guides/environment-variables
+- Vite env variables (`VITE_`): https://vite.dev/guide/env-and-mode
+- Create React App environment variables (`REACT_APP_`, deprecation notice): https://create-react-app.dev/docs/adding-custom-environment-variables/
+
+======================================================================
+==> realtime-webhooks.md
+======================================================================
+
+# WebSockets, server-sent events, and webhooks: authenticating the non-page endpoints
+
+Streaming an LLM response commonly rides a WebSocket or an SSE stream, and integrations commonly call back through a webhook. All three are transports, not authentication mechanisms, and each is routinely shipped wide open. [authentication.md](authentication.md) rule 15 already says each transport needs its own check; this guide is that check for these three.
+
+## 1. WebSocket authentication
+
+The browser `WebSocket()` constructor takes only a URL and an optional `protocols` list; it has no argument for request headers, so a page cannot attach `Authorization: Bearer ...` to the handshake (per MDN's WebSocket API reference). Two verified patterns fill the gap:
+
+- **Cookie plus Origin check.** The handshake is still an HTTP request, so a session cookie the server already set is sent automatically. That alone is not enough: any page on any origin can open a WebSocket to your endpoint and ride the visitor's cookie, which is cross-site WebSocket hijacking (CSWSH). OWASP's WebSocket Security Cheat Sheet is explicit: validate the `Origin` header on every handshake against an allowlist, not a denylist, since wildcard or substring matching is error-prone. Reject the upgrade server-side before any application logic runs if `Origin` is missing or not on the list.
+- **A token in the subprotocol or the first message.** `Sec-WebSocket-Protocol` (the `protocols` argument) is meant for subprotocol negotiation, but OWASP recommends token-based authentication as the stronger option for exactly this case: pass a short-lived token as a subprotocol value or as the first message after the socket opens, verify it before treating the connection as authenticated, and rotate tokens on long-lived connections.
+
+Do both where you can: Origin validation stops the hijack, and a token means a stolen cookie alone is not a working credential against the socket.
+
+## 2. Server-sent events (SSE)
+
+An `EventSource` is a plain HTTP GET (confirmed on MDN); it carries cookies the same way any GET does, and `withCredentials: true` sends them cross-origin too. `EventSource` cannot set an `Authorization` header either, so a token-in-header scheme does not reach it. That leaves the same obligations as any authenticated GET: the server must still require the session cookie, and because the browser will happily fire that GET from a page on another origin, checking Origin (and treating the endpoint like a CSRF-relevant one) applies here as much as it does to a WebSocket. If a client needs a header-based token, use `fetch()` with a `ReadableStream` reader instead of `EventSource`.
+
+## 3. Webhooks: verify the sender, not just the shape of the payload
+
+A webhook has no session and no browser to enforce Origin, so the check is a signature over the raw request body:
+
+- **GitHub** signs deliveries with `X-Hub-Signature-256`: an HMAC-SHA256 hex digest of the payload using your webhook's secret, prefixed `sha256=`. Recompute it yourself and compare with a constant-time function (`crypto.timingSafeEqual` in Node.js, `secure_compare` in Ruby); a plain `==` leaks timing.
+- **Stripe** signs events with `Stripe-Signature`, formatted `t=<timestamp>,v1=<signature>`. The signed payload is the timestamp concatenated with `.` and the raw body, HMAC-SHA256 with the endpoint's `whsec_...` secret. Verify with an official library where one exists; reject if the timestamp is older than your tolerance (Stripe's libraries default to 5 minutes, and Stripe warns never to set the tolerance to 0, which disables the recency check entirely).
+
+Apply both lessons everywhere: use a distinct secret per endpoint (rotating one does not break every integration at once), and reject a request whose signature does not match or whose timestamp is stale, before your handler touches it. Both providers require the exact raw bytes; a framework that parses and re-serializes JSON before your verification code runs will break the check, so verify signatures against the body as received. Where a webhook route must be exempt from a site-wide CSRF filter, scope that exemption to that one route and method only, never to a whole controller or prefix.
+
+## 4. Bound the expensive endpoints too
+
+Inference, upload, and job-submission endpoints are usually the ones behind these transports, and an authenticated caller can still exhaust them. Enforce, at the proxy in front of the app rather than only in application code: a maximum request/body size, a concurrency cap per client, a request timeout matched to realistic response time, and a per-client rate limit. [authentication.md](authentication.md) covers the identity side these limits key off; the proxy guides (nginx, Caddy, Traefik) carry the directives for each.
+
+## Verify
+
+```bash
+# No session, no token: refused before any data streams
+curl -i --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" \
+  https://app.example.com/ws                       # expect 401/403, not 101
+
+# Cross-origin handshake: rejected on Origin even with a valid cookie
+curl -i --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Origin: https://evil.example" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" \
+  -b "session=REPLACE_WITH_VALID_SESSION_COOKIE" https://app.example.com/ws   # expect 403
+
+curl -i https://app.example.com/events              # SSE without a session: 401/403, not text/event-stream
+
+curl -i -X POST https://app.example.com/webhooks/provider \
+  -H "X-Hub-Signature-256: sha256=0000000000000000000000000000000000000000000000000000000000000000" \
+  -d '{"test":true}'                                 # expect 401, wrong signature rejected
+```
+
+## Common mistakes
+
+- Treating the page login as coverage for the WebSocket or SSE endpoint it opens; each needs its own check.
+- Comparing webhook signatures with `==` instead of a constant-time comparison.
+- Letting a framework's body parser touch the request before webhook signature verification runs, which breaks the raw-body check.
+
+## Sources (checked September 2026)
+
+- MDN: WebSocket API, `WebSocket()` constructor (no header support, `protocols` argument): https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/WebSocket
+- MDN: Using server-sent events (`EventSource`, plain GET, `withCredentials`): https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
+- OWASP WebSocket Security Cheat Sheet (Origin allowlisting, token-based authentication): https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html
+- GitHub: Validating webhook deliveries (`X-Hub-Signature-256`, constant-time comparison): https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
+- Stripe: Verify webhook signatures (`Stripe-Signature`, timestamp tolerance, official libraries): https://docs.stripe.com/webhooks#verify-official-libraries
+
+======================================================================
+==> bi-dashboards.md
+======================================================================
+
+# BI dashboards: Metabase, Superset, Redash
+
+These tools hold live connections to your production databases and cache query results in their own
+storage. An exposed instance, or one still running default or example credentials, leaks both the
+dashboards themselves and the databases behind them. One rule dominates everything tool-specific
+below, the same as [admin-uis.md](admin-uis.md): **never public.** Reach it over SSH port
+forwarding, a tailnet ([tailscale.md](tailscale.md)), or Cloudflare Access ([cloudflare.md](cloudflare.md)),
+with MFA enforced at that fronting layer ([mfa.md](mfa.md)), and connect it to the database with a
+least-privilege, read-only account wherever the dashboards do not need to write back.
+
+## Metabase
+
+The first account created during setup becomes the admin account, so an instance reachable on the
+network before you finish the setup wizard lets whoever gets there first claim admin. Complete
+setup before the instance is reachable from anywhere but you.
+
+Public links and public embeds are enabled by default and let admins share a question, dashboard,
+or document with anyone holding the URL; visitors get view-only results with no login. Metabase's
+own docs warn that the public link URL is recoverable from a public embed, so an embed is not a
+stronger boundary than a plain public link. Row and column security (per-user sandboxing of the
+underlying data) is a Pro/Enterprise feature, not available on the open-source edition, so on the
+free tier a public link or a shared question exposes whatever rows and columns the question already
+queries. Disable public sharing in Admin Settings unless you specifically need it, and treat every
+public link as a permanent, unauthenticated data release.
+
+## Apache Superset
+
+Superset ships a `SECRET_KEY` that signs session cookies; its own docs call it "very important to
+keep the `SECRET_KEY` secret and set to a secure unique complex random value." Set it, and change
+the admin password created at first run, before the instance is reachable by anyone else. Anonymous
+visitors are assigned the Public role only when `AUTH_ROLE_PUBLIC` is configured; leave it unset
+unless you intend anonymous dashboard access, and if you do, scope that role's permissions with
+`PUBLIC_ROLE_LIKE` rather than granting it broadly. Superset's own `docker-compose.yml` states
+plainly that the stack is not supported for production and that a real deployment needs its own
+environment file with unique passwords and `SECRET_KEY`; do not run the example or dev compose file
+against a production database.
+
+## Redash
+
+Setup creates the admin account on first run: "it will ask you to create your admin account. Once
+this is done, you can start using Redash." Redash's own setup guidance calls out HTTPS as something
+you add, not something it does for you: "If this is a production setup, you should enforce HTTPS."
+Front it the same as the other tools here rather than relying on anything Redash provides natively.
+
+## Verify
+
+```bash
+ss -tlnp | grep -E ':3000|:8088|:5000'   # Metabase / Superset / Redash bound to loopback only, ports vary by install
+curl -sI https://bi.example.com/         # 401/403 or a login redirect, never a dashboard
+```
+
+Confirm from outside your network that each tool's URL never renders a dashboard without a login,
+that no default admin/admin or example credentials still work, and that the database role each tool
+connects with is read-only where the dashboards do not need write access; check the connection
+string or data source config, not just the tool's own login.
+
+## Sources (checked September 2026)
+
+- Metabase documentation home: https://www.metabase.com/docs/latest/
+- Metabase setting up Metabase (first account is admin): https://www.metabase.com/docs/latest/configuring-metabase/setting-up-metabase
+- Metabase public links and embeds: https://www.metabase.com/docs/latest/embedding/public-links
+- Metabase data permissions (row and column security is Pro/Enterprise): https://www.metabase.com/docs/latest/permissions/data
+- Superset security: https://superset.apache.org/admin-docs/security/
+- Superset docker-compose.yml (production warning): https://github.com/apache/superset/blob/master/docker-compose.yml
+- Redash help center: https://redash.io/help/
+- Redash setting up a Redash instance: https://redash.io/help/open-source/setup/
+
+======================================================================
+==> pocketbase.md
+======================================================================
+
+# Self-hosted backends: PocketBase and Appwrite
+
+Like Firebase and Supabase ([firebase-supabase.md](firebase-supabase.md)), these backends hand a
+public API endpoint to your client code; the collection or resource rules you write are the only
+gate between the internet and your data. Both also ship an admin console whose first user becomes
+the operator account, so that bootstrap step has to happen before the instance is reachable by
+anyone else.
+
+## PocketBase
+
+Create the superuser before opening access. The console command is
+`./pocketbase superuser create EMAIL PASS`; the alternative is the web-based installer linked from
+the server's own startup log. Do not leave a fresh instance open to the network while that account
+is still unclaimed.
+
+PocketBase has no native TLS listener beyond its own ACME integration: run
+`./pocketbase serve yourdomain.com` and it issues and renews a Let's Encrypt certificate for that
+domain automatically, or put it behind your own reverse proxy per [nginx.md](nginx.md) or
+[caddy.md](caddy.md) and terminate TLS there instead.
+
+PocketBase 0.38 and later can restrict superuser sessions by IP: set the allowed list under
+Settings > Application > Superuser IPs, or from the console with
+`./pocketbase superuser ips 127.0.0.1 10.0.0.0 --dir=/path/to/your/pb_data`. The same settings panel
+can require an additional one-time code (email-delivered) when authenticating as a superuser. Both
+are worth enabling for any instance reachable beyond your own machine.
+
+None of that replaces the actual access control: every collection's API rules (`listRule`,
+`viewRule`, `createRule`, `updateRule`, `deleteRule`) decide what non-superusers can do. A rule left
+`null` is "locked", meaning only a superuser can perform that action; an empty string opens the
+action to everyone, including unauthenticated guests. Superusers bypass API rules entirely, so
+never hand a superuser account or token to a client application; use collection rules and scoped
+auth for that.
+
+## Appwrite (self-hosted)
+
+Enforce HTTPS in production with `_APP_OPTIONS_FORCE_HTTPS`; Appwrite's own docs say to "always
+prefer HTTPS over HTTP in production environments." Front it per [nginx.md](nginx.md) or
+[caddy.md](caddy.md) and [fronting-auth.md](fronting-auth.md) if you are not terminating TLS at
+Appwrite itself.
+
+By default only the first user can register through the console; every account after that has to be
+invited. Lock this down further with `_APP_CONSOLE_WHITELIST_ROOT` (only that first user can ever
+self-register), `_APP_CONSOLE_WHITELIST_EMAILS`, or `_APP_CONSOLE_WHITELIST_IPS` to restrict who can
+reach the console dashboard at all.
+
+Project API keys are scoped rather than all-or-nothing; grant only the scopes a given key needs, and
+treat any key with `keys.write` as equivalent to an admin credential, since it can change or delete
+other keys' scopes. Keys are meant for server SDKs and CLI use, never for client-side code; store
+them the way [secrets.md](secrets.md) describes, not in the repository or the client bundle.
+
+## Verify
+
+```bash
+curl -sI https://backend.example.com/_/           # PocketBase admin UI: login page, not a dashboard
+curl -sI https://backend.example.com/console       # Appwrite console: login page or 401, no open signup form
+```
+
+After bootstrap, confirm the console no longer offers public signup (only invitation), that a
+collection or resource with no rule set denies every request from a non-admin client, and that the
+key or token embedded in your client bundle is a scoped key, never a superuser token or an
+admin/`keys.write` API key. Grep the client bundle for the string used by your admin credentials; it
+should not appear.
+
+## Sources (checked September 2026)
+
+- PocketBase going to production: https://pocketbase.io/docs/going-to-production/
+- PocketBase API rules and filters: https://pocketbase.io/docs/api-rules-and-filters/
+- Appwrite self-hosting production security: https://appwrite.io/docs/advanced/self-hosting/production/security
+- Appwrite project API keys: https://appwrite.io/docs/advanced/platform/api-keys
 
 ======================================================================
 ==> common-mistakes.md

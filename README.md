@@ -17,7 +17,7 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
    - No domain at all: use [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
    - Internal or development use only: use [self-signed.md](self-signed.md).
 3. Apply the guide that matches the stack (index below). If the stack has no guide, place it behind a reverse proxy configured per [nginx.md](nginx.md) or [caddy.md](caddy.md) and keep the application itself on loopback.
-4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md).
+4. Enable authentication on every exposed endpoint per [authentication.md](authentication.md). Admin panels, APIs, dashboards, and databases must never be reachable without credentials, and default or hardcoded credentials must never ship. Add MFA to human logins where viable, per [mfa.md](mfa.md). A tool with no native login goes behind a login layer per [fronting-auth.md](fronting-auth.md).
 5. When login comes from a provider (Google, Microsoft Entra, GitHub, Okta, or a hosted customer-identity service), check the returned identity against an allowlist (tenant, domain, group, or users) before granting access; a successful login is not authorisation. Choose the provider per [identity-providers.md](identity-providers.md) and wire it per [oidc-integration.md](oidc-integration.md), or place login in front of the app per [cloud-identity-proxies.md](cloud-identity-proxies.md).
 6. Redirect HTTP to HTTPS, or do not listen on HTTP at all.
 7. Run the verification checklist below before reporting the work as complete. Report any item you could not test instead of asserting that it passed.
@@ -45,12 +45,14 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [nodejs.md](nodejs.md) | Node.js and Express: HTTPS server, security headers, sessions, password hashing |
 | [python.md](python.md) | Flask, FastAPI/Uvicorn, Gunicorn, Django: TLS options and secure settings |
 | [nextjs.md](nextjs.md) | Next.js: sessions, Route Handlers, Server Actions, Auth.js and Better Auth, Vercel |
+| [frontend-frameworks.md](frontend-frameworks.md) | SvelteKit, Nuxt, Vite: server-route auth, sessions, public-env prefixes |
 | [go.md](go.md) | Go net/http: TLS, proxy layout, bcrypt, cookies, client TLS discipline |
 | [dotnet.md](dotnet.md) | ASP.NET Core and Kestrel: HTTPS, HSTS, forwarded headers, Identity, cookies |
 | [java.md](java.md) | Spring Boot: server.ssl, forwarded headers, Spring Security, session cookies |
 | [php.md](php.md) | PHP and Laravel: password_hash, session cookies, trusted proxies, forced HTTPS |
 | [ruby.md](ruby.md) | Rails and Puma: force_ssl, trusted proxies, has_secure_password, credentials |
 | [docker.md](docker.md) | Docker and Compose: safe port publishing, the UFW bypass problem, TLS termination |
+| [container-hardening.md](container-hardening.md) | Non-root, dropped capabilities, read-only root, network segmentation |
 | [postgresql.md](postgresql.md) | PostgreSQL: server TLS, SCRAM authentication, pg_hba rules, verified client connections |
 | [mysql.md](mysql.md) | MySQL and MariaDB: required TLS transport, per-user TLS, modern auth plugins |
 | [mongodb.md](mongodb.md) | MongoDB: requireTLS, authorization, admin user creation, bind address |
@@ -60,11 +62,16 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [gradio.md](gradio.md) | Gradio: launch() auth and TLS parameters, share link risks |
 | [streamlit.md](streamlit.md) | Streamlit: TLS options, native OIDC login, reverse proxy deployment |
 | [tailscale.md](tailscale.md) | Tailscale serve (tailnet-only) and funnel (public) with automatic TLS |
+| [tunnels.md](tunnels.md) | frp and WireGuard, self-hosted tunnels when there is no public IP |
 | [host.md](host.md) | Host baseline: SSH hardening, firewall default-deny, brute-force protection, updates |
 | [secrets.md](secrets.md) | Secrets: repository hygiene, scanning, rotation after a leak, sops/age |
 | [machine-auth.md](machine-auth.md) | Machine identity: API keys, client credentials, mutual TLS, workload identity federation, secret managers |
+| [fronting-auth.md](fronting-auth.md) | oauth2-proxy, Authelia, Pomerium: login and MFA in front of an app that has none |
 | [cloud-firewalls.md](cloud-firewalls.md) | Security groups and VPC rules: no 0.0.0.0/0 on databases, SSH posture |
 | [paas.md](paas.md) | Render, Fly.io, Vercel, and similar: platform TLS, your auth and secrets |
+| [egress-metadata.md](egress-metadata.md) | Egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials |
+| [gpu-clouds.md](gpu-clouds.md) | RunPod, Vast.ai, Lambda, Modal: rented GPUs have no default-deny firewall |
+| [deployment-lifecycle.md](deployment-lifecycle.md) | Verify from outside, safe first-run order, previews, and teardown |
 | [kubernetes.md](kubernetes.md) | Gateway API with a maintained controller, cert-manager TLS, entry-point authentication; ingress-nginx is retired |
 | [elasticsearch.md](elasticsearch.md) | Elasticsearch and OpenSearch: keep the built-in security on |
 | [minio.md](minio.md) | MinIO: root credentials, certs directory TLS, scoped access keys |
@@ -74,6 +81,10 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [clickhouse.md](clickhouse.md) | ClickHouse: user passwords, secure ports, network restrictions |
 | [neo4j.md](neo4j.md) | Neo4j: initial password, Bolt and HTTPS TLS, auth stays on |
 | [memcached.md](memcached.md) | Memcached: no auth by default; loopback, SASL and TLS where built in |
+| [nats.md](nats.md) | NATS and JetStream, auth, TLS, and the unauthenticated monitoring port |
+| [search-engines.md](search-engines.md) | Meilisearch and Typesense, master key, scoped search keys, production mode |
+| [sqlite.md](sqlite.md) | SQLite in deployment, the file is the exposure; Turso tokens; Litestream |
+| [surrealdb.md](surrealdb.md) | SurrealDB, root credentials, bind address, access levels, TLS |
 | [open-webui.md](open-webui.md) | Open WebUI: signup control, pending role, fronting TLS |
 | [litellm.md](litellm.md) | LiteLLM proxy: master key, per-app virtual keys |
 | [model-servers.md](model-servers.md) | llama.cpp, vLLM, TGI, SGLang, Triton, LM Studio: loopback, API keys, TLS in front |
@@ -84,12 +95,20 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [agent-builders.md](agent-builders.md) | Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS |
 | [n8n.md](n8n.md) | n8n: listen address, native TLS, owner setup, MFA enforcement |
 | [code-server.md](code-server.md) | code-server: SSH forwarding first, password auth, TLS |
+| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: no native auth; loopback and a proxy |
+| [chat-uis.md](chat-uis.md) | AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login |
+| [llm-observability.md](llm-observability.md) | Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys |
+| [workflow-orchestrators.md](workflow-orchestrators.md) | Prefect, Dagster, Airflow, Temporal, Flower: no auth by default |
 | [admin-uis.md](admin-uis.md) | phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus: never public |
 | [devops-uis.md](devops-uis.md) | Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public |
+| [bi-dashboards.md](bi-dashboards.md) | Metabase, Superset, Redash: never public; least-privilege database user |
+| [pocketbase.md](pocketbase.md) | PocketBase and Appwrite: the rules are the security; lock the admin console |
 | [object-storage.md](object-storage.md) | S3, R2, GCS, Azure Blob, Supabase Storage: private by default, scoped credentials, signed URLs |
 | [firebase-supabase.md](firebase-supabase.md) | Firebase rules and Supabase RLS: the rules are the security |
 | [cors.md](cors.md) | CORS: exact origins, never * with credentials |
 | [headers.md](headers.md) | Security headers: HSTS, CSP, and companions for your app |
+| [web-exposure.md](web-exposure.md) | Files a web server must never serve: dotfiles, .git, dumps, client secrets |
+| [realtime-webhooks.md](realtime-webhooks.md) | WebSocket, SSE, and webhook authentication |
 | [common-mistakes.md](common-mistakes.md) | The recurring findings, each linked to its fix |
 
 ## Decision guide
@@ -99,6 +118,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 - App on a home server or behind NAT, with a domain you can put on Cloudflare: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. With no domain at all: [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
 - Internal tool, staging, or local development: [self-signed.md](self-signed.md), with authentication still enabled.
 - Databases and model servers (PostgreSQL, MySQL, MongoDB, Redis, Ollama): keep them off public interfaces entirely where possible; the per-tool guides cover TLS and authentication for the cases where network exposure is unavoidable.
+- Tool with no native authentication: put it behind a login layer per [fronting-auth.md](fronting-auth.md).
 
 ## Verification checklist
 
@@ -113,6 +133,7 @@ Run these after configuration. All must pass before the service is considered pr
 7. Renewal is automated where ACME is used: `sudo certbot renew --dry-run` passes, or the server (Caddy, Traefik) manages renewal itself.
 8. Public endpoints have been scanned with the [Qualys SSL Labs test](https://www.ssllabs.com/ssltest/) or [testssl.sh](https://github.com/drwetter/testssl.sh).
 9. Human-facing logins carry a second factor where the stack supports one; [mfa.md](mfa.md) lists the options, and the per-tool guides state what is viable.
+10. Probe from outside the deployment network (a second host, or check your public IP on Shodan or Censys): cloud-firewall and Docker-publishing mistakes only show from outside. See [deployment-lifecycle.md](deployment-lifecycle.md).
 
 ## Scope and currency
 

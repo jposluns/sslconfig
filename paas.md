@@ -20,7 +20,11 @@ Each platform provides environment/secret configuration. Set secrets there; neve
 
 Managed databases from these platforms come with TLS endpoints; require verified TLS in the connection string per the database guides ([postgresql.md](postgresql.md), [mysql.md](mysql.md)) and keep the credentials in the platform's secret store. Databases you run yourself elsewhere follow their own guides plus [cloud-firewalls.md](cloud-firewalls.md).
 
-## 5. Verify
+## 5. Hugging Face Spaces
+
+A new Space is public by default: anyone can view the source and reach the running app. Visibility can be changed to "protected" (the source stays private to the owner and collaborators, but the running app is still public through its embed URL or custom domain) or "private" (both the source and the running app are restricted to the owner and collaborators). Space secrets belong in the Settings tab's secrets store, never in the repository or its README metadata; anything set as a "variable" instead of a "secret" is still publicly readable. Dev Mode opens an SSH and VS Code endpoint straight into the running container, which is materially more access than the app itself, so treat an unattended Dev Mode session the same as any other exposed admin path. For serverless GPU platforms, see [gpu-clouds.md](gpu-clouds.md).
+
+## 6. Verify
 
 ```bash
 curl -sI http://app.example.com/          # platform redirects to https
@@ -32,3 +36,4 @@ curl -s  https://app.example.com/api/...  # 401/403 without credentials
 
 - Render: https://render.com/docs ; Fly.io: https://fly.io/docs ; Vercel: https://vercel.com/docs (each documents managed TLS and environment configuration; consult your platform's pages for the exact toggles)
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
+- Hugging Face Spaces: https://huggingface.co/docs/hub/spaces-overview and https://huggingface.co/docs/hub/spaces-config-reference

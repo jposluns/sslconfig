@@ -8,6 +8,7 @@ An identity-aware proxy puts a login page in front of an application without cha
 2. **The app never trusts a plain identity header.** Where the proxy provides a signed assertion (AWS, Google Cloud, Cloudflare), verify its signature, issuer, audience, and expiry before using any claim. Where the platform documents that clients cannot set the identity headers (Azure), that guarantee holds only for requests that arrived through the platform.
 3. **MFA comes from the identity provider behind the proxy.** None of these proxies adds a second factor of its own; enforce it at the IdP and the proxy inherits it ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)).
 4. Authorization is still yours: the proxy proves who the user is, and the app or the proxy policy decides what they may do ([authentication.md](authentication.md)).
+5. **Fail closed.** An auth layer must deny when it cannot decide: missing auth configuration, an unreachable authorization service, and an unmatched route must never fall through to the app unauthenticated. Test this both at startup and across a proxy reload.
 
 ## 2. AWS Application Load Balancer
 
@@ -82,6 +83,8 @@ curl -s -H "x-amzn-oidc-identity: admin" \
 ```
 
 After logging in, confirm that the app's own identity check reads the signed assertion (`x-amzn-oidc-data`, `x-goog-iap-jwt-assertion`, `Cf-Access-Jwt-Assertion`) and rejects a request carrying a tampered one.
+
+- With the identity provider or the proxy's own auth service stopped, a request to a protected route is denied, not passed through to the app.
 
 ## Common mistakes
 

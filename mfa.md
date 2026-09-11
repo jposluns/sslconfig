@@ -58,6 +58,7 @@ Machine protocols (database wire protocols, model-server APIs) have no interacti
 - Repeated wrong codes hit a rate limit or lockout.
 - Submitting the same valid TOTP code a second time within its time step is refused.
 - No TOTP secret or recovery code appears in the repository or its history.
+- A departed user's second factor, active sessions, and app-level access are revoked, not only their password changed. Enforcing MFA is not the end; offboarding belongs in the access lifecycle too, and [deployment-lifecycle.md](deployment-lifecycle.md) has the checklist.
 
 ## Standards and sources (checked September 2026)
 

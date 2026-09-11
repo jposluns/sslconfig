@@ -72,9 +72,14 @@ redis-cli --tls --cacert ca.crt -h redis.example.com ping   # NOAUTH error until
 - One `requirepass` value shared across environments and committed to the repository.
 - TLS enabled but the plaintext `port` left open alongside it; set `port 0`.
 
+## Valkey
+
+Valkey, the community fork of Redis, uses the same `requirepass`, ACL, and TLS configuration described above without changes; apply this guide's steps directly. See [valkey.io](https://valkey.io/).
+
 ## Sources (checked September 2026)
 
 - Redis documentation (security, TLS, and ACL pages): https://redis.io/docs/latest/
 - redis.conf self-documented example in the Redis source distribution: https://github.com/redis/redis
 - Redis configuration (directive format `keyword argument1 argument2 ... argumentN`): https://redis.io/docs/latest/operate/oss_and_stack/management/config/
 - PING command reference (ACL categories `@fast`, `@connection`): https://redis.io/docs/latest/commands/ping/
+- Valkey: https://valkey.io/
