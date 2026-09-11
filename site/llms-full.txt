@@ -2695,7 +2695,7 @@ Server-side check: `await auth.api.getSession({ headers: await headers() })` in 
 
 ## 6. Vercel: Deployment Protection is not user authentication
 
-Deployment Protection controls who can open a deployment URL: Vercel Authentication admits Vercel users with access to the project; Passport, Password Protection, and Trusted IPs are Enterprise or paid add-on options. Standard Protection covers previews and generated URLs but not production domains, and protecting production needs Pro or Enterprise (as of September 2026, per the Vercel docs). It gates your team's previews; your users are not Vercel users, so production still needs section 2 ([paas.md](paas.md)).
+Deployment Protection controls who can open a deployment URL: Vercel Authentication admits Vercel users with access to the project; Passport, Password Protection, and Trusted IPs are Enterprise or paid add-on options. Standard Protection covers previews and generated URLs but not production domains; selecting the All Deployments scope for Vercel Authentication extends it to production, and Vercel's changelog of 9 September 2026 makes that free on every plan including Hobby, where protecting production previously required the USD 150 per month Advanced Deployment Protection add-on (at the time of writing). Availability is not activation: the production domain stays public until All Deployments is configured. It gates your team's previews; your users are not Vercel users, so production still needs section 2 ([paas.md](paas.md)).
 
 ## Verify
 
@@ -2722,6 +2722,7 @@ grep -rl "${SESSION_SECRET:0:8}" .next/static           # no output: the browser
 - Auth.js installation: https://authjs.dev/getting-started/installation ; deployment (`AUTH_SECRET`, `AUTH_TRUST_HOST`, provider variables): https://authjs.dev/getting-started/deployment ; protecting resources: https://authjs.dev/getting-started/session-management/protecting
 - Better Auth introduction: https://www.better-auth.com/docs/introduction ; installation: https://www.better-auth.com/docs/installation ; options: https://www.better-auth.com/docs/reference/options ; Next.js integration: https://www.better-auth.com/docs/integrations/next ; two-factor plugin: https://www.better-auth.com/docs/plugins/2fa
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
+- Vercel changelog, protect production deployments for free on every plan (9 September 2026): https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan
 
 ======================================================================
 ==> go.md
@@ -3308,7 +3309,7 @@ On Render, Fly.io, Railway, Vercel, Heroku, and similar platforms, TLS is not yo
 
 ## 1. Authentication: entirely yours
 
-The platform does not authenticate your application's users. Some platforms protect the deployment itself: Vercel Deployment Protection, for example, can require a Vercel login to open preview and deployment URLs on every plan, and production domains on Pro and above, with Password Protection as a paid add-on (per https://vercel.com/docs/deployment-protection as of September 2026). That gate keeps the public out of a preview; it is not your app's login. Every non-public endpoint still needs login or keys per [authentication.md](authentication.md), MFA where viable per [mfa.md](mfa.md), and a hosted provider makes both easy ([identity-providers.md](identity-providers.md)). "It is on Vercel" changes nothing about an open `/api/admin`.
+The platform does not authenticate your application's users. Some platforms protect the deployment itself: Vercel Deployment Protection, for example, can require a Vercel login to open preview and deployment URLs on every plan, and production domains too once the All Deployments scope is selected, which Vercel's changelog of 9 September 2026 made free on every plan including Hobby; Password Protection remains a paid add-on (at the time of writing). That gate keeps the public out of a preview; it is not your app's login. Every non-public endpoint still needs login or keys per [authentication.md](authentication.md), MFA where viable per [mfa.md](mfa.md), and a hosted provider makes both easy ([identity-providers.md](identity-providers.md)). "It is on Vercel" changes nothing about an open `/api/admin`.
 
 ## 2. Secrets: use the platform's store
 
@@ -3340,6 +3341,7 @@ curl -s  https://app.example.com/api/...  # 401/403 without credentials
 
 - Render: https://render.com/docs ; Fly.io: https://fly.io/docs ; Vercel: https://vercel.com/docs (each documents managed TLS and environment configuration; consult your platform's pages for the exact toggles)
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
+- Vercel changelog, protect production deployments for free on every plan (9 September 2026): https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan
 - Hugging Face Spaces: https://huggingface.co/docs/hub/spaces-overview and https://huggingface.co/docs/hub/spaces-config-reference
 
 ======================================================================
@@ -4000,7 +4002,11 @@ Loopback or private networks by default; public access only via the TLS endpoint
 
 ```bash
 ss -tlnp | grep 9000                                   # private unless deliberate
-curl -s https://s3.example.com:9000/                   # answers over TLS; anonymous access denied
+curl -s -o /dev/null -w '%{http_code}\n' https://s3.example.com:9000/                     # service root: anonymous ListBuckets denied
+curl -s -o /dev/null -w '%{http_code}\n' https://s3.example.com:9000/REPLACE_WITH_BUCKET/ # per bucket: anonymous listing denied
+curl -s -o /dev/null -w '%{http_code}\n' https://s3.example.com:9000/REPLACE_WITH_BUCKET/REPLACE_WITH_PRIVATE_OBJECT
+                                                       # a known private object: 403, never 200. Anonymous policies are set per
+                                                       # bucket, so a denial at the service root does not prove any bucket is private
 mc alias set mys3 https://s3.example.com:9000 REPLACE_WITH_ACCESS_KEY REPLACE_WITH_SECRET_KEY   # app key works; root key stays unused by apps
 ```
 
@@ -4009,6 +4015,7 @@ mc alias set mys3 https://s3.example.com:9000 REPLACE_WITH_ACCESS_KEY REPLACE_WI
 - MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/enterprise/aistor-object-store/installation/linux/network-encryption/
 - MinIO: https://min.io/
 - MinIO community repository (archived 2026-04-25, successor editions): https://github.com/minio/minio
+- MinIO `mc anonymous set` (anonymous policies are set per bucket and permit actions without authentication): https://docs.min.io/enterprise/aistor-object-store/reference/cli/mc-anonymous/mc-anonymous-set/
 
 ======================================================================
 ==> rabbitmq.md
@@ -5092,7 +5099,7 @@ Native TLS exists when the binary is built with OpenSSL (`-DLLAMA_OPENSSL=ON`): 
 
 ## vLLM (OpenAI-compatible server)
 
-vLLM's server supports requiring an API key; check `vllm serve --help` on your installed version for the current option name (the docs at https://docs.vllm.ai/ document it; this guide avoids pinning the flag because vLLM's CLI moves quickly). vLLM does not terminate TLS for you in typical deployments, so front it with a TLS proxy or tunnel and keep the server itself on loopback or a private network.
+vLLM's server supports requiring an API key; check `vllm serve --help` on your installed version for the current option name (the docs at https://docs.vllm.ai/ document it; this guide avoids pinning the flag because vLLM's CLI moves quickly). The key does not cover the whole server. vLLM's own security page states that it authenticates only the `/v1`, `/v2`, and `/inference` path prefixes, and lists `/invocations`, the SageMaker-compatible route, as requiring no key while reaching the same inference capability as the protected `/v1` routes; the profiler routes `/start_profile` and `/stop_profile` are likewise unauthenticated, and a plugin route outside those prefixes is unauthenticated unless the plugin enforces its own check. vLLM says plainly not to rely on the key alone. Allowlist only the routes your application needs at the proxy and refuse everything else there, `/invocations` included, rather than assuming the key covers the surface. vLLM does not terminate TLS for you in typical deployments, so front it with a TLS proxy or tunnel and keep the server itself on loopback or a private network.
 
 ## Hugging Face Text Generation Inference (TGI)
 
@@ -5143,12 +5150,17 @@ LM Studio's developer server is a desktop feature. The documentation addresses i
 ss -tlnp | grep -E ':(8080|8000|8001|8002|3000|9000|30000|1234) '   # loopback only
 curl -s https://models.example.com/v1/models            # 401 without a key
 curl -s https://models.example.com/v1/models -H "Authorization: Bearer <key>"   # succeeds
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://models.example.com/invocations -d '{}'
+                                                        # vLLM: 404 or 403 from the PROXY. vLLM does not require the
+                                                        # API key on this route, so a 200 here is an unauthenticated
+                                                        # inference endpoint even though the check above passed
 ```
 
 ## Sources (checked September 2026)
 
 - llama.cpp server README (defaults, --api-key, SSL flags): https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 - vLLM documentation: https://docs.vllm.ai/
+- vLLM security, API key authentication limitations (protected prefixes, unprotected `/invocations` and profiler routes): https://docs.vllm.ai/en/latest/usage/security/
 - TGI launcher arguments (--hostname, --port, --api-key, --prometheus-port): https://huggingface.co/docs/text-generation-inference/reference/launcher
 - TGI router source (what --api-key enforces): https://github.com/huggingface/text-generation-inference/blob/main/router/src/server.rs
 - TGI repository (maintenance-mode notice, archived 2026-03-21): https://github.com/huggingface/text-generation-inference
@@ -6145,7 +6157,10 @@ dashboard and the gateway on a private network or behind an identity-aware front
 
 The Collector is the pipe these tools (and others) receive traces through, and it ships with no security
 applied until you configure it. The project's own hardening guidance: bind receivers to a specific interface
-or `localhost` (for example `127.0.0.1:4317`), never the default all-interfaces listener, unless a proxy or
+or `localhost` (for example `127.0.0.1:4317`). From Collector v0.110.0 the default host for every server in
+Collector components is `localhost`; on earlier versions the default was all interfaces, and the
+`component.UseLocalHostAsDefaultHost` feature gate switches it. Set the endpoint explicitly on any version
+rather than trusting the default, and widen it only where a proxy or
 mesh in front needs the wider bind; require TLS on every receiver and exporter; and attach an authenticator
 extension, such as `basicauth` (htpasswd-style credentials, or a static `client_auth` username/password for
 outgoing calls) or `bearertokenauth` (a static or file-backed token sent as an `Authorization` header), to any
@@ -6157,11 +6172,17 @@ enabled component is attack surface, and run the process as a non-root user.
 
 ```bash
 ss -tlnp | grep -E ':(3000|6006|4317|4318) '                          # loopback or private only, never 0.0.0.0
-curl -sI --max-time 5 http://langfuse.example.com/api/public/health   # dashboard: a login page or 401, never data
+curl -sS -o /dev/null -w '%{http_code}\n' https://langfuse.example.com/   # dashboard: login page or 401, never the project view
+                                                                        # /api/public/health returns health status by design and is
+                                                                        # not an access-control check; it proves nothing here
 curl -sS -o /dev/null -w '%{http_code}\n' https://langfuse.example.com/api/public/projects
                                                                         # 401 without -u public-key:secret-key
-curl -sS -o /dev/null -w '%{http_code}\n' http://otel-collector.internal:4318/v1/traces -d '{}'
-                                                                        # rejected without the configured auth header
+curl -sS -o /dev/null -w '%{http_code}\n' https://otel-collector.internal:4318/v1/traces \
+  -H 'Content-Type: application/json' -d '{"resourceSpans":[]}'
+                                                                        # 401 or 403 without the configured auth header. The content
+                                                                        # type matters: with curl's default form encoding the Collector
+                                                                        # answers 415 on the body alone, before authentication, so the
+                                                                        # rejection would prove nothing
 ```
 
 A dashboard that renders traces, prompts, or provider keys without a login is a finding; so is an OTLP port
@@ -6225,7 +6246,10 @@ manager's responsibility, not something the software enforces for you. Access is
 testing only: it prints a warning banner on login, and its users and roles (`viewer`, `user`, `op`, `admin`)
 come from `simple_auth_manager_users` in `[core]` (for example `bob:admin,peter:viewer`), with a password
 auto-generated per user and printed to the webserver logs unless you set your own. For production, configure
-the FAB auth manager (`[fab] auth_backends`) against LDAP, OAuth, or another real identity backend instead,
+the FAB auth manager instead: install the FAB provider, then set `[core] auth_manager` to
+`airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager` and confirm the effective manager with
+`airflow config get-value core auth_manager`. `[fab] auth_backends` is a different setting that selects the
+authentication backends for the FAB API, not the auth manager. Point FAB at LDAP, OAuth, or another real identity backend,
 and put MFA at that identity provider ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)).
 
 ## Temporal (self-hosted)
@@ -6255,8 +6279,11 @@ bind `--address=127.0.0.1` behind a proxy rather than relying on Basic Auth as t
 
 ```bash
 ss -tlnp | grep -E ':(4200|3000|8080|7233|8233|5555) '                 # loopback or private only, never 0.0.0.0
-curl -sS -o /dev/null -w '%{http_code}\n' http://prefect.internal:4200/api/health
-                                                                        # 401 without the auth string once configured
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST http://prefect.internal:4200/api/flows/filter -d '{}'
+                                                                        # 401 without the auth string once configured. Do NOT probe
+                                                                        # /api/health or /api/ready: Prefect exempts those two paths
+                                                                        # on GET so container probes keep working, so they answer 200
+                                                                        # whether or not authentication is configured
 curl -sS -o /dev/null -w '%{http_code}\n' -u '' http://dagster.internal:3000/
                                                                         # must be blocked at the proxy, not Dagster itself
 curl -sSI https://airflow.example.com/                                 # login redirect, never the DAG list
@@ -6284,6 +6311,9 @@ path.
 - Prefect, self-hosted server on Windows (default port 4200): https://docs.prefect.io/v3/how-to-guides/self-hosted/server-windows
 - Dagster, webserver and UI (default local port, no documented built-in auth): https://docs.dagster.io/guides/operate/webserver
 - Apache Airflow, security overview: https://airflow.apache.org/docs/apache-airflow/stable/security/
+- Apache Airflow, auth manager selection (`[core] auth_manager`, `airflow config get-value core auth_manager`): https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/auth-manager/index.html
+- Apache Airflow FAB provider, API authentication (`[fab] auth_backends`, independent of the auth manager): https://airflow.apache.org/docs/apache-airflow-providers-fab/stable/auth-manager/api-authentication.html
+- Prefect server source (health and ready paths exempted from the auth string on GET): https://github.com/PrefectHQ/prefect/blob/main/src/prefect/server/api/server.py
 - Apache Airflow, quickstart (default port 8080): https://airflow.apache.org/docs/apache-airflow/stable/start.html
 - Apache Airflow, security model ("doesn't support unauthenticated users", "not designed to be exposed... to
   untrusted users on the public internet"): https://airflow.apache.org/docs/apache-airflow/stable/security/security_model.html
