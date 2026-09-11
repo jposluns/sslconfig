@@ -43,7 +43,10 @@ dashboard and the gateway on a private network or behind an identity-aware front
 
 The Collector is the pipe these tools (and others) receive traces through, and it ships with no security
 applied until you configure it. The project's own hardening guidance: bind receivers to a specific interface
-or `localhost` (for example `127.0.0.1:4317`), never the default all-interfaces listener, unless a proxy or
+or `localhost` (for example `127.0.0.1:4317`). From Collector v0.110.0 the default host for every server in
+Collector components is `localhost`; on earlier versions the default was all interfaces, and the
+`component.UseLocalHostAsDefaultHost` feature gate switches it. Set the endpoint explicitly on any version
+rather than trusting the default, and widen it only where a proxy or
 mesh in front needs the wider bind; require TLS on every receiver and exporter; and attach an authenticator
 extension, such as `basicauth` (htpasswd-style credentials, or a static `client_auth` username/password for
 outgoing calls) or `bearertokenauth` (a static or file-backed token sent as an `Authorization` header), to any
@@ -55,11 +58,17 @@ enabled component is attack surface, and run the process as a non-root user.
 
 ```bash
 ss -tlnp | grep -E ':(3000|6006|4317|4318) '                          # loopback or private only, never 0.0.0.0
-curl -sI --max-time 5 http://langfuse.example.com/api/public/health   # dashboard: a login page or 401, never data
+curl -sS -o /dev/null -w '%{http_code}\n' https://langfuse.example.com/   # dashboard: login page or 401, never the project view
+                                                                        # /api/public/health returns health status by design and is
+                                                                        # not an access-control check; it proves nothing here
 curl -sS -o /dev/null -w '%{http_code}\n' https://langfuse.example.com/api/public/projects
                                                                         # 401 without -u public-key:secret-key
-curl -sS -o /dev/null -w '%{http_code}\n' http://otel-collector.internal:4318/v1/traces -d '{}'
-                                                                        # rejected without the configured auth header
+curl -sS -o /dev/null -w '%{http_code}\n' https://otel-collector.internal:4318/v1/traces \
+  -H 'Content-Type: application/json' -d '{"resourceSpans":[]}'
+                                                                        # 401 or 403 without the configured auth header. The content
+                                                                        # type matters: with curl's default form encoding the Collector
+                                                                        # answers 415 on the body alone, before authentication, so the
+                                                                        # rejection would prove nothing
 ```
 
 A dashboard that renders traces, prompts, or provider keys without a login is a finding; so is an OTLP port

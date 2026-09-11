@@ -11,6 +11,27 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 
 ## 2026-09-11
 
+### Fixed
+
+- Seven accuracy defects, each re-checked against the vendor's own page or source before the edit, found
+  by a tri-family QA scan of the whole corpus (#12). `model-servers.md` recommended a vLLM API key and
+  verified only `/v1/models`; vLLM authenticates only the `/v1`, `/v2` and `/inference` prefixes and
+  leaves `/invocations` open to the same inference capability, so a reader whose Verify step passed still
+  had an unauthenticated inference endpoint. `workflow-orchestrators.md` named `[fab] auth_backends` to
+  select Airflow's auth manager, which is `[core] auth_manager`; the FAB setting selects API
+  authentication backends and is independent of it. `llm-observability.md` called the all-interfaces
+  listener the OpenTelemetry Collector default, which has been `localhost` since v0.110.0.
+  `nextjs.md` and `paas.md` still required Pro or Enterprise to protect a Vercel production domain,
+  contradicting `cloud-identity-proxies.md`, which already carried the 9 September 2026 change making it
+  free on every plan.
+- Four Verify steps that could not discriminate (#12). The Prefect check expected a 401 on `/api/health`,
+  which the server exempts on GET so container probes keep working, so it would have failed a correctly
+  configured server; it now probes `POST /api/flows/filter`. The Langfuse check treated
+  `/api/public/health` as an access-control test although it returns health status by design. The MinIO
+  check tested the service root, which does not prove any bucket is private, because anonymous policies
+  are set per bucket. The OTLP probe sent `{}` with curl's default form encoding, which the Collector
+  rejects with 415 on content type before reaching authentication, so the rejection proved nothing.
+
 ### Changed
 
 - The project was renamed from `sslconfig` to `secureconfig`. The GitHub repository is now

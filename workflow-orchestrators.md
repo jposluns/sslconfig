@@ -33,7 +33,10 @@ manager's responsibility, not something the software enforces for you. Access is
 testing only: it prints a warning banner on login, and its users and roles (`viewer`, `user`, `op`, `admin`)
 come from `simple_auth_manager_users` in `[core]` (for example `bob:admin,peter:viewer`), with a password
 auto-generated per user and printed to the webserver logs unless you set your own. For production, configure
-the FAB auth manager (`[fab] auth_backends`) against LDAP, OAuth, or another real identity backend instead,
+the FAB auth manager instead: install the FAB provider, then set `[core] auth_manager` to
+`airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager` and confirm the effective manager with
+`airflow config get-value core auth_manager`. `[fab] auth_backends` is a different setting that selects the
+authentication backends for the FAB API, not the auth manager. Point FAB at LDAP, OAuth, or another real identity backend,
 and put MFA at that identity provider ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)).
 
 ## Temporal (self-hosted)
@@ -63,8 +66,11 @@ bind `--address=127.0.0.1` behind a proxy rather than relying on Basic Auth as t
 
 ```bash
 ss -tlnp | grep -E ':(4200|3000|8080|7233|8233|5555) '                 # loopback or private only, never 0.0.0.0
-curl -sS -o /dev/null -w '%{http_code}\n' http://prefect.internal:4200/api/health
-                                                                        # 401 without the auth string once configured
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST http://prefect.internal:4200/api/flows/filter -d '{}'
+                                                                        # 401 without the auth string once configured. Do NOT probe
+                                                                        # /api/health or /api/ready: Prefect exempts those two paths
+                                                                        # on GET so container probes keep working, so they answer 200
+                                                                        # whether or not authentication is configured
 curl -sS -o /dev/null -w '%{http_code}\n' -u '' http://dagster.internal:3000/
                                                                         # must be blocked at the proxy, not Dagster itself
 curl -sSI https://airflow.example.com/                                 # login redirect, never the DAG list
@@ -92,6 +98,9 @@ path.
 - Prefect, self-hosted server on Windows (default port 4200): https://docs.prefect.io/v3/how-to-guides/self-hosted/server-windows
 - Dagster, webserver and UI (default local port, no documented built-in auth): https://docs.dagster.io/guides/operate/webserver
 - Apache Airflow, security overview: https://airflow.apache.org/docs/apache-airflow/stable/security/
+- Apache Airflow, auth manager selection (`[core] auth_manager`, `airflow config get-value core auth_manager`): https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/auth-manager/index.html
+- Apache Airflow FAB provider, API authentication (`[fab] auth_backends`, independent of the auth manager): https://airflow.apache.org/docs/apache-airflow-providers-fab/stable/auth-manager/api-authentication.html
+- Prefect server source (health and ready paths exempted from the auth string on GET): https://github.com/PrefectHQ/prefect/blob/main/src/prefect/server/api/server.py
 - Apache Airflow, quickstart (default port 8080): https://airflow.apache.org/docs/apache-airflow/stable/start.html
 - Apache Airflow, security model ("doesn't support unauthenticated users", "not designed to be exposed... to
   untrusted users on the public internet"): https://airflow.apache.org/docs/apache-airflow/stable/security/security_model.html

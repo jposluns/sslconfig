@@ -15,7 +15,7 @@ Native TLS exists when the binary is built with OpenSSL (`-DLLAMA_OPENSSL=ON`): 
 
 ## vLLM (OpenAI-compatible server)
 
-vLLM's server supports requiring an API key; check `vllm serve --help` on your installed version for the current option name (the docs at https://docs.vllm.ai/ document it; this guide avoids pinning the flag because vLLM's CLI moves quickly). vLLM does not terminate TLS for you in typical deployments, so front it with a TLS proxy or tunnel and keep the server itself on loopback or a private network.
+vLLM's server supports requiring an API key; check `vllm serve --help` on your installed version for the current option name (the docs at https://docs.vllm.ai/ document it; this guide avoids pinning the flag because vLLM's CLI moves quickly). The key does not cover the whole server. vLLM's own security page states that it authenticates only the `/v1`, `/v2`, and `/inference` path prefixes, and lists `/invocations`, the SageMaker-compatible route, as requiring no key while reaching the same inference capability as the protected `/v1` routes; the profiler routes `/start_profile` and `/stop_profile` are likewise unauthenticated, and a plugin route outside those prefixes is unauthenticated unless the plugin enforces its own check. vLLM says plainly not to rely on the key alone. Allowlist only the routes your application needs at the proxy and refuse everything else there, `/invocations` included, rather than assuming the key covers the surface. vLLM does not terminate TLS for you in typical deployments, so front it with a TLS proxy or tunnel and keep the server itself on loopback or a private network.
 
 ## Hugging Face Text Generation Inference (TGI)
 
@@ -66,12 +66,17 @@ LM Studio's developer server is a desktop feature. The documentation addresses i
 ss -tlnp | grep -E ':(8080|8000|8001|8002|3000|9000|30000|1234) '   # loopback only
 curl -s https://models.example.com/v1/models            # 401 without a key
 curl -s https://models.example.com/v1/models -H "Authorization: Bearer <key>"   # succeeds
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://models.example.com/invocations -d '{}'
+                                                        # vLLM: 404 or 403 from the PROXY. vLLM does not require the
+                                                        # API key on this route, so a 200 here is an unauthenticated
+                                                        # inference endpoint even though the check above passed
 ```
 
 ## Sources (checked September 2026)
 
 - llama.cpp server README (defaults, --api-key, SSL flags): https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 - vLLM documentation: https://docs.vllm.ai/
+- vLLM security, API key authentication limitations (protected prefixes, unprotected `/invocations` and profiler routes): https://docs.vllm.ai/en/latest/usage/security/
 - TGI launcher arguments (--hostname, --port, --api-key, --prometheus-port): https://huggingface.co/docs/text-generation-inference/reference/launcher
 - TGI router source (what --api-key enforces): https://github.com/huggingface/text-generation-inference/blob/main/router/src/server.rs
 - TGI repository (maintenance-mode notice, archived 2026-03-21): https://github.com/huggingface/text-generation-inference

@@ -128,7 +128,7 @@ Server-side check: `await auth.api.getSession({ headers: await headers() })` in 
 
 ## 6. Vercel: Deployment Protection is not user authentication
 
-Deployment Protection controls who can open a deployment URL: Vercel Authentication admits Vercel users with access to the project; Passport, Password Protection, and Trusted IPs are Enterprise or paid add-on options. Standard Protection covers previews and generated URLs but not production domains, and protecting production needs Pro or Enterprise (as of September 2026, per the Vercel docs). It gates your team's previews; your users are not Vercel users, so production still needs section 2 ([paas.md](paas.md)).
+Deployment Protection controls who can open a deployment URL: Vercel Authentication admits Vercel users with access to the project; Passport, Password Protection, and Trusted IPs are Enterprise or paid add-on options. Standard Protection covers previews and generated URLs but not production domains; selecting the All Deployments scope for Vercel Authentication extends it to production, and Vercel's changelog of 9 September 2026 makes that free on every plan including Hobby, where protecting production previously required the USD 150 per month Advanced Deployment Protection add-on (at the time of writing). Availability is not activation: the production domain stays public until All Deployments is configured. It gates your team's previews; your users are not Vercel users, so production still needs section 2 ([paas.md](paas.md)).
 
 ## Verify
 
@@ -155,3 +155,4 @@ grep -rl "${SESSION_SECRET:0:8}" .next/static           # no output: the browser
 - Auth.js installation: https://authjs.dev/getting-started/installation ; deployment (`AUTH_SECRET`, `AUTH_TRUST_HOST`, provider variables): https://authjs.dev/getting-started/deployment ; protecting resources: https://authjs.dev/getting-started/session-management/protecting
 - Better Auth introduction: https://www.better-auth.com/docs/introduction ; installation: https://www.better-auth.com/docs/installation ; options: https://www.better-auth.com/docs/reference/options ; Next.js integration: https://www.better-auth.com/docs/integrations/next ; two-factor plugin: https://www.better-auth.com/docs/plugins/2fa
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
+- Vercel changelog, protect production deployments for free on every plan (9 September 2026): https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan
