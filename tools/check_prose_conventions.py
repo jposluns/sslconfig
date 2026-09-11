@@ -23,9 +23,17 @@ is a command inside backticks. Applying the carve-out to both is how the first d
 this gate missed `./pocketbase serve yourdomain.com`, which is the defect it was written
 to catch.
 
+EXEMPTIONS, each with a reason. Spelling skips `backticks`, "double quotes", 'single
+quotes' and URLs, because a quotation must not be silently edited and a URL path cannot be
+respelled without breaking the link. The placeholder check skips CHANGELOG.md, because an
+entry recording a placeholder replacement has to name the old value, and a changelog line
+is not something a reader pastes into a server.
+
 WHAT THIS DOES NOT PROVE: that the prose is otherwise correct, that -ize was applied to
 words outside this list, or that a placeholder outside this list is safe. Both checks are
-closed lists, and a closed list only catches what it names.
+closed lists, and a closed list only catches what it names. The first version of this file
+also listed example.org as a bad placeholder, which is wrong: RFC 2606 reserves
+example.com, example.net and example.org alike.
 """
 import re
 import sys
@@ -40,28 +48,41 @@ SKIP_DIRS = {".git", "node_modules", "__pycache__", "tools", "scripts", ".github
 # there, and reporting both would send a reader to the file they must not hand-edit.
 GENERATED = {"llms-full.txt"}
 
+# The changelog records what changed, which for a placeholder replacement means naming the
+# old value. Scanning it would make this very change undocumentable: an honest entry saying
+# `yourdomain.com` was replaced would turn the build red. A changelog entry is also not
+# something a reader copies into a server, which is what the placeholder rule protects.
+NO_PLACEHOLDER_CHECK = {"CHANGELOG.md"}
+
 # British -ise forms whose Oxford counterpart is -ize. Deliberately a closed list: a
 # regex for "any -ise word" would flag exercise, advertise, comprise and the rest.
 ISE_STEMS = (
     "authoris", "organis", "recognis", "randomis", "normalis", "synchronis",
     "initialis", "customis", "minimis", "maximis", "categoris", "prioritis",
-    "standardis", "summaris", "utilis", "analys" + "e",  # analyse, not analysis
+    "standardis", "summaris", "utilis", "optimis", "serialis", "deserialis",
+    "sanitis", "virtualis", "containeris", "paramateris", "parameteris",
+    "tokenis", "anonymis", "pseudonymis", "capitalis", "centralis", "generalis",
+    "localis", "modernis", "specialis", "visualis", "analys" + "e",  # analyse, not analysis
 )
 ISE_RE = re.compile(r"\b(" + "|".join(ISE_STEMS) + r")(e|es|ed|ing|ation|ations|er|ers)?\b", re.I)
 
 # Placeholders that are not in the house set. Each is a domain someone may actually own.
 BAD_PLACEHOLDERS = re.compile(
     r"\b(yourdomain\.com|yoursite\.com|mydomain\.com|mysite\.com|yourcompany\.com|"
-    r"yourserver\.com|example\.org|test\.com)\b", re.I
+    r"yourserver\.com|mycompany\.com|foo\.com|bar\.com)\b", re.I
 )
 
-QUOTED_RE = re.compile(r"`[^`]*`|\"[^\"]*\"")
+QUOTED_RE = re.compile(r"`[^`]*`|\"[^\"]*\"|'[^']*'")
+# A cited URL may contain a British spelling in its path, and respelling it breaks the
+# link. UK government and vendor documentation routinely does this.
+URL_RE = re.compile(r"https?://\S+")
 
 
 def unquoted(line):
     """The line with backticked and double-quoted spans blanked out, so matches inside a
     quotation are not found. Length is preserved so column positions stay meaningful."""
-    return QUOTED_RE.sub(lambda m: " " * len(m.group(0)), line)
+    blanked = URL_RE.sub(lambda m: " " * len(m.group(0)), line)
+    return QUOTED_RE.sub(lambda m: " " * len(m.group(0)), blanked)
 
 
 def main() -> int:
@@ -92,7 +113,7 @@ def main() -> int:
                     f"{path.relative_to(root)}:{lineno}: British spelling '{m.group(0)}', "
                     f"use the Oxford -ize form"
                 )
-            p = BAD_PLACEHOLDERS.search(line)
+            p = None if path.name in NO_PLACEHOLDER_CHECK else BAD_PLACEHOLDERS.search(line)
             if p:
                 findings.append(
                     f"{path.relative_to(root)}:{lineno}: placeholder '{p.group(0)}' is outside the "

@@ -87,7 +87,10 @@ Redpanda implements the Kafka wire protocol, so the client-side and protocol-lev
 
 ```bash
 ss -tlnp | grep -E '9092|9093'                                # 9093 only, or 9092 on 127.0.0.1
-openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake with your certificate
+openssl s_client -connect kafka.example.com:9093 -verify_hostname kafka.example.com \
+  -verify_return_error </dev/null                             # prints Verification: OK. Without those two
+                                                              # flags the handshake succeeds against any
+                                                              # certificate and proves only that TLS is on
 # wrong.properties: a copy of client.properties (security.protocol=SASL_SSL) with a deliberately wrong SCRAM password
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
   --group app-workers --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)

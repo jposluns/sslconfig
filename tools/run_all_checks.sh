@@ -143,6 +143,10 @@ echo "== no Verify block disables TLS verification =="
 # warn against it.
 if verify_safety=$(python3 tools/check_verify_safety.py 2>&1); then
   printf '%s\n' "$verify_safety"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$verify_safety"; then
+    bad "check_verify_safety.py printed findings but exited 0"
+  fi
 elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$verify_safety"; then
   bad "check_verify_safety.py crashed; its findings are incomplete"
   printf '%s\n' "$verify_safety" | sed 's/^/          /'
@@ -161,6 +165,10 @@ echo "== prose conventions: Oxford -ize and house placeholders =="
 # spans are exempt from the SPELLING check only, so a changelog entry can quote the old spelling.
 if prose_conv=$(python3 tools/check_prose_conventions.py 2>&1); then
   printf '%s\n' "$prose_conv"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$prose_conv"; then
+    bad "check_prose_conventions.py printed findings but exited 0"
+  fi
 elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$prose_conv"; then
   bad "check_prose_conventions.py crashed; its findings are incomplete"
   printf '%s\n' "$prose_conv" | sed 's/^/          /'

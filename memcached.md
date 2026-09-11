@@ -40,7 +40,10 @@ MFA: there is no login for a person, so no second factor applies; human access t
 ss -tlnup | grep 11211                                    # 127.0.0.1 or the private address; no UDP line
 printf 'stats\r\nquit\r\n' | nc 127.0.0.1 11211           # works locally
 printf 'stats\r\nquit\r\n' | nc cache.example.com 11211   # from outside: connection refused or timeout
-openssl s_client -connect 10.0.0.5:11211 </dev/null       # TLS handshake when -Z is on
+openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_return_error </dev/null
+                                                          # prints Verification: OK when -Z is on. A bare
+                                                          # handshake with no CA file shows TLS is enabled,
+                                                          # not that the certificate is trusted
 ```
 
 With `-S`, a plain `stats` over the text protocol is rejected, because the binary protocol is enforced.
