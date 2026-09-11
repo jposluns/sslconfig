@@ -63,6 +63,7 @@ Authelia is a login portal with built-in TOTP and WebAuthn, sitting behind the p
 nginx calls a dedicated `auth-request` endpoint (its `auth_request` module cannot forward the method and body the way the others' forward-auth middlewares do). That endpoint must be defined; Authelia's own snippets (`authelia-location.conf` and `authelia-authrequest.conf`) show it as:
 
 ```nginx
+resolver 127.0.0.11 valid=30s;
 set $upstream_authelia http://authelia:9091/api/authz/auth-request;
 location /internal/authelia/authz {
     internal;
@@ -80,6 +81,11 @@ auth_request /internal/authelia/authz;
 auth_request_set $redirection_url $upstream_http_location;
 error_page 401 =302 $redirection_url;
 ```
+
+nginx needs a way to resolve the `authelia` hostname at request time since `proxy_pass` here targets
+a variable rather than a static address, so the `resolver` line above (or a matching `upstream`
+block) is required; Authelia's nginx integration assumes a Docker DNS resolver is available for
+this, per Authelia's nginx integration guide.
 
 Traefik and Caddy call `/api/authz/forward-auth` instead:
 

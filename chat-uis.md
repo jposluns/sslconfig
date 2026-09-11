@@ -57,8 +57,10 @@ ss -tlnp | grep -E '3001|3210|3000'                    # each UI on 127.0.0.1 on
 curl -s http://203.0.113.10:3210/                       # from another host: connection refused
 curl -s https://chat.example.com/api/some-endpoint      # without a key/token: 401
 curl -sI https://chat.example.com/                      # via the proxy: TLS, login required
-# LobeChat SSO: sign in with a Google account NOT listed in AUTH_ALLOWED_EMAILS
-#   expect rejection after the Google redirect, before any session is created
+# LobeChat SSO: attempt to register/sign in with a Google account that has never registered and is
+#   NOT listed in AUTH_ALLOWED_EMAILS; expect rejection at registration, before any account or session
+#   is created (AUTH_ALLOWED_EMAILS gates new registration; it does not revoke an already-registered
+#   user's existing session)
 ```
 
 ## Common mistakes

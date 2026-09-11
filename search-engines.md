@@ -1,6 +1,6 @@
 # Search engines for RAG: Meilisearch and Typesense
 
-Both back RAG pipelines and site search, both ship a keyless dev mode meant for a laptop, and both hand out one bootstrap key that is full admin over every index. Ship that dev-mode instance or leak that bootstrap key and the whole corpus, every document your RAG pipeline embedded, is readable and writable by whoever has it.
+Both back RAG pipelines and site search, and both hand out a bootstrap or default key that is full admin over every index; Meilisearch also ships a keyless development mode meant for a laptop, but Typesense requires an API key from the moment it starts, with no keyless mode of its own. Ship an unprotected Meilisearch dev-mode instance, or leak either engine's bootstrap or default key, and the whole corpus, every document your RAG pipeline embedded, is readable and writable by whoever has it.
 
 ## Meilisearch
 
@@ -53,5 +53,5 @@ Grep the client bundle and repository history for the admin/master/bootstrap key
 
 ## Sources (checked September 2026)
 
-- Meilisearch security overview (MEILI_MASTER_KEY, --env production, default admin/search keys, tenant tokens): https://www.meilisearch.com/docs/resources/self_hosting/security/overview
+- Meilisearch master API keys (MEILI_MASTER_KEY, the four default API keys): https://www.meilisearch.com/docs/resources/self_hosting/security/master_api_keys
 - Typesense data access control (bootstrap api-key, /keys, actions, collections, filter_by, include_fields/exclude_fields, expires_at): https://typesense.org/docs/guide/data-access-control.html

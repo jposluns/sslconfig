@@ -99,15 +99,21 @@ docker exec app id                                  # uid is not 0
 docker exec app sh -c 'touch /x'                    # read-only fs: fails
 kubectl get pod app -o jsonpath='{.spec.containers[0].securityContext}'
 
+# resolve the db Service's ClusterIP once and probe that same IP from both pods below; the
+# role: other pod has no DNS egress under the policies above, so a probe by hostname would fail on
+# name resolution rather than on the NetworkPolicy, and access by IP could still work even if
+# the policy were not enforcing anything
+DBIP=$(kubectl get svc db -o jsonpath='{.spec.clusterIP}')
+
 # a probe pod needs its own admission-compliant securityContext under the restricted PSA level, and a
 # real TCP connect to the db's actual port (a Postgres port does not speak HTTP, so wget cannot test it)
-SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3","db","5432"]}]}}'
+SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3",'"$DBIP"',"5432"]}]}}'
 
 kubectl run probe-permitted --rm -it --restart=Never --image=busybox:1.36 --labels=role=app \
-  --overrides="$SC" -- true                          # from a pod labeled role=app: must succeed
+  --overrides="$SC" -- true                          # from a pod labeled role=app, by IP: must succeed first, proving the path works
 
 kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labels=role=other \
-  --overrides="$SC" -- true                          # from a pod without that label: must time out
+  --overrides="$SC" -- true                          # from a pod without that label, same IP: must time out or be refused at TCP, not fail on DNS
 ```
 
 ## Sources (checked September 2026)

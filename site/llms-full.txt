@@ -104,7 +104,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [agent-builders.md](agent-builders.md) | Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS |
 | [n8n.md](n8n.md) | n8n: listen address, native TLS, owner setup, MFA enforcement |
 | [code-server.md](code-server.md) | code-server: SSH forwarding first, password auth, TLS |
-| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: exposed by default; keep on loopback and add a login |
+| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: keep on loopback and add a login before exposing |
 | [chat-uis.md](chat-uis.md) | AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login |
 | [llm-observability.md](llm-observability.md) | Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys |
 | [workflow-orchestrators.md](workflow-orchestrators.md) | Prefect, Dagster, Airflow, Temporal, Flower: keep off the public internet and require auth |
@@ -539,10 +539,10 @@ The private key never leaves the peer that generated it; only the public key goe
 wg set wg0 listen-port 51820 private-key /path/to/private-key peer "REPLACE_WITH_PEER_PUBLIC_KEY" allowed-ips 192.168.88.0/24 endpoint 203.0.113.10:51820
 ```
 
-`AllowedIPs` is dual-purpose "Cryptokey Routing," but the two purposes are not symmetric. On the sending side it "behaves as a sort of routing table," picking which peer a destination IP goes to. On the receiving side it "behaves as a sort of access control list" for the packet's source address only, dropping a decrypted packet whose source IP does not match the sending peer's configured `AllowedIPs`; it is a spoofing check, not a destination filter. Once a peer is authenticated, its `AllowedIPs` entry places no limit on which destinations that peer is allowed to reach if the server is willing to forward the traffic there. Scope `AllowedIPs` to exactly the address or subnet a peer should be reached at, never `0.0.0.0/0` unless that peer is genuinely meant to be a full-tunnel gateway, and restrict which destinations a peer can reach through the server with a firewall rule on the server itself, for example an nftables rule dropping forwarded packets from that peer to anything outside its intended subnet:
+`AllowedIPs` is dual-purpose "Cryptokey Routing," but the two purposes are not symmetric. On the sending side it "behaves as a sort of routing table," picking which peer a destination IP goes to. On the receiving side it "behaves as a sort of access control list" for the packet's source address only, dropping a decrypted packet whose source IP does not match the sending peer's configured `AllowedIPs`; it is a spoofing check, not a destination filter, and it is the server's actual restriction on which source address a peer may use. Once a peer is authenticated, its `AllowedIPs` entry places no limit on which destinations that peer is allowed to reach if the server is willing to forward the traffic there. Scope `AllowedIPs` to exactly the address or subnet a peer should be reached at, never `0.0.0.0/0` unless that peer is genuinely meant to be a full-tunnel gateway, and restrict which destinations a peer can reach through the server with a firewall rule on the server itself, matching the same source prefix as that peer's `AllowedIPs` so the peer cannot rotate its source address within that prefix to evade a narrower rule, for example an nftables rule dropping forwarded packets from anywhere in this peer's permitted subnet to a destination outside its intended subnet, with a counter so the rule's effect can be confirmed later:
 
 ```bash
-nft add rule inet filter forward iifname "wg0" ip saddr 192.168.88.2 ip daddr != 192.168.88.0/24 drop
+nft add rule inet filter forward iifname "wg0" ip saddr 192.168.88.0/24 ip daddr != 192.168.88.0/24 counter drop
 ```
 
 By default WireGuard "tries to be as silent as possible when not being used," so the only inbound port a firewall needs to open is the single WireGuard UDP `ListenPort`; everything else on the host stays closed per [host.md](host.md).
@@ -555,7 +555,18 @@ frpc -c frpc-wrongtoken.toml   # expect an authentication failure, no proxy regi
 
 ss -ulnp | grep 51820          # WireGuard: only the one UDP port listening
 sudo ufw status verbose        # no other inbound rule added for the tunneled service
-ping -c1 192.168.99.50         # from that peer, a destination outside its intended subnet: blocked by the server-side firewall rule above, not by AllowedIPs
+
+# positive control: from the peer, a destination inside its intended subnet must succeed, proving
+# the tunnel and routing both work
+ping -c1 192.168.88.10
+
+# forbidden destination: from the peer, a host the server would otherwise forward to (its own LAN,
+# reachable through the tunnel if not for this rule) but outside 192.168.88.0/24, so a failure here
+# is attributable to the firewall rule rather than to an address that was never routed or never live
+ping -c1 192.168.1.50          # expect 100 percent packet loss
+
+# confirm the drop is the firewall rule acting, not a routing gap: its counter must be nonzero
+sudo nft list ruleset | grep -A1 'saddr 192.168.88.0/24'   # packets and bytes both greater than 0
 ```
 
 ## Sources (checked September 2026)
@@ -1008,7 +1019,7 @@ Use `actions.ngrok.oauth.identity.email in ['alice@example.com']` for an explici
 
 ## 7. Vercel Deployment Protection
 
-Vercel's protection guards a deployment from the public; it is not your application's user login. **Vercel Authentication** (all plans) admits logged-in team or project members with at least a viewer role, users granted access on request, holders of a shareable link, and automation with the bypass header. **Standard Protection** covers preview deployments and generated deployment URLs but not production domains; protecting production requires **All Deployments**, available on Pro and Enterprise. **Password Protection** is an Enterprise feature or a paid Pro add-on (Advanced Deployment Protection, USD 150 per month at the time of writing); Trusted IPs and Passport (your own IdP) are Enterprise only. On Hobby, the production domain stays public.
+Vercel's protection guards a deployment from the public; it is not your application's user login. **Vercel Authentication** (all plans) admits logged-in team or project members with at least a viewer role, users granted access on request, holders of a shareable link, and automation with the bypass header. **Standard Protection** covers preview deployments and generated deployment URLs but not production domains; the **All Deployments** scope closes that gap, and Vercel's September 9, 2026 change made pairing it with Vercel Authentication free on every plan, including Hobby, rather than Pro and Enterprise only (per Vercel's Deployment Protection changelog, at the time of writing; the configuration reference page itself still listed All Deployments as Pro and Enterprise only when checked, so confirm current availability in your own dashboard). Until All Deployments protection is configured, the production domain stays public on every plan. **Password Protection** is an Enterprise feature or a paid Pro add-on (Advanced Deployment Protection, USD 150 per month at the time of writing); Trusted IPs and Passport (your own IdP) are Enterprise only.
 
 ## Verify
 
@@ -1203,6 +1214,7 @@ Authelia is a login portal with built-in TOTP and WebAuthn, sitting behind the p
 nginx calls a dedicated `auth-request` endpoint (its `auth_request` module cannot forward the method and body the way the others' forward-auth middlewares do). That endpoint must be defined; Authelia's own snippets (`authelia-location.conf` and `authelia-authrequest.conf`) show it as:
 
 ```nginx
+resolver 127.0.0.11 valid=30s;
 set $upstream_authelia http://authelia:9091/api/authz/auth-request;
 location /internal/authelia/authz {
     internal;
@@ -1220,6 +1232,11 @@ auth_request /internal/authelia/authz;
 auth_request_set $redirection_url $upstream_http_location;
 error_page 401 =302 $redirection_url;
 ```
+
+nginx needs a way to resolve the `authelia` hostname at request time since `proxy_pass` here targets
+a variable rather than a static address, so the `resolver` line above (or a matching `upstream`
+block) is required; Authelia's nginx integration assumes a Docker DNS resolver is available for
+this, per Authelia's nginx integration guide.
 
 Traefik and Caddy call `/api/authz/forward-auth` instead:
 
@@ -2291,7 +2308,7 @@ CSRF: `csrf.checkOrigin` (default `true`, deprecated in the current reference) c
 
 Public env: only variables prefixed `PUBLIC_` (`env.publicPrefix`) are "statically injected into your bundle at build time" and reachable from `$env/static/public`; anything else throws if imported from client code. Keep secrets in modules SvelteKit treats as server-only, either `$env/static/private` / `$env/dynamic/private`, a `.server.js` filename, or anything under `$lib/server/` ([secrets.md](secrets.md)); SvelteKit statically traces import chains and fails the build if client code imports one, even through a dynamic `import()`.
 
-None of this gates a request for you by default: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). The `handle` hook in `hooks.server.js` can enforce access, since it runs on every request and may return a `Response` before `resolve` renders the route, but only when it actually checks the session and blocks; using it just to redirect an unauthenticated page navigation, or just to attach identity onto `event.locals` for other handlers to read, still leaves a directly reached `+server.js` endpoint or form action open. Do not base the authorization decision on `event.url`, `route`, or `params` inside `handle`, since those are client supplied and can be manipulated; check the session instead. Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a client-side redirect alone.
+None of this gates a request for you by default: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). The `handle` hook in `hooks.server.js` can enforce access, since it runs on every request and may return a `Response` before `resolve` renders the route, but only when it actually checks the session and blocks; using it just to redirect an unauthenticated page navigation, or just to attach identity onto `event.locals` for other handlers to read, still leaves a directly reached `+server.js` endpoint or form action open. Inside `handle`, `event.url`, `route`, and `params` can reflect the calling page rather than the resource actually being requested, so do not rely on them alone to decide what is being authorized; checking the session there is necessary but not sufficient, since a session check alone does not authorize access to the specific resource, so also enforce that check at the point each resource is served. Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a client-side redirect alone.
 
 ## Nuxt (Nitro server routes)
 
@@ -2320,12 +2337,14 @@ Both are development tooling, not a production server: the `vite preview` docs s
 ```bash
 curl -si https://app.example.com/api/private | head -1   # 401 with no session cookie, on all three frameworks
 ls build dist .output 2>/dev/null                          # confirm which output directory your build actually produced
-grep -rl "REPLACE_WITH_YOUR_ACTUAL_SECRET_VALUE" build dist .output 2>/dev/null
-                                                            # any line here is a leaked value; treat no output as clean only
-                                                            # if the ls above found a real directory, since a missing one
-                                                            # also produces no output from grep
+grep -rlF "REPLACE_WITH_YOUR_ACTUAL_SECRET_VALUE" build dist .output; echo "exit: $?"
+                                                            # search the built client output for the literal secret value with a
+                                                            # fixed-string match; exit 1 is the goal, exit 2 means a listed
+                                                            # directory did not exist, and grep's own errors are left visible
 curl -si https://app.example.com/ -H "Host: evil.example.com" | head -1   # a spoofed Host is not trusted
 ```
+
+A clean grep result here is evidence, not proof: it means the literal value did not match in the directories searched, not that the secret cannot be present in some other form. A bundler could split, encode, or otherwise transform it, so check the exit code and confirm the directory actually exists rather than reading silence alone as clean.
 
 Behind a reverse proxy, confirm cookies still carry `Secure` and redirects use an `https://` `Location` once `ORIGIN` (SvelteKit) is set; without it, SvelteKit often builds an `http://` URL even though the browser connection is TLS. `NUXT_PUBLIC_...` is the public runtime-config prefix, exposed straight to the client bundle; it is not a trusted-proxy or secure-cookie setting and does nothing for this check. Nuxt's own trusted-proxy and origin handling come from its deployment preset and hosting platform rather than one documented app-level variable, so verify the equivalent behavior against whichever adapter you deploy with.
 
@@ -2451,15 +2470,21 @@ docker exec app id                                  # uid is not 0
 docker exec app sh -c 'touch /x'                    # read-only fs: fails
 kubectl get pod app -o jsonpath='{.spec.containers[0].securityContext}'
 
+# resolve the db Service's ClusterIP once and probe that same IP from both pods below; the
+# role: other pod has no DNS egress under the policies above, so a probe by hostname would fail on
+# name resolution rather than on the NetworkPolicy, and access by IP could still work even if
+# the policy were not enforcing anything
+DBIP=$(kubectl get svc db -o jsonpath='{.spec.clusterIP}')
+
 # a probe pod needs its own admission-compliant securityContext under the restricted PSA level, and a
 # real TCP connect to the db's actual port (a Postgres port does not speak HTTP, so wget cannot test it)
-SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3","db","5432"]}]}}'
+SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3",'"$DBIP"',"5432"]}]}}'
 
 kubectl run probe-permitted --rm -it --restart=Never --image=busybox:1.36 --labels=role=app \
-  --overrides="$SC" -- true                          # from a pod labeled role=app: must succeed
+  --overrides="$SC" -- true                          # from a pod labeled role=app, by IP: must succeed first, proving the path works
 
 kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labels=role=other \
-  --overrides="$SC" -- true                          # from a pod without that label: must time out
+  --overrides="$SC" -- true                          # from a pod without that label, same IP: must time out or be refused at TCP, not fail on DNS
 ```
 
 ## Sources (checked September 2026)
@@ -3333,11 +3358,20 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://169.254.169.254/metadata/instan
 # credentials, must succeed
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://sts.amazonaws.com/
 
-# negative control: a known-live host outside the egress allow list must be blocked, not merely
-# unresolved; curl reports a DNS failure differently from a network-level block
-curl -sv --max-time 5 https://www.example.com/ 2>&1 | grep -q "Could not resolve host" \
-  && echo "DNS failure, not a policy block: confirm this host still resolves before retrying" \
-  || echo "blocked past DNS resolution, or timed out: this is the egress policy taking effect"
+# negative control: a known-live host outside the egress allow list, judged by curl's exit status,
+# not by matching text in its output, since a successful connection also lacks the string
+# "Could not resolve host" and so would otherwise be misreported as blocked
+curl -s --max-time 5 -o /dev/null https://example.com/
+rc=$?
+if [ "$rc" -eq 0 ]; then
+  echo "FAIL: connected to a host outside the allow list, egress is not enforced"
+elif [ "$rc" -eq 6 ]; then
+  echo "inconclusive: DNS resolution failed (curl exit 6), confirm this host still resolves before retrying"
+elif [ "$rc" -eq 7 ] || [ "$rc" -eq 28 ]; then
+  echo "pass: connection refused or timed out (curl exit $rc), the egress policy is blocking this host"
+else
+  echo "unexpected curl exit code $rc, investigate before treating this as a pass"
+fi
 # confirm the metadata options actually took effect
 aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
   --query 'Reservations[].Instances[].MetadataOptions'
@@ -3398,8 +3432,11 @@ MFA: none of these platforms add a second factor to the workload itself. The acc
 
 ```bash
 ss -tlnp                                   # enumerate every listening port on the box
-curl -s http://127.0.0.1:8888/             # notebook: 403/redirect without its token in the URL/header
-curl -s "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/"    # 401 without credentials, once auth is configured (RunPod's proxy hostname form; substitute the equivalent for your platform)
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8888/api/contents   # 403 without the token
+curl -sS -o /dev/null -w '%{http_code}\n' "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/REPLACE_WITH_PROTECTED_PATH"
+# 401 without credentials, against an actual protected endpoint rather than "/" (RunPod's proxy hostname form; substitute the equivalent for your platform)
+curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer REPLACE_WITH_TOKEN" "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/REPLACE_WITH_PROTECTED_PATH"
+# 200 with the correct credentials, so the pair shows the listener itself gates access, not only the proxy hostname's obscurity
 ```
 
 Every port `ss` shows listening should be either closed (not exposed at the platform layer) or authenticated (the listener itself demands a key, token, or login). A Jupyter server that answers without its token is a finding, whichever of these platforms it runs on.
@@ -4525,11 +4562,13 @@ The HTTP monitoring endpoint is off unless configured (`http_port: 8222` in the 
 
 ## Verify
 
+The `nats` CLI reads a saved context and environment variables (`NATS_URL`, `NATS_USER`, `NATS_PASSWORD`, and similar) before falling back to any default, so a credential-free test has to neutralize both or it can silently inherit credentials from whatever context happens to be active.
+
 ```bash
 ss -tlnp | grep -E ':(4222|8222) '                                                                                                                          # 4222 as intended, 8222 loopback/private only
 nats pub orders.created hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE --user order-svc --password REPLACE_WITH_LONG_RANDOM_PASSWORD   # allowed subject, valid credentials: succeeds
 nats pub other.subject hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE --user order-svc --password REPLACE_WITH_LONG_RANDOM_PASSWORD     # subject outside the allow list: fails
-nats pub orders.created hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE                                                                  # no --user/--password: fails
+nats --context "" --server nats://REPLACE_WITH_NATS_HOST:4222 pub orders.created hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE   # empty context, explicit server, no --user/--password: fails, and cannot inherit credentials from a saved context or NATS_URL/NATS_USER/NATS_PASSWORD
 curl -s http://monitor.example.com:8222/connz                                                                                                               # connection refused/timeout from outside
 ```
 
@@ -4554,7 +4593,7 @@ curl -s http://monitor.example.com:8222/connz                                   
 
 # Search engines for RAG: Meilisearch and Typesense
 
-Both back RAG pipelines and site search, both ship a keyless dev mode meant for a laptop, and both hand out one bootstrap key that is full admin over every index. Ship that dev-mode instance or leak that bootstrap key and the whole corpus, every document your RAG pipeline embedded, is readable and writable by whoever has it.
+Both back RAG pipelines and site search, and both hand out a bootstrap or default key that is full admin over every index; Meilisearch also ships a keyless development mode meant for a laptop, but Typesense requires an API key from the moment it starts, with no keyless mode of its own. Ship an unprotected Meilisearch dev-mode instance, or leak either engine's bootstrap or default key, and the whole corpus, every document your RAG pipeline embedded, is readable and writable by whoever has it.
 
 ## Meilisearch
 
@@ -4607,7 +4646,7 @@ Grep the client bundle and repository history for the admin/master/bootstrap key
 
 ## Sources (checked September 2026)
 
-- Meilisearch security overview (MEILI_MASTER_KEY, --env production, default admin/search keys, tenant tokens): https://www.meilisearch.com/docs/resources/self_hosting/security/overview
+- Meilisearch master API keys (MEILI_MASTER_KEY, the four default API keys): https://www.meilisearch.com/docs/resources/self_hosting/security/master_api_keys
 - Typesense data access control (bootstrap api-key, /keys, actions, collections, filter_by, include_fields/exclude_fields, expires_at): https://typesense.org/docs/guide/data-access-control.html
 
 ======================================================================
@@ -5968,8 +6007,10 @@ ss -tlnp | grep -E '3001|3210|3000'                    # each UI on 127.0.0.1 on
 curl -s http://203.0.113.10:3210/                       # from another host: connection refused
 curl -s https://chat.example.com/api/some-endpoint      # without a key/token: 401
 curl -sI https://chat.example.com/                      # via the proxy: TLS, login required
-# LobeChat SSO: sign in with a Google account NOT listed in AUTH_ALLOWED_EMAILS
-#   expect rejection after the Google redirect, before any session is created
+# LobeChat SSO: attempt to register/sign in with a Google account that has never registered and is
+#   NOT listed in AUTH_ALLOWED_EMAILS; expect rejection at registration, before any account or session
+#   is created (AUTH_ALLOWED_EMAILS gates new registration; it does not revoke an already-registered
+#   user's existing session)
 ```
 
 ## Common mistakes
@@ -6575,7 +6616,7 @@ challenge path is served before the dotfile deny is reached (`allow`/`deny`: `ng
 ## Apache
 
 ```apache
-<DirectoryMatch "/\.(?!well-known)">
+<DirectoryMatch "/\.(?!well-known(?:/|$))">
     Require all denied
 </DirectoryMatch>
 
@@ -6587,9 +6628,13 @@ challenge path is served before the dotfile deny is reached (`allow`/`deny`: `ng
 `<FilesMatch>` matches the request's basename, not its full path, so it alone does not catch
 `/.git/config`: the matched name is `config`, which does not start with a dot (per the core module
 documentation). The `<DirectoryMatch>` rule above matches any dot-prefixed path segment (`.git`, `.svn`,
-and similar), with a negative lookahead that carves out `.well-known` so the ACME challenge path still
-resolves; keep the `<FilesMatch>` rule as a backstop for `.sql`, `.dump`, and `.bak` basenames and for
-top-level dotfiles like `/.env`.
+and similar) as a substring of the filesystem path, because Apache's regex is not anchored unless the
+pattern itself anchors it (per the core module documentation). A bare `(?!well-known)` lookahead only
+rules out that literal substring, so it would still allow a directory that merely starts with
+"well-known", such as `/.well-known-backup/config`; the `(?:/|$)` boundary requires the exempted
+segment to be `well-known` exactly, ending at a slash or the path's end, so only the real ACME
+challenge directory is exempt. Keep the `<FilesMatch>` rule as a backstop for `.sql`, `.dump`, and
+`.bak` basenames and for top-level dotfiles like `/.env`.
 
 ## Caddy
 
@@ -6625,6 +6670,13 @@ curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.git/config
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/config.php.bak
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/db.sql
 # each line above must print 403 or 404, never the file's content
+
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known/acme-challenge/x
+# must not be 403 or 404; the DirectoryMatch exemption must still let the real ACME
+# challenge path through
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known-backup/config
+# must be 403 or 404; a directory name that only starts with "well-known" must not
+# inherit that exemption
 
 grep -rn "sk-\|AKIA\|-----BEGIN" .next/static build dist 2>/dev/null
 # must print nothing when run against the built client bundle, not the source;
@@ -6673,7 +6725,7 @@ A webhook has no session and no browser to enforce Origin, so the check is a sig
 - **GitHub** signs deliveries with `X-Hub-Signature-256`: an HMAC-SHA256 hex digest of the payload using your webhook's secret, prefixed `sha256=`. Recompute it yourself and compare with a constant-time function (`crypto.timingSafeEqual` in Node.js, `secure_compare` in Ruby); a plain `==` leaks timing.
 - **Stripe** signs events with `Stripe-Signature`, formatted `t=<timestamp>,v1=<signature>`. The signed payload is the timestamp concatenated with `.` and the raw body, HMAC-SHA256 with the endpoint's `whsec_...` secret. Verify with an official library where one exists; reject if the timestamp is older than your tolerance (Stripe's libraries default to 5 minutes, and Stripe warns never to set the tolerance to 0, which disables the recency check entirely).
 
-Apply the shared lesson everywhere: use a distinct secret per endpoint (rotating one does not break every integration at once), and reject a request whose signature does not match before your handler touches it. Replay handling itself is provider specific, not a single universal timestamp check: GitHub's signed payload carries no timestamp, so track the `X-GitHub-Delivery` id and refuse to reprocess a delivery you have already handled; Stripe signs a timestamp as part of the signed payload, so also reject a request whose timestamp is older than your tolerance window, and never set that tolerance to zero, which disables the recency check entirely. Both providers require the exact raw bytes; a framework that parses and re-serializes JSON before your verification code runs will break the check, so verify signatures against the body as received. Where a webhook route must be exempt from a site-wide CSRF filter, scope that exemption to that one route and method only, never to a whole controller or prefix.
+Apply the shared lesson everywhere: use a distinct secret per endpoint (rotating one does not break every integration at once), and reject a request whose signature does not match before your handler touches it. Replay handling itself is provider specific, not a single universal timestamp check. GitHub's signed payload carries no timestamp, and `X-GitHub-Delivery` is not part of what the signature covers: `X-Hub-Signature-256` is computed over the raw body alone (per GitHub's guidance on validating webhook deliveries), so a captured signed request replayed with a different or reused delivery id still produces a valid signature. Tracking `X-GitHub-Delivery` and refusing a delivery id you have already handled only catches GitHub's own retries of the same delivery; it is not replay protection. For genuine replay protection, make handling idempotent against data the authenticated payload itself carries (an event id or resource state field), or store a digest of the verified body with a retention window and refuse to reprocess a digest already seen, or lean on a provider whose signature already covers a timestamp. Stripe signs a timestamp as part of the signed payload, so reject a request whose timestamp is older than your tolerance window, and never set that tolerance to zero, which disables the recency check entirely. Both providers require the exact raw bytes; a framework that parses and re-serializes JSON before your verification code runs will break the check, so verify signatures against the body as received. Where a webhook route must be exempt from a site-wide CSRF filter, scope that exemption to that one route and method only, never to a whole controller or prefix.
 
 ## 4. Bound the expensive endpoints too
 

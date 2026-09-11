@@ -16,7 +16,7 @@ CSRF: `csrf.checkOrigin` (default `true`, deprecated in the current reference) c
 
 Public env: only variables prefixed `PUBLIC_` (`env.publicPrefix`) are "statically injected into your bundle at build time" and reachable from `$env/static/public`; anything else throws if imported from client code. Keep secrets in modules SvelteKit treats as server-only, either `$env/static/private` / `$env/dynamic/private`, a `.server.js` filename, or anything under `$lib/server/` ([secrets.md](secrets.md)); SvelteKit statically traces import chains and fails the build if client code imports one, even through a dynamic `import()`.
 
-None of this gates a request for you by default: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). The `handle` hook in `hooks.server.js` can enforce access, since it runs on every request and may return a `Response` before `resolve` renders the route, but only when it actually checks the session and blocks; using it just to redirect an unauthenticated page navigation, or just to attach identity onto `event.locals` for other handlers to read, still leaves a directly reached `+server.js` endpoint or form action open. Do not base the authorization decision on `event.url`, `route`, or `params` inside `handle`, since those are client supplied and can be manipulated; check the session instead. Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a client-side redirect alone.
+None of this gates a request for you by default: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). The `handle` hook in `hooks.server.js` can enforce access, since it runs on every request and may return a `Response` before `resolve` renders the route, but only when it actually checks the session and blocks; using it just to redirect an unauthenticated page navigation, or just to attach identity onto `event.locals` for other handlers to read, still leaves a directly reached `+server.js` endpoint or form action open. Inside `handle`, `event.url`, `route`, and `params` can reflect the calling page rather than the resource actually being requested, so do not rely on them alone to decide what is being authorized; checking the session there is necessary but not sufficient, since a session check alone does not authorize access to the specific resource, so also enforce that check at the point each resource is served. Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a client-side redirect alone.
 
 ## Nuxt (Nitro server routes)
 
@@ -45,12 +45,14 @@ Both are development tooling, not a production server: the `vite preview` docs s
 ```bash
 curl -si https://app.example.com/api/private | head -1   # 401 with no session cookie, on all three frameworks
 ls build dist .output 2>/dev/null                          # confirm which output directory your build actually produced
-grep -rl "REPLACE_WITH_YOUR_ACTUAL_SECRET_VALUE" build dist .output 2>/dev/null
-                                                            # any line here is a leaked value; treat no output as clean only
-                                                            # if the ls above found a real directory, since a missing one
-                                                            # also produces no output from grep
+grep -rlF "REPLACE_WITH_YOUR_ACTUAL_SECRET_VALUE" build dist .output; echo "exit: $?"
+                                                            # search the built client output for the literal secret value with a
+                                                            # fixed-string match; exit 1 is the goal, exit 2 means a listed
+                                                            # directory did not exist, and grep's own errors are left visible
 curl -si https://app.example.com/ -H "Host: evil.example.com" | head -1   # a spoofed Host is not trusted
 ```
+
+A clean grep result here is evidence, not proof: it means the literal value did not match in the directories searched, not that the secret cannot be present in some other form. A bundler could split, encode, or otherwise transform it, so check the exit code and confirm the directory actually exists rather than reading silence alone as clean.
 
 Behind a reverse proxy, confirm cookies still carry `Secure` and redirects use an `https://` `Location` once `ORIGIN` (SvelteKit) is set; without it, SvelteKit often builds an `http://` URL even though the browser connection is TLS. `NUXT_PUBLIC_...` is the public runtime-config prefix, exposed straight to the client bundle; it is not a trusted-proxy or secure-cookie setting and does nothing for this check. Nuxt's own trusted-proxy and origin handling come from its deployment preset and hosting platform rather than one documented app-level variable, so verify the equivalent behavior against whichever adapter you deploy with.
 

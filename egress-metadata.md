@@ -76,11 +76,20 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://169.254.169.254/metadata/instan
 # credentials, must succeed
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://sts.amazonaws.com/
 
-# negative control: a known-live host outside the egress allow list must be blocked, not merely
-# unresolved; curl reports a DNS failure differently from a network-level block
-curl -sv --max-time 5 https://www.example.com/ 2>&1 | grep -q "Could not resolve host" \
-  && echo "DNS failure, not a policy block: confirm this host still resolves before retrying" \
-  || echo "blocked past DNS resolution, or timed out: this is the egress policy taking effect"
+# negative control: a known-live host outside the egress allow list, judged by curl's exit status,
+# not by matching text in its output, since a successful connection also lacks the string
+# "Could not resolve host" and so would otherwise be misreported as blocked
+curl -s --max-time 5 -o /dev/null https://example.com/
+rc=$?
+if [ "$rc" -eq 0 ]; then
+  echo "FAIL: connected to a host outside the allow list, egress is not enforced"
+elif [ "$rc" -eq 6 ]; then
+  echo "inconclusive: DNS resolution failed (curl exit 6), confirm this host still resolves before retrying"
+elif [ "$rc" -eq 7 ] || [ "$rc" -eq 28 ]; then
+  echo "pass: connection refused or timed out (curl exit $rc), the egress policy is blocking this host"
+else
+  echo "unexpected curl exit code $rc, investigate before treating this as a pass"
+fi
 # confirm the metadata options actually took effect
 aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
   --query 'Reservations[].Instances[].MetadataOptions'

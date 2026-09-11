@@ -40,10 +40,10 @@ The private key never leaves the peer that generated it; only the public key goe
 wg set wg0 listen-port 51820 private-key /path/to/private-key peer "REPLACE_WITH_PEER_PUBLIC_KEY" allowed-ips 192.168.88.0/24 endpoint 203.0.113.10:51820
 ```
 
-`AllowedIPs` is dual-purpose "Cryptokey Routing," but the two purposes are not symmetric. On the sending side it "behaves as a sort of routing table," picking which peer a destination IP goes to. On the receiving side it "behaves as a sort of access control list" for the packet's source address only, dropping a decrypted packet whose source IP does not match the sending peer's configured `AllowedIPs`; it is a spoofing check, not a destination filter. Once a peer is authenticated, its `AllowedIPs` entry places no limit on which destinations that peer is allowed to reach if the server is willing to forward the traffic there. Scope `AllowedIPs` to exactly the address or subnet a peer should be reached at, never `0.0.0.0/0` unless that peer is genuinely meant to be a full-tunnel gateway, and restrict which destinations a peer can reach through the server with a firewall rule on the server itself, for example an nftables rule dropping forwarded packets from that peer to anything outside its intended subnet:
+`AllowedIPs` is dual-purpose "Cryptokey Routing," but the two purposes are not symmetric. On the sending side it "behaves as a sort of routing table," picking which peer a destination IP goes to. On the receiving side it "behaves as a sort of access control list" for the packet's source address only, dropping a decrypted packet whose source IP does not match the sending peer's configured `AllowedIPs`; it is a spoofing check, not a destination filter, and it is the server's actual restriction on which source address a peer may use. Once a peer is authenticated, its `AllowedIPs` entry places no limit on which destinations that peer is allowed to reach if the server is willing to forward the traffic there. Scope `AllowedIPs` to exactly the address or subnet a peer should be reached at, never `0.0.0.0/0` unless that peer is genuinely meant to be a full-tunnel gateway, and restrict which destinations a peer can reach through the server with a firewall rule on the server itself, matching the same source prefix as that peer's `AllowedIPs` so the peer cannot rotate its source address within that prefix to evade a narrower rule, for example an nftables rule dropping forwarded packets from anywhere in this peer's permitted subnet to a destination outside its intended subnet, with a counter so the rule's effect can be confirmed later:
 
 ```bash
-nft add rule inet filter forward iifname "wg0" ip saddr 192.168.88.2 ip daddr != 192.168.88.0/24 drop
+nft add rule inet filter forward iifname "wg0" ip saddr 192.168.88.0/24 ip daddr != 192.168.88.0/24 counter drop
 ```
 
 By default WireGuard "tries to be as silent as possible when not being used," so the only inbound port a firewall needs to open is the single WireGuard UDP `ListenPort`; everything else on the host stays closed per [host.md](host.md).
@@ -56,7 +56,18 @@ frpc -c frpc-wrongtoken.toml   # expect an authentication failure, no proxy regi
 
 ss -ulnp | grep 51820          # WireGuard: only the one UDP port listening
 sudo ufw status verbose        # no other inbound rule added for the tunneled service
-ping -c1 192.168.99.50         # from that peer, a destination outside its intended subnet: blocked by the server-side firewall rule above, not by AllowedIPs
+
+# positive control: from the peer, a destination inside its intended subnet must succeed, proving
+# the tunnel and routing both work
+ping -c1 192.168.88.10
+
+# forbidden destination: from the peer, a host the server would otherwise forward to (its own LAN,
+# reachable through the tunnel if not for this rule) but outside 192.168.88.0/24, so a failure here
+# is attributable to the firewall rule rather than to an address that was never routed or never live
+ping -c1 192.168.1.50          # expect 100 percent packet loss
+
+# confirm the drop is the firewall rule acting, not a routing gap: its counter must be nonzero
+sudo nft list ruleset | grep -A1 'saddr 192.168.88.0/24'   # packets and bytes both greater than 0
 ```
 
 ## Sources (checked September 2026)

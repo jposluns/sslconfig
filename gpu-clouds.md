@@ -38,8 +38,11 @@ MFA: none of these platforms add a second factor to the workload itself. The acc
 
 ```bash
 ss -tlnp                                   # enumerate every listening port on the box
-curl -s http://127.0.0.1:8888/             # notebook: 403/redirect without its token in the URL/header
-curl -s "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/"    # 401 without credentials, once auth is configured (RunPod's proxy hostname form; substitute the equivalent for your platform)
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8888/api/contents   # 403 without the token
+curl -sS -o /dev/null -w '%{http_code}\n' "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/REPLACE_WITH_PROTECTED_PATH"
+# 401 without credentials, against an actual protected endpoint rather than "/" (RunPod's proxy hostname form; substitute the equivalent for your platform)
+curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer REPLACE_WITH_TOKEN" "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/REPLACE_WITH_PROTECTED_PATH"
+# 200 with the correct credentials, so the pair shows the listener itself gates access, not only the proxy hostname's obscurity
 ```
 
 Every port `ss` shows listening should be either closed (not exposed at the platform layer) or authenticated (the listener itself demands a key, token, or login). A Jupyter server that answers without its token is a finding, whichever of these platforms it runs on.

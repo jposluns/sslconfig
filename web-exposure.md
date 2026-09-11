@@ -26,7 +26,7 @@ challenge path is served before the dotfile deny is reached (`allow`/`deny`: `ng
 ## Apache
 
 ```apache
-<DirectoryMatch "/\.(?!well-known)">
+<DirectoryMatch "/\.(?!well-known(?:/|$))">
     Require all denied
 </DirectoryMatch>
 
@@ -38,9 +38,13 @@ challenge path is served before the dotfile deny is reached (`allow`/`deny`: `ng
 `<FilesMatch>` matches the request's basename, not its full path, so it alone does not catch
 `/.git/config`: the matched name is `config`, which does not start with a dot (per the core module
 documentation). The `<DirectoryMatch>` rule above matches any dot-prefixed path segment (`.git`, `.svn`,
-and similar), with a negative lookahead that carves out `.well-known` so the ACME challenge path still
-resolves; keep the `<FilesMatch>` rule as a backstop for `.sql`, `.dump`, and `.bak` basenames and for
-top-level dotfiles like `/.env`.
+and similar) as a substring of the filesystem path, because Apache's regex is not anchored unless the
+pattern itself anchors it (per the core module documentation). A bare `(?!well-known)` lookahead only
+rules out that literal substring, so it would still allow a directory that merely starts with
+"well-known", such as `/.well-known-backup/config`; the `(?:/|$)` boundary requires the exempted
+segment to be `well-known` exactly, ending at a slash or the path's end, so only the real ACME
+challenge directory is exempt. Keep the `<FilesMatch>` rule as a backstop for `.sql`, `.dump`, and
+`.bak` basenames and for top-level dotfiles like `/.env`.
 
 ## Caddy
 
@@ -76,6 +80,13 @@ curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.git/config
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/config.php.bak
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/db.sql
 # each line above must print 403 or 404, never the file's content
+
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known/acme-challenge/x
+# must not be 403 or 404; the DirectoryMatch exemption must still let the real ACME
+# challenge path through
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known-backup/config
+# must be 403 or 404; a directory name that only starts with "well-known" must not
+# inherit that exemption
 
 grep -rn "sk-\|AKIA\|-----BEGIN" .next/static build dist 2>/dev/null
 # must print nothing when run against the built client bundle, not the source;
