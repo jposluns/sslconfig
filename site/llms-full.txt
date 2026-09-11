@@ -2533,7 +2533,12 @@ still need their own TLS and auth on top ([postgresql.md](postgresql.md), [mysql
 
 ```bash
 docker exec app id                                  # uid is not 0
-docker exec app sh -c 'touch /x'                    # read-only fs: fails
+docker exec app sh -c 'touch /app/probe && echo WRITABLE || echo refused'
+                                                    # read-only fs: prints "refused". Probe a directory the container
+                                                    # user owns, not `/`: a non-root user cannot write `/` on a writable
+                                                    # filesystem either, so `touch /x` refuses for the wrong reason and
+                                                    # passes even after `read_only` is removed. A tmpfs you mounted for
+                                                    # scratch stays writable by design; do not probe that path
 kubectl get pod app -o jsonpath='{.spec.containers[0].securityContext}'
 
 # resolve the db Service's ClusterIP once and probe that same IP from both pods below; the
@@ -2544,13 +2549,27 @@ DBIP=$(kubectl get svc db -o jsonpath='{.spec.clusterIP}')
 
 # a probe pod needs its own admission-compliant securityContext under the restricted PSA level, and a
 # real TCP connect to the db's actual port (a Postgres port does not speak HTTP, so wget cannot test it)
-SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3",'"$DBIP"',"5432"]}]}}'
+# Quote the address into the JSON: unquoted, `10.96.0.5` is a bare token and the array is not valid
+# JSON, so kubectl rejects the override and neither probe below runs. The override's container name
+# must also match the pod name, because kubectl run names the container after the pod and a strategic
+# merge keys containers by name, so a mismatched name adds a second container instead of replacing
+# the command. Build the override per pod:
+probe_override() {
+  printf '%s' '{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"'"$1"'","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3","'"$DBIP"'","5432"]}]}}'
+}
 
 kubectl run probe-permitted --rm -it --restart=Never --image=busybox:1.36 --labels=role=app \
-  --overrides="$SC" -- true                          # from a pod labeled role=app, by IP: must succeed first, proving the path works
+  --overrides="$(probe_override probe-permitted)" -- true
+                                                     # from a pod labeled role=app, by IP: must succeed FIRST. This is the
+                                                     # positive control. If it fails, the policy, the override, or this
+                                                     # image's `nc` is the problem, and the forbidden probe below proves
+                                                     # nothing: a refusal you cannot distinguish from a broken probe is
+                                                     # not evidence
 
 kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labels=role=other \
-  --overrides="$SC" -- true                          # from a pod without that label, same IP: must time out or be refused at TCP, not fail on DNS
+  --overrides="$(probe_override probe-forbidden)" -- true
+                                                     # from a pod without that label, same IP: must time out or be refused
+                                                     # at TCP, not fail on DNS
 ```
 
 ## Sources (checked September 2026)
@@ -3081,6 +3100,10 @@ curl_setopt($ch, CURLOPT_CAINFO, '/etc/ssl/certs/internal-ca.pem'); // internal 
 ss -xlnp | grep php-fpm                                       # Unix socket; with TCP, ss -tlnp shows 127.0.0.1:9000 only
 curl -sI https://app.example.com/                             # succeeds without -k
 curl -sI https://app.example.com/login | grep -i set-cookie   # secure; httponly; samesite=lax
+curl -s -o /dev/null -w '%{http_code}\n' https://app.example.com/REPLACE_WITH_PROTECTED_PATH
+                                                              # 401, 403, or a redirect to /login with no session cookie.
+                                                              # TLS and cookie flags say nothing about whether a route
+                                                              # actually refuses an unauthenticated request
 ```
 
 ## Sources (checked September 2026)
@@ -3422,6 +3445,13 @@ curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/latest/meta-data
 curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/computeMetadata/v1/instance/
 # Azure, no Metadata: true header: must fail, must not return metadata
 curl -s -o /dev/null -w '%{http_code}\n' 'http://169.254.169.254/metadata/instance?api-version=2025-04-07'
+# the three checks above test the header requirement, which is not the control this guide
+# recommends. Test the network block itself, WITH the header the service requires, from a
+# workload that has no legitimate reason to reach metadata:
+curl -s -o /dev/null -m 5 -w '%{http_code}\n' -H 'Metadata-Flavor: Google' \
+  http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token
+# must time out or be refused by the egress policy. A 200 here is a credential-issuing
+# endpoint reachable from the workload, whatever the header checks above returned
 # positive control: a host on the egress allow list, for example the AWS STS endpoint used for role
 # credentials, must succeed
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://sts.amazonaws.com/
@@ -5359,7 +5389,11 @@ N8N_SSL_CERT=/path/to/fullchain.pem
 
 ```bash
 ss -tlnp | grep 5678                    # 127.0.0.1, not :: or 0.0.0.0
-curl -sI https://n8n.example.com/       # TLS, and a login page rather than the editor
+curl -sI https://n8n.example.com/       # TLS
+curl -s -o /dev/null -w '%{http_code}\n' https://n8n.example.com/api/v1/workflows
+                                        # 401 without an `X-N8N-API-KEY` header. Use a request that returns a body,
+                                        # not `-I`: a HEAD response carries none, so it cannot tell a login page
+                                        # from the editor
 ```
 
 ## Sources (checked September 2026)
@@ -5367,6 +5401,7 @@ curl -sI https://n8n.example.com/       # TLS, and a login page rather than the 
 - n8n deployment environment variables (N8N_LISTEN_ADDRESS, N8N_PROTOCOL, N8N_SSL_KEY, N8N_SSL_CERT, defaults): https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/deployment.md
 - n8n security policies (MFA enforcement, licensing, SSO exception): https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/manage-security-policies.md
 - n8n SSL setup: https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/set-up-ssl.md
+- n8n public API authentication (`/api/v1` base path, `X-N8N-API-KEY` header): https://docs.n8n.io/api/authentication/
 
 ======================================================================
 ==> code-server.md
@@ -6497,7 +6532,14 @@ Without `--tlsverify` the daemon does not check client certificates. Firewall 23
 ss -tlnp | grep -E ':(9443|9000|8000|3000|81|3001|2375|2376) '   # 127.0.0.1 or absent, never 0.0.0.0
 curl -skI https://panel.example.com/                              # 401/403 or a login redirect, never a dashboard
 docker -H tcp://203.0.113.10:2375 info                            # must fail: connection refused or filtered
-docker -H tcp://203.0.113.10:2376 info                            # must fail without the client certificate
+env -u DOCKER_HOST -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH \
+  curl -sS -o /dev/null -w '%{http_code}\n' --cacert ca.pem https://203.0.113.10:2376/_ping
+                                                                  # must fail the handshake on the CLIENT certificate. Do not use
+                                                                  # `docker ... info` here: without `--tlsverify` it fails for the
+                                                                  # wrong reason, and `DOCKER_CERT_PATH` exported in the setup above
+                                                                  # can silently supply the very certificate the check is meant to lack
+curl -sS -o /dev/null -w '%{http_code}\n' --cacert ca.pem --cert client-cert.pem --key client-key.pem \
+  https://203.0.113.10:2376/_ping                                 # positive control: 200 with the right client certificate
 ```
 
 From outside the network, every panel URL is unreachable or shows a login; a page that renders host, container, or repository data without one is a finding.
@@ -6767,16 +6809,25 @@ curl -s -o /dev/null -w '%{http_code}\n' https://example.com/config.php.bak
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/db.sql
 # each line above must print 403 or 404, never the file's content
 
-curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known/acme-challenge/x
-# must not be 403 or 404; the DirectoryMatch exemption must still let the real ACME
-# challenge path through
+printf 'probe' | sudo tee /var/www/html/.well-known/acme-challenge/probe >/dev/null
+curl -s https://example.com/.well-known/acme-challenge/probe
+sudo rm -f /var/www/html/.well-known/acme-challenge/probe
+# must return "probe", never 403: the exemption has to let a real challenge file through.
+# Requesting a token that does not exist proves nothing, because a correctly exempted
+# directory still answers 404 for a file that is not there
 curl -s -o /dev/null -w '%{http_code}\n' https://example.com/.well-known-backup/config
 # must be 403 or 404; a directory name that only starts with "well-known" must not
 # inherit that exemption
 
-grep -rn "sk-\|AKIA\|-----BEGIN" .next/static build dist 2>/dev/null
-# must print nothing when run against the built client bundle, not the source;
-# a variable that never compiled in cannot leak
+for d in .next/static build dist; do
+  [ -d "$d" ] || { echo "$d: absent, nothing scanned"; continue; }
+  grep -rn "sk-\|AKIA\|ghp_\|sb_secret_\|-----BEGIN" "$d"; echo "$d exit: $?"
+done
+# run against the built client bundle, not the source. Exit 1 with no output is clean, exit 0
+# is a match, and exit 2 is a grep failure that is NOT clean. Do not send the errors to
+# /dev/null and read silence as a pass: against a directory that does not exist, grep exits 2
+# and prints nothing, which looks exactly like success. A clean result is evidence, not proof:
+# a bundler can split or encode a value, so scan for the literal secret as well
 ```
 
 Any backup path known to have existed on the server should also 404 at the deployed URL.
