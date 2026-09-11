@@ -92,7 +92,7 @@ openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake wi
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
   --group app-workers --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config client.properties \
-  --group app-workers --topic orders --from-beginning --max-messages 1   # authorised app credential (group from the ACL in step 4): reads one message
+  --group app-workers --topic orders --from-beginning --max-messages 1   # authorized app credential (group from the ACL in step 4): reads one message
 bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties --list --topic orders
 ```
 

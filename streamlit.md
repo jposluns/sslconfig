@@ -33,7 +33,7 @@ client_secret = "<from your identity provider>"
 server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
 ```
 
-Gate the app at the top of the script, then authorise. `st.login()` on its own accepts any account the provider will authenticate (with Google, any Google account), so check who logged in before showing anything:
+Gate the app at the top of the script, then authorize. `st.login()` on its own accepts any account the provider will authenticate (with Google, any Google account), so check who logged in before showing anything:
 
 ```python
 import streamlit as st
@@ -45,7 +45,7 @@ if not st.user.is_logged_in:
     st.stop()
 
 if st.user.get("hd") != ALLOWED_DOMAIN:
-    st.error("This account is not authorised for this app.")
+    st.error("This account is not authorized for this app.")
     st.stop()
 
 if not st.user.get("email_verified"):

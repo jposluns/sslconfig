@@ -24,7 +24,7 @@ If you are an AI assistant configuring, generating, or reviewing a service, appl
 3. Apply every guide that fits the deployment, not just one. Select the service or framework, its host or platform, containers where used, plus identity, secrets, and the operational controls below. For a service with no guide, verify its native controls against the vendor documentation and use a private-access or fronting-layer pattern.
 4. Redirect HTTP to HTTPS, or do not listen on HTTP at all.
 5. Require authentication on every non-public endpoint. Never ship default or hardcoded credentials. Add MFA to human logins where viable per [mfa.md](mfa.md); where a tool has no native login, put one in front per [fronting-auth.md](fronting-auth.md).
-6. A successful login is not authorisation. Check the returned identity against an allowlist (tenant, hosted domain, group, or explicit users) before granting access. Choose the provider per [identity-providers.md](identity-providers.md), wire it per [oidc-integration.md](oidc-integration.md), or put login in front of the app per [cloud-identity-proxies.md](cloud-identity-proxies.md).
+6. A successful login is not authorization. Check the returned identity against an allowlist (tenant, hosted domain, group, or explicit users) before granting access. Choose the provider per [identity-providers.md](identity-providers.md), wire it per [oidc-integration.md](oidc-integration.md), or put login in front of the app per [cloud-identity-proxies.md](cloud-identity-proxies.md).
 7. Keep secrets out of the repository and load them from the environment or a secret manager per [secrets.md](secrets.md); give each service and agent its own scoped credentials per [machine-auth.md](machine-auth.md).
 8. Contain what an exposed or compromised service can reach. Block unneeded outbound access and lock down cloud metadata per [egress-metadata.md](egress-metadata.md), and never serve dotfiles, database dumps, or client secrets per [web-exposure.md](web-exposure.md).
 9. AI and data tools (model servers, vector databases, MCP servers, agent builders, chat and image UIs, MLflow, Ray) vary in their defaults and native controls, and many need authentication and TLS configured explicitly. Keep them on loopback and apply the matching guide before any exposure.
@@ -671,7 +671,7 @@ TLS without authentication leaves a service open to the whole internet over an e
 8. **Harden sessions.** Set cookies `Secure`, `HttpOnly`, and `SameSite` (`Lax` or `Strict`), sign them with a strong random secret, and expire them. Invalidate sessions on password change.
 9. **Rate-limit authentication endpoints** and lock or delay after repeated failures. Log authentication successes and failures with source address and account, and keep the logs long enough to investigate an incident. fail2ban is a low-effort control for SSH and login panels on Linux hosts. Bound expensive endpoints too: inference, uploads, and job submission need request-size, concurrency, and timeout limits in addition to per-client rate limits, because an exposed AI endpoint left without them can burn GPU time and money even while correctly rejecting bad credentials, a failure mode known as denial of wallet. [realtime-webhooks.md](realtime-webhooks.md) covers the streaming and webhook transports these limits also apply to.
 10. **Least privilege everywhere.** Separate admin from daily-use accounts, and give database and OS service accounts only the rights the application uses.
-11. **Federated login is authentication, not authorisation.** After Google, Microsoft, GitHub, or any provider returns an identity, check it against an allowlist (tenant, hosted domain from the verified token claim, organisation or group membership, or explicit users) before granting access. Any Google account is not "staff", and Microsoft's multi-tenant `common` endpoint admits every Microsoft account unless the app validates the issuer and tenant. [oidc-integration.md](oidc-integration.md) has the checks; [identity-providers.md](identity-providers.md) has the providers.
+11. **Federated login is authentication, not authorization.** After Google, Microsoft, GitHub, or any provider returns an identity, check it against an allowlist (tenant, hosted domain from the verified token claim, organization or group membership, or explicit users) before granting access. Any Google account is not "staff", and Microsoft's multi-tenant `common` endpoint admits every Microsoft account unless the app validates the issuer and tenant. [oidc-integration.md](oidc-integration.md) has the checks; [identity-providers.md](identity-providers.md) has the providers.
 12. **OIDC and OAuth hygiene.** Authorization code flow with PKCE; exact-match redirect URIs; `state` and `nonce` verified; ID tokens validated for signature (keys from the provider's JWKS, algorithm pinned, never `none`), issuer, audience, and expiry; short-lived access tokens with refresh-token rotation; tokens never in URLs. Prefer a server-side session in an `HttpOnly` cookie to tokens in browser storage. Link accounts by issuer plus subject, never by email alone.
 13. **Enforce MFA where access is granted, not only where it is enrolled.** A user who enrolled a second factor but can still act with a password-only session is not protected. Require the factor in provider policy or in the app, and test it.
 14. **Protect the control plane.** MFA on the Git host, the cloud account, the DNS registrar, the deployment platform, the secret manager, and the identity provider's administrator account. A takeover there bypasses every control inside the app.
@@ -827,9 +827,9 @@ Every tier and price below was read from the vendor's pricing page in September 
 
 ## 1. Decide which kind of identity you need
 
-- **Workforce identity**: your team signs in with the organisation's existing accounts (Google Workspace, Microsoft Entra ID, Okta). Use it for admin panels, dashboards, internal tools, and anything only staff should reach. If your organisation already runs one of these, use it; do not buy a second directory.
+- **Workforce identity**: your team signs in with the organization's existing accounts (Google Workspace, Microsoft Entra ID, Okta). Use it for admin panels, dashboards, internal tools, and anything only staff should reach. If your organization already runs one of these, use it; do not buy a second directory.
 - **Customer identity (CIAM)**: your application's own users sign up and sign in. Use a hosted provider rather than writing password storage, MFA, recovery, and rate limiting yourself.
-- **Developer identity**: GitHub (or GitLab) login gates a tool for developers, optionally restricted to an organisation. Often the simplest correct choice for a solo or small project.
+- **Developer identity**: GitHub (or GitLab) login gates a tool for developers, optionally restricted to an organization. Often the simplest correct choice for a solo or small project.
 
 A login proves who the person is. **It does not decide whether they may use your app.** After any of the providers below, your application (or the fronting layer) still checks that the identity is on an allowlist: a tenant, a hosted domain, a group, or an explicit list of users. Accepting every Google or Microsoft account as "staff" is the recurring mistake; [oidc-integration.md](oidc-integration.md) covers the check.
 
@@ -838,8 +838,8 @@ A login proves who the person is. **It does not decide whether they may use your
 | Provider | Free tier and MFA facts (September 2026) | Fit |
 |---|---|---|
 | Microsoft Entra ID | Free tier, bundled with Azure and Microsoft 365 subscriptions, includes MFA and unlimited SSO to SaaS apps. Security defaults require every user to register MFA, enforce it for administrators, and prompt other users when Microsoft judges it necessary. P1 at $7 per user per month (annual commitment) adds Conditional Access, which is how you require MFA for everyone on every sign-in; P2 at $10 adds risk-based policies. | Any team already on Microsoft 365. |
-| Google Workspace / Cloud Identity | Sign in with Google (OIDC) costs nothing per app. Enforcing 2-Step Verification for the whole organisation is an admin-console setting in Workspace or Cloud Identity. Cloud Identity Free exists; its default licence count was not read from a Google page for this guide, so check the source. | Any team already on Workspace. |
-| Okta Workforce Identity | Okta Verify supports push, TOTP, and FastPass. A $1,500 annual contract minimum applies and there is no free production tier. | Only when your organisation already runs Okta. Not a purchase for a small project. |
+| Google Workspace / Cloud Identity | Sign in with Google (OIDC) costs nothing per app. Enforcing 2-Step Verification for the whole organization is an admin-console setting in Workspace or Cloud Identity. Cloud Identity Free exists; its default licence count was not read from a Google page for this guide, so check the source. | Any team already on Workspace. |
+| Okta Workforce Identity | Okta Verify supports push, TOTP, and FastPass. A $1,500 annual contract minimum applies and there is no free production tier. | Only when your organization already runs Okta. Not a purchase for a small project. |
 | JumpCloud, OneLogin, Ping Identity | Workforce directories in the same class. Tiers not verified for this guide. | Existing enterprise estates only. |
 
 ## 3. Customer identity providers
@@ -857,7 +857,7 @@ A login proves who the person is. **It does not decide whether they may use your
 
 ## 4. Developer identity
 
-- **GitHub OAuth**: an OAuth app gives login for any GitHub user; restrict to members of your organisation or team in the app (or with oauth2-proxy, which has a GitHub provider with org and team restrictions). GitHub Actions OIDC is a different mechanism for workloads, covered in [machine-auth.md](machine-auth.md).
+- **GitHub OAuth**: an OAuth app gives login for any GitHub user; restrict to members of your organization or team in the app (or with oauth2-proxy, which has a GitHub provider with org and team restrictions). GitHub Actions OIDC is a different mechanism for workloads, covered in [machine-auth.md](machine-auth.md).
 - **AWS IAM Identity Center**: the free workforce directory for your team's own AWS console and CLI access. It is not a general OIDC provider for Application Load Balancer authentication; for app login on AWS pair the ALB with Cognito or an OIDC provider from section 3 ([cloud-identity-proxies.md](cloud-identity-proxies.md)).
 
 ## 5. Self-hosted identity providers
@@ -872,7 +872,7 @@ Keycloak, authentik, Zitadel, Ory, and Authelia ([mfa.md](mfa.md)) give you OIDC
 
 ## 7. Poor fits for a small project
 
-Zscaler Private Access, HashiCorp Boundary, Ping Identity, OneLogin, and Okta as a new purchase are enterprise products with enterprise pricing and sales-led onboarding. They are listed so an assistant recognises them when a customer already has them, not as recommendations.
+Zscaler Private Access, HashiCorp Boundary, Ping Identity, OneLogin, and Okta as a new purchase are enterprise products with enterprise pricing and sales-led onboarding. They are listed so an assistant recognizes them when a customer already has them, not as recommendations.
 
 ## Verify
 
@@ -920,12 +920,12 @@ Authorization code flow with PKCE from a server-side (confidential) client. RFC 
 
 The discovery document at `<issuer>/.well-known/openid-configuration` supplies the endpoints and `jwks_uri`; its `issuer` value must be identical to the prefix you fetched it from. Every library in section 4 reads it for you.
 
-## 2. Login is not authorisation
+## 2. Login is not authorization
 
 The provider proves who the person is. Whether they may use your app is your check, run after token validation and before the session exists, against an allowlist. The claim differs per provider:
 
-- **Google**: the `hd` claim in the ID token must equal your Workspace domain (`example.com`). The `hd` request parameter only optimises the account picker; Google's documentation says not to rely on it for access control and to validate the returned `hd` claim. Treat a missing `hd` claim as a rejection.
-- **Microsoft Entra**: the `tid` claim must be your tenant ID and `iss` must be `https://login.microsoftonline.com/<tenant-id>/v2.0`. Register the app as **Single tenant only** when only your organisation signs in. The `organizations` authority accepts any Entra tenant and `common` also accepts personal accounts; the issuer then varies per tenant, so an app on those authorities that does not check `tid` (or the GUID in `iss`) admits every Microsoft account. Microsoft documents `email` and `preferred_username` as mutable and unfit for authorisation; key the local account on `oid` or `sub` plus `tid`.
+- **Google**: the `hd` claim in the ID token must equal your Workspace domain (`example.com`). The `hd` request parameter only optimizes the account picker; Google's documentation says not to rely on it for access control and to validate the returned `hd` claim. Treat a missing `hd` claim as a rejection.
+- **Microsoft Entra**: the `tid` claim must be your tenant ID and `iss` must be `https://login.microsoftonline.com/<tenant-id>/v2.0`. Register the app as **Single tenant only** when only your organization signs in. The `organizations` authority accepts any Entra tenant and `common` also accepts personal accounts; the issuer then varies per tenant, so an app on those authorities that does not check `tid` (or the GUID in `iss`) admits every Microsoft account. Microsoft documents `email` and `preferred_username` as mutable and unfit for authorization; key the local account on `oid` or `sub` plus `tid`.
 - **GitHub**: GitHub OAuth apps speak OAuth 2.0, not OpenID Connect; there is no discovery document and no ID token. After the token exchange call `GET https://api.github.com/user` for the identity, then check `GET /user/memberships/orgs/<org>` (200 with `"state": "active"` means a member; 404 means not affiliated) or a team with `GET /orgs/<org>/teams/<team_slug>/memberships/<username>` (200 with `"state": "active"`; the REST reference documents `pending` for an unaccepted invitation, and 404 means no membership). Both need the `read:org` scope. Key the local account on the numeric `id` from `/user`, not the `login`.
 - **Okta**: add a `groups` claim to the ID token (org authorization server: **Applications > Applications >** your app **> Sign On**, edit the OpenID Connect ID Token section, filter **Matches regex** `.*`; the client must also request the `groups` scope) and require membership of a named group. The claim holds at most 100 groups and the request fails beyond that; use a narrower filter in large orgs.
 
@@ -936,7 +936,7 @@ The default for an identity that passes none of these is to reject and log it, n
 The client secret is a secret: environment variable or secret manager, never a repository or an image ([secrets.md](secrets.md)). Substitute the callback path your library expects for `https://app.example.com/auth/callback`.
 
 - **Google**: Google Cloud console **Clients** page (`https://console.developers.google.com/auth/clients`); create an OAuth client and add the redirect URI. The match is exact, including scheme, case, and trailing slash. Discovery: `https://accounts.google.com/.well-known/openid-configuration`; `iss` is `https://accounts.google.com` or `accounts.google.com`.
-- **Microsoft Entra**: Microsoft Entra admin center, **Entra ID > App registrations > New registration**; under **Supported account types** choose **Single tenant only** unless you are building for other organisations. Then **Authentication > Add a platform > Web** and add the redirect URI. Record the Application (client) ID and create a client secret. Discovery: `https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration` with `<tenant>` your directory (tenant) ID; `common` or `organizations` only together with the `tid` check above.
+- **Microsoft Entra**: Microsoft Entra admin center, **Entra ID > App registrations > New registration**; under **Supported account types** choose **Single tenant only** unless you are building for other organizations. Then **Authentication > Add a platform > Web** and add the redirect URI. Record the Application (client) ID and create a client secret. Discovery: `https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration` with `<tenant>` your directory (tenant) ID; `common` or `organizations` only together with the `tid` check above.
 - **GitHub**: profile picture **> Settings > Developer settings > OAuth apps > New OAuth App**; set the Authorization callback URL. Authorize at `https://github.com/login/oauth/authorize` with `client_id`, `redirect_uri`, `scope=read:user read:org`, `state`, and PKCE (`code_challenge` with `code_challenge_method=S256`; GitHub does not accept `plain`); exchange at `https://github.com/login/oauth/access_token` with `client_id`, `client_secret`, `code`, the `code_verifier` that produced the challenge, and the same `redirect_uri`. Always send `redirect_uri`; when it is absent GitHub uses the first registered callback. Apps that had a single callback URL before August 3, 2026 keep wildcard matching for it, which accepts any subdirectory path on the same host; disable wildcard matching in the app settings so the callback must match exactly.
 - **Okta**: Admin Console, **Applications and Resources > Applications > Create App Integration**, sign-in method **OIDC - OpenID Connect**, type **Web Application**; set the sign-in and sign-out redirect URIs and the assignment (Okta's guide allows everyone in the org; narrow it to a group). Client ID and secret are on the **General** tab under Client Credentials. Discovery: `https://<org>.okta.com/.well-known/openid-configuration` for the org authorization server, `https://<org>.okta.com/oauth2/<authorizationServerId>/.well-known/openid-configuration` for a custom one; `iss` equals that prefix.
 
@@ -975,7 +975,7 @@ Use a maintained library; do not hand-parse JWTs. The snippets are from each lib
 
 Your app does not run the second factor; the provider does, under its policy: Conditional Access in Entra (**Entra ID > Conditional Access > Policies**, grant **Require authentication strength**; a P1 feature per [identity-providers.md](identity-providers.md)), 2-Step Verification in the Google Admin console (**Security > Authentication > 2-step verification**, Enforcement **On**), and authentication policies plus the global session policy in Okta. Ordering and options in [mfa.md](mfa.md).
 
-An app can additionally refuse a session whose ID token shows no second factor, where the provider documents the claim. Okta's `amr` array carries values such as `pwd`, `mfa`, `otp`, and `hwk`. For Entra, check the ID token claims reference and the optional claims reference for the `amr` claim and its `mfa` value before relying on it. For Google, enforce 2SV in Workspace; no ID token MFA claim was verified for this guide. GitHub OAuth has no ID token, so MFA is whatever the organisation requires of its members.
+An app can additionally refuse a session whose ID token shows no second factor, where the provider documents the claim. Okta's `amr` array carries values such as `pwd`, `mfa`, `otp`, and `hwk`. For Entra, check the ID token claims reference and the optional claims reference for the `amr` claim and its `mfa` value before relying on it. For Google, enforce 2SV in Workspace; no ID token MFA claim was verified for this guide. GitHub OAuth has no ID token, so MFA is whatever the organization requires of its members.
 
 ## Verify
 
@@ -1173,7 +1173,7 @@ A GitHub Actions job can request a short-lived OIDC token (`permissions: id-toke
 }
 ```
 
-IAM refuses a trust policy whose `sub` condition is absent or only a wildcard, and AWS warns that a condition wider than your organisation lets "GitHub Actions from organizations or repositories outside of your control" assume the role.
+IAM refuses a trust policy whose `sub` condition is absent or only a wildcard, and AWS warns that a condition wider than your organization lets "GitHub Actions from organizations or repositories outside of your control" assume the role.
 
 **Google Cloud.** Create a Workload Identity Pool provider with `gcloud iam workload-identity-pools providers create-oidc` using `--issuer-uri="https://token.actions.githubusercontent.com"`, an `--attribute-mapping` such as `google.subject=assertion.sub,attribute.repository=assertion.repository`, and an `--attribute-condition` such as `assertion.repository_owner == 'example-org'`. Then grant `roles/iam.workloadIdentityUser` on the service account to `principalSet://iam.googleapis.com/<POOL_RESOURCE_NAME>/attribute.repository/example-org/example-repo`, which names the exact repository. Google recommends conditions on the numeric `repository_id` and `repository_owner_id` claims over names, since a name can be re-registered by someone else. The `google-github-actions/auth` step takes `workload_identity_provider` and `service_account`.
 
@@ -2119,7 +2119,7 @@ import secrets
 token = secrets.token_urlsafe(32)
 ```
 
-- FastAPI's `fastapi.security` classes (`HTTPBearer`, `APIKeyHeader`, `OAuth2AuthorizationCodeBearer`, and so on) extract the credential from the request and declare the OpenAPI security scheme; they validate nothing, and `OpenIdConnect` is documented as a stub that does not implement the scheme or use the discovery URL. Use them to extract the token, then validate it (signature, issuer, audience, expiry) with an OIDC library such as Authlib, and authorise per [oidc-integration.md](oidc-integration.md).
+- FastAPI's `fastapi.security` classes (`HTTPBearer`, `APIKeyHeader`, `OAuth2AuthorizationCodeBearer`, and so on) extract the credential from the request and declare the OpenAPI security scheme; they validate nothing, and `OpenIdConnect` is documented as a stub that does not implement the scheme or use the discovery URL. Use them to extract the token, then validate it (signature, issuer, audience, expiry) with an OIDC library such as Authlib, and authorize per [oidc-integration.md](oidc-integration.md).
 - Rate-limit login routes (for example with a proxy-level limit or a library such as slowapi for ASGI apps).
 - MFA: add TOTP with [pyotp](https://github.com/pyauth/pyotp) plus the [qrcode](https://pypi.org/project/qrcode/) package for enrolment QR codes; [django-otp](https://pypi.org/project/django-otp/) integrates this into Django. Requirements and options in [mfa.md](mfa.md).
 
@@ -2691,7 +2691,7 @@ import { handlers } from "@/auth"
 export const { GET, POST } = handlers
 ```
 
-Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for OIDC `AUTH_<PROVIDER>_ISSUER`; provider setup and the allowlist check are in [oidc-integration.md](oidc-integration.md) and [identity-providers.md](identity-providers.md). Behind a reverse proxy set `AUTH_TRUST_HOST=true` (automatic on Vercel). Server code calls `const session = await auth()`. Wrapping a Route Handler with `auth(...)` only fills in `req.auth`; nothing refuses the request for you, so the handler must check the session, then authorise, then touch data:
+Providers are configured from `AUTH_<PROVIDER>_ID`, `AUTH_<PROVIDER>_SECRET`, and for OIDC `AUTH_<PROVIDER>_ISSUER`; provider setup and the allowlist check are in [oidc-integration.md](oidc-integration.md) and [identity-providers.md](identity-providers.md). Behind a reverse proxy set `AUTH_TRUST_HOST=true` (automatic on Vercel). Server code calls `const session = await auth()`. Wrapping a Route Handler with `auth(...)` only fills in `req.auth`; nothing refuses the request for you, so the handler must check the session, then authorize, then touch data:
 
 ```ts
 // app/api/notes/route.ts
@@ -4276,7 +4276,7 @@ openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake wi
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
   --group app-workers --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config client.properties \
-  --group app-workers --topic orders --from-beginning --max-messages 1   # authorised app credential (group from the ACL in step 4): reads one message
+  --group app-workers --topic orders --from-beginning --max-messages 1   # authorized app credential (group from the ACL in step 4): reads one message
 bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties --list --topic orders
 ```
 
@@ -5331,7 +5331,7 @@ client_secret = "<from your identity provider>"
 server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
 ```
 
-Gate the app at the top of the script, then authorise. `st.login()` on its own accepts any account the provider will authenticate (with Google, any Google account), so check who logged in before showing anything:
+Gate the app at the top of the script, then authorize. `st.login()` on its own accepts any account the provider will authenticate (with Google, any Google account), so check who logged in before showing anything:
 
 ```python
 import streamlit as st
@@ -5343,7 +5343,7 @@ if not st.user.is_logged_in:
     st.stop()
 
 if st.user.get("hd") != ALLOWED_DOMAIN:
-    st.error("This account is not authorised for this app.")
+    st.error("This account is not authorized for this app.")
     st.stop()
 
 if not st.user.get("email_verified"):
@@ -7122,7 +7122,7 @@ The recurring findings behind exposed AI-assisted projects, distilled from the g
 12. **Database ports open to `0.0.0.0/0` in cloud firewalls** because a remote client needed access once. ([cloud-firewalls.md](cloud-firewalls.md))
 13. **Firebase or Supabase rules left open** (`allow read, write: if true;`, RLS disabled) because the client key "worked": the key is public by design, the rules are the security. ([firebase-supabase.md](firebase-supabase.md))
 14. **Single-factor logins on human-facing services** when the stack or a fronting layer supports MFA. ([mfa.md](mfa.md))
-15. **"Signed in with Google" treated as authorised.** Any Google or Microsoft account passes the login and nothing checks the domain, tenant, or group. ([oidc-integration.md](oidc-integration.md))
+15. **"Signed in with Google" treated as authorized.** Any Google or Microsoft account passes the login and nothing checks the domain, tenant, or group. ([oidc-integration.md](oidc-integration.md))
 16. **MCP servers on all interfaces.** An HTTP MCP server bound to `0.0.0.0` with no token or OAuth hands every tool it exposes to the network. ([mcp-servers.md](mcp-servers.md))
 17. **Unauthenticated AI infrastructure**: Ray dashboards, MLflow trackers, and vector databases with authentication off. ([ray.md](ray.md), [mlflow.md](mlflow.md), [vector-databases.md](vector-databases.md))
 18. **MFA enrolled but not enforced**: users have a second factor and a password-only session still works. ([authentication.md](authentication.md))

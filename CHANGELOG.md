@@ -96,6 +96,15 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 
 ### Changed
 
+- Prose now uses Oxford `-ize` spellings throughout (#18). The corpus mixed British `-ise` and Oxford
+  `-ize`, with the `-ise` forms holding the recurring line "login is not authorisation" in `README.md`,
+  `authentication.md`, the `oidc-integration.md` heading and the site's front page. 27 instances were
+  converted across 12 files. Technical identifiers were already `-ize` and are untouched: the
+  `Authorization` header, `authorization_endpoint`, `authorizationEnabled`, AWS `authorizer`, and the
+  term of art "authorization code flow". The case worth naming is `oidc-integration.md` lines 24 and 35,
+  where prose `organisation` sat on the same line as the Microsoft Entra authority name `organizations`
+  in backticks; both lines now carry the converted prose word and the identifier unchanged.
+
 - The project was renamed from `sslconfig` to `secureconfig`. The GitHub repository is now
   `jposluns/secureconfig` and the site is served at `secureconfig.ai`; GitHub redirects the old
   repository path. Every
@@ -183,12 +192,12 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   guide's Sources section lists the pages. A three-family review (Claude, Codex, Gemini) of the
   whole branch then found and corrected further defects, listed under Fixed; details that no page
   confirmed were left out.
-- `authentication.md` rules 11 to 15: federated login is not authorisation, OIDC and OAuth hygiene,
+- `authentication.md` rules 11 to 15: federated login is not authorization, OIDC and OAuth hygiene,
   MFA enforced where access is granted, control-plane MFA, and authentication on every transport;
   plus a negative-test quick check.
 - `mfa.md`: a phishing-resistant factor for administrators, enrolment is not enforcement, a pointer
   to hosted providers, and a section on passkeys and hardware keys.
-- `common-mistakes.md` items 15 to 19, including federated login treated as authorisation and MCP
+- `common-mistakes.md` items 15 to 19, including federated login treated as authorization and MCP
   servers bound to all interfaces.
 - `model-servers.md` now covers Text Generation Inference, SGLang, Triton, and LM Studio.
 - README: an AI-assistant rule on federated login and a decision-guide entry for team and customer
