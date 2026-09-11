@@ -58,6 +58,16 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   carrying no security configuration (#14). The weekly link sweep treats a redirect as passing, so a
   stale citation of this shape stays green indefinitely. Replaced with the current documentation home,
   and the page documenting the generated `http_ca.crt` is now cited beside it.
+- The four fronting-proxy guides never checked the backend's bind address (#15).
+  `common-mistakes.md` opens the corpus-wide list with "Binding to `0.0.0.0` to fix a connection
+  problem and never binding back", and `nginx.md` repeats it as its own first common mistake, yet
+  the Verify blocks in `nginx.md`, `caddy.md`, `haproxy.md` and `traefik.md` probed only the front
+  door. All of those checks pass while the application also answers directly on port 3000, bypassing
+  the proxy's TLS and authentication, so a reader in exactly the state this project ranks first
+  collected four passes. Each Verify block now ends with the `ss -tlnp` check already used in
+  `model-servers.md`, `vector-databases.md`, `docker.md` and the database guides; `traefik.md` also
+  checks published container ports. `apache.md` and `lighttpd.md` serve content directly and front
+  no backend, so the check does not apply to them and they were left alone.
 
 ### Changed
 
