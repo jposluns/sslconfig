@@ -1536,14 +1536,46 @@ Mutual TLS for machine-to-machine access:
 
 Basic authentication is single-factor. For human-facing sites, add MFA with the `auth_request` mechanism pointed at an [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 4. Verify
+## 4. Bound the expensive endpoints
+
+An authenticated caller can still exhaust an inference, upload, or job-submission endpoint, which is
+denial of wallet when the endpoint costs GPU time ([authentication.md](authentication.md)). Declare the
+zones in the `http` block and apply the limits per location.
+
+```nginx
+# http block
+limit_req_zone  $binary_remote_addr zone=api:10m rate=10r/s;
+limit_conn_zone $binary_remote_addr zone=apiconn:10m;
+
+server {
+    client_max_body_size 10m;                   # 413 above this; the default is 1m
+
+    location /api/ {
+        limit_req  zone=api burst=20 nodelay;   # 503 once the burst is spent
+        limit_conn apiconn 10;                  # concurrent connections per client address
+        proxy_read_timeout 60s;                 # match realistic response time, not the default 60s blindly
+        proxy_send_timeout 60s;
+        proxy_pass http://127.0.0.1:3000;
+    }
+}
+```
+
+A streaming response needs a longer `proxy_read_timeout` than a JSON API. Set it on the streaming
+location only; raising it globally removes the timeout from every route that does not stream.
+
+## 5. Verify
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 200 without -k
 curl -s  https://example.com/api    # expect 401/403 without credentials
-ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All three checks
+head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/api/
+                                    # 413: larger than client_max_body_size
+for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' https://example.com/api/; done; echo
+                                    # 503 appears once the rate and burst are spent. All 200s means
+                                    # limit_req is not applying to this location
+ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the app also answers directly on port 3000,
                                     # which bypasses this proxy's TLS and its authentication. That
                                     # bypass is the first common mistake below, and the first item in
@@ -1560,6 +1592,10 @@ ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.
 ## Sources (checked September 2026)
 
 - Configuring HTTPS servers: https://nginx.org/en/docs/http/configuring_https_servers.html
+- Core module (`client_max_body_size`): https://nginx.org/en/docs/http/ngx_http_core_module.html
+- Request rate limiting (`limit_req_zone`, `limit_req`, `burst`, `nodelay`): https://nginx.org/en/docs/http/ngx_http_limit_req_module.html
+- Connection limiting (`limit_conn_zone`, `limit_conn`): https://nginx.org/en/docs/http/ngx_http_limit_conn_module.html
+- Proxy module (`proxy_read_timeout`, `proxy_send_timeout`, `proxy_connect_timeout`): https://nginx.org/en/docs/http/ngx_http_proxy_module.html
 - ngx_http_auth_basic_module: https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
 
@@ -1728,7 +1764,23 @@ Path matches are exact, and `/admin/*` alone does not match `/admin` itself, so 
 
 `basic_auth` is single-factor. For human-facing sites, add MFA with the `forward_auth` directive (Caddy 2.5.1 and later) pointed at an [Authelia](https://www.authelia.com/) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 4. Verify
+## 4. Bound the expensive endpoints
+
+Caddy caps request bodies natively. **It has no rate limiting in the standard build**: `rate_limit` is
+not a Caddyfile directive, and rate limiting requires the community `caddy-ratelimit` module compiled in
+with xcaddy, or a layer in front of Caddy. Do not assume a stock Caddy is rate limited, and do not
+follow a `rate_limit` example without checking that your binary has that module.
+
+```caddy
+app.example.com {
+    request_body {
+        max_size 10MB
+    }
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+## 5. Verify
 
 ```bash
 caddy validate --config /etc/caddy/Caddyfile
@@ -1736,6 +1788,8 @@ curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin     # 401 with the @admin matcher
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin/x   # 401 as well
+head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://app.example.com/
+                                     # 413: larger than request_body max_size
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which
                                      # bypasses Caddy's TLS and its authentication
@@ -1750,6 +1804,9 @@ ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0
 ## Sources (checked September 2026)
 
 - Automatic HTTPS: https://caddyserver.com/docs/automatic-https
+- `request_body` directive (`max_size`): https://caddyserver.com/docs/caddyfile/directives/request_body
+- Caddyfile directive list, which carries no `rate_limit` entry: https://caddyserver.com/docs/caddyfile/directives
+- caddy-ratelimit, the community module that adds rate limiting: https://github.com/mholt/caddy-ratelimit
 - basic_auth directive: https://caddyserver.com/docs/caddyfile/directives/basic_auth
 - tls directive: https://caddyserver.com/docs/caddyfile/directives/tls
 - Request matchers (path, wildcards, multiple paths): https://caddyserver.com/docs/caddyfile/matchers
@@ -1818,13 +1875,35 @@ Hashed `password` entries rely on the system's crypt(3); `$6$` works on glibc-ba
 
 Basic authentication here is single-factor. For human-facing sites, add MFA with an [Authelia](https://www.authelia.com/) portal (HAProxy is supported through Authelia's Lua module) or by fronting the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 3. Verify
+## 3. Bound the expensive endpoints
+
+The timeouts in section 1 are half of this. Add a concurrency cap with `maxconn`, which in `global` is
+the maximum per-process concurrent connections and in a frontend caps that frontend.
+
+HAProxy has **no single request-body-size directive**. Its `req.body_size` fetch reads only what has
+been buffered, and the manual recommends `option http-buffer-request` to wait for the body first, which
+is itself bounded by `tune.bufsize`. Treat the check below as a coarse guard and enforce the real limit
+at the application.
+
+```haproxy
+global
+    maxconn 4096
+
+frontend https-in
+    maxconn 2000
+    option  http-buffer-request
+    http-request deny deny_status 413 if { req.body_size gt 10485760 }
+```
+
+## 4. Verify
 
 ```bash
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 401 without credentials once auth is on
-ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. Both checks
+head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/
+                                    # 413, subject to the tune.bufsize caveat in section 3
+ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the backend also answers directly on port 3000,
                                     # which bypasses HAProxy's TLS and its authentication
 ```
@@ -1838,6 +1917,7 @@ ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 
 ## Sources (checked September 2026)
 
 - HAProxy documentation: https://www.haproxy.org/ (configuration manual for your installed version)
+- Configuration manual (`maxconn`, `option http-buffer-request`, `req.body_size`, `tune.bufsize`, `http-request deny deny_status`): https://docs.haproxy.org/3.0/configuration.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
 
 ======================================================================
@@ -1922,15 +2002,36 @@ http:
 
 basicAuth is single-factor. For human-facing sites, add MFA with the `forwardAuth` middleware pointed at [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy), or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 4. Verify
+## 4. Bound the expensive endpoints
+
+Three middlewares, attached to the router alongside the auth middleware from section 3.
+
+```yaml
+    labels:
+      - traefik.http.middlewares.app-body.buffering.maxRequestBodyBytes=10485760
+      - traefik.http.middlewares.app-inflight.inflightreq.amount=10
+      - traefik.http.middlewares.app-rate.ratelimit.average=10
+      - traefik.http.middlewares.app-rate.ratelimit.burst=20
+      - traefik.http.routers.app.middlewares=app-auth,app-body,app-inflight,app-rate
+```
+
+`buffering` reads the request into memory or disk before forwarding it, so a large
+`maxRequestBodyBytes` trades memory for tolerance. `ratelimit` is per source by default; `inflightreq`
+caps concurrent in-flight requests rather than their rate, and the two bound different failure modes.
+
+## 5. Verify
 
 ```bash
 curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
+head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://app.example.com/
+                                     # 413: larger than buffering.maxRequestBodyBytes
+for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' https://app.example.com/; done; echo
+                                     # 429 appears once the rate limit and burst are spent
 docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
-ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. Both checks above
-                                     # pass while the app is published directly, which bypasses Traefik's
-                                     # TLS and its authentication middleware
+ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. The TLS and auth
+                                     # checks above pass while the app is published directly, which
+                                     # bypasses Traefik's TLS and its authentication middleware
 ```
 
 Check the Traefik log for ACME errors on first start; issuance failures otherwise surface as a self-signed "TRAEFIK DEFAULT CERT" in the browser.
@@ -1944,6 +2045,9 @@ Check the Traefik log for ACME errors on first start; issuance failures otherwis
 ## Sources (checked September 2026)
 
 - Traefik documentation: https://doc.traefik.io/traefik/ (HTTPS/ACME, routers, and basicAuth middleware sections)
+- Buffering middleware (`maxRequestBodyBytes`, `memRequestBodyBytes`): https://doc.traefik.io/traefik/middlewares/http/buffering/
+- InFlightReq middleware (`amount`): https://doc.traefik.io/traefik/middlewares/http/inflightreq/
+- RateLimit middleware (`average`, `burst`, `period`): https://doc.traefik.io/traefik/middlewares/http/ratelimit/
 
 ======================================================================
 ==> nodejs.md
@@ -6910,7 +7014,7 @@ Apply the shared lesson everywhere: use a distinct secret per endpoint (rotating
 
 ## 4. Bound the expensive endpoints too
 
-Inference, upload, and job-submission endpoints are usually the ones behind these transports, and an authenticated caller can still exhaust them. Two layers need separate limits. At the proxy in front of the app: a maximum request or body size, a connection concurrency cap per client, and a request timeout matched to realistic response time bound the HTTP connection itself; this repository's nginx, Caddy, and Traefik guides do not yet carry those specific directives, so set them directly from each proxy's own documentation. After a WebSocket upgrade, a single accepted connection can still carry unlimited messages or job submissions, which the connection-level limits above do not touch; OWASP's WebSocket Security Cheat Sheet calls for message-level authorization (checking that each individual message is allowed, not only the handshake) and message-level rate limiting (capping messages per connection per time window) as the separate control that applies once the socket is open. [authentication.md](authentication.md) covers the identity side these limits key off.
+Inference, upload, and job-submission endpoints are usually the ones behind these transports, and an authenticated caller can still exhaust them. Two layers need separate limits. At the proxy in front of the app: a maximum request or body size, a connection concurrency cap per client, and a request timeout matched to realistic response time bound the HTTP connection itself; the nginx, Caddy, HAProxy and Traefik guides here each carry those directives in their "Bound the expensive endpoints" section, including where a proxy has no native control for one of them. After a WebSocket upgrade, a single accepted connection can still carry unlimited messages or job submissions, which the connection-level limits above do not touch; OWASP's WebSocket Security Cheat Sheet calls for message-level authorization (checking that each individual message is allowed, not only the handshake) and message-level rate limiting (capping messages per connection per time window) as the separate control that applies once the socket is open. [authentication.md](authentication.md) covers the identity side these limits key off.
 
 ## Verify
 

@@ -68,14 +68,46 @@ Mutual TLS for machine-to-machine access:
 
 Basic authentication is single-factor. For human-facing sites, add MFA with the `auth_request` mechanism pointed at an [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 4. Verify
+## 4. Bound the expensive endpoints
+
+An authenticated caller can still exhaust an inference, upload, or job-submission endpoint, which is
+denial of wallet when the endpoint costs GPU time ([authentication.md](authentication.md)). Declare the
+zones in the `http` block and apply the limits per location.
+
+```nginx
+# http block
+limit_req_zone  $binary_remote_addr zone=api:10m rate=10r/s;
+limit_conn_zone $binary_remote_addr zone=apiconn:10m;
+
+server {
+    client_max_body_size 10m;                   # 413 above this; the default is 1m
+
+    location /api/ {
+        limit_req  zone=api burst=20 nodelay;   # 503 once the burst is spent
+        limit_conn apiconn 10;                  # concurrent connections per client address
+        proxy_read_timeout 60s;                 # match realistic response time, not the default 60s blindly
+        proxy_send_timeout 60s;
+        proxy_pass http://127.0.0.1:3000;
+    }
+}
+```
+
+A streaming response needs a longer `proxy_read_timeout` than a JSON API. Set it on the streaming
+location only; raising it globally removes the timeout from every route that does not stream.
+
+## 5. Verify
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 200 without -k
 curl -s  https://example.com/api    # expect 401/403 without credentials
-ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All three checks
+head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/api/
+                                    # 413: larger than client_max_body_size
+for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' https://example.com/api/; done; echo
+                                    # 503 appears once the rate and burst are spent. All 200s means
+                                    # limit_req is not applying to this location
+ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the app also answers directly on port 3000,
                                     # which bypasses this proxy's TLS and its authentication. That
                                     # bypass is the first common mistake below, and the first item in
@@ -92,5 +124,9 @@ ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.
 ## Sources (checked September 2026)
 
 - Configuring HTTPS servers: https://nginx.org/en/docs/http/configuring_https_servers.html
+- Core module (`client_max_body_size`): https://nginx.org/en/docs/http/ngx_http_core_module.html
+- Request rate limiting (`limit_req_zone`, `limit_req`, `burst`, `nodelay`): https://nginx.org/en/docs/http/ngx_http_limit_req_module.html
+- Connection limiting (`limit_conn_zone`, `limit_conn`): https://nginx.org/en/docs/http/ngx_http_limit_conn_module.html
+- Proxy module (`proxy_read_timeout`, `proxy_send_timeout`, `proxy_connect_timeout`): https://nginx.org/en/docs/http/ngx_http_proxy_module.html
 - ngx_http_auth_basic_module: https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/

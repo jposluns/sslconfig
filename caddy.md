@@ -67,7 +67,23 @@ Path matches are exact, and `/admin/*` alone does not match `/admin` itself, so 
 
 `basic_auth` is single-factor. For human-facing sites, add MFA with the `forward_auth` directive (Caddy 2.5.1 and later) pointed at an [Authelia](https://www.authelia.com/) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 4. Verify
+## 4. Bound the expensive endpoints
+
+Caddy caps request bodies natively. **It has no rate limiting in the standard build**: `rate_limit` is
+not a Caddyfile directive, and rate limiting requires the community `caddy-ratelimit` module compiled in
+with xcaddy, or a layer in front of Caddy. Do not assume a stock Caddy is rate limited, and do not
+follow a `rate_limit` example without checking that your binary has that module.
+
+```caddy
+app.example.com {
+    request_body {
+        max_size 10MB
+    }
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+## 5. Verify
 
 ```bash
 caddy validate --config /etc/caddy/Caddyfile
@@ -75,6 +91,8 @@ curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin     # 401 with the @admin matcher
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin/x   # 401 as well
+head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://app.example.com/
+                                     # 413: larger than request_body max_size
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which
                                      # bypasses Caddy's TLS and its authentication
@@ -89,6 +107,9 @@ ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0
 ## Sources (checked September 2026)
 
 - Automatic HTTPS: https://caddyserver.com/docs/automatic-https
+- `request_body` directive (`max_size`): https://caddyserver.com/docs/caddyfile/directives/request_body
+- Caddyfile directive list, which carries no `rate_limit` entry: https://caddyserver.com/docs/caddyfile/directives
+- caddy-ratelimit, the community module that adds rate limiting: https://github.com/mholt/caddy-ratelimit
 - basic_auth directive: https://caddyserver.com/docs/caddyfile/directives/basic_auth
 - tls directive: https://caddyserver.com/docs/caddyfile/directives/tls
 - Request matchers (path, wildcards, multiple paths): https://caddyserver.com/docs/caddyfile/matchers

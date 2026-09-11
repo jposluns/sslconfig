@@ -58,13 +58,35 @@ Hashed `password` entries rely on the system's crypt(3); `$6$` works on glibc-ba
 
 Basic authentication here is single-factor. For human-facing sites, add MFA with an [Authelia](https://www.authelia.com/) portal (HAProxy is supported through Authelia's Lua module) or by fronting the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 3. Verify
+## 3. Bound the expensive endpoints
+
+The timeouts in section 1 are half of this. Add a concurrency cap with `maxconn`, which in `global` is
+the maximum per-process concurrent connections and in a frontend caps that frontend.
+
+HAProxy has **no single request-body-size directive**. Its `req.body_size` fetch reads only what has
+been buffered, and the manual recommends `option http-buffer-request` to wait for the body first, which
+is itself bounded by `tune.bufsize`. Treat the check below as a coarse guard and enforce the real limit
+at the application.
+
+```haproxy
+global
+    maxconn 4096
+
+frontend https-in
+    maxconn 2000
+    option  http-buffer-request
+    http-request deny deny_status 413 if { req.body_size gt 10485760 }
+```
+
+## 4. Verify
 
 ```bash
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 401 without credentials once auth is on
-ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. Both checks
+head -c 11M /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' --data-binary @- https://example.com/
+                                    # 413, subject to the tune.bufsize caveat in section 3
+ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. All the checks
                                     # above pass while the backend also answers directly on port 3000,
                                     # which bypasses HAProxy's TLS and its authentication
 ```
@@ -78,4 +100,5 @@ ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 
 ## Sources (checked September 2026)
 
 - HAProxy documentation: https://www.haproxy.org/ (configuration manual for your installed version)
+- Configuration manual (`maxconn`, `option http-buffer-request`, `req.body_size`, `tune.bufsize`, `http-request deny deny_status`): https://docs.haproxy.org/3.0/configuration.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
