@@ -23,9 +23,12 @@ is a command inside backticks. Applying the carve-out to both is how the first d
 this gate missed `./pocketbase serve yourdomain.com`, which is the defect it was written
 to catch.
 
-EXEMPTIONS, each with a reason. Spelling skips `backticks`, "double quotes", 'single
-quotes' and URLs, because a quotation must not be silently edited and a URL path cannot be
-respelled without breaking the link. The placeholder check skips CHANGELOG.md, because an
+EXEMPTIONS, each with a reason. Spelling skips `backticks`, "double quotes", URLs, fenced
+code and block quotations, because a quotation must not be silently edited, a URL path
+cannot be respelled without breaking the link, and `def serialise(value)` is an identifier.
+Single quotes are NOT an exemption: an apostrophe pair spanning contractions blanked the
+prose between them, so "Don't authorise this with the admin's key" passed. A comment inside
+a fence IS read, because it is a sentence a reader reads. The placeholder check skips CHANGELOG.md, because an
 entry recording a placeholder replacement has to name the old value, and a changelog line
 is not something a reader pastes into a server.
 

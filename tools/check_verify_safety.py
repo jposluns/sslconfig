@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Flag commands in Verify blocks that skip TLS certificate verification.
 
-WHAT THIS CATCHES: the patterns listed in CHECKS below, in a command inside a fenced or
-indented code block inside a Verify section. It exists because this corpus forbids
+WHAT THIS CATCHES: the patterns listed in CHECKS below, in a command inside any fenced or
+indented code block in a guide. It scans every block rather than only Verify sections,
+because an insecure flag is a defect wherever a reader copies it from, and because two
+rounds of review found bugs in the section-tracking logic itself. It exists because this corpus forbids
 disabling TLS verification in three places (common-mistakes.md item 5, self-signed.md,
 README.sources.md) and three Verify blocks did it anyway. A probe that skips verification
 is satisfied by a substituted certificate as readily as by the right one, and one of
@@ -64,6 +66,9 @@ def split_segments(code):
     while i < len(code):
         ch = code[i]
         if quote:
+            if ch == "\\" and i + 1 < len(code):
+                buf.append(code[i:i + 2]); i += 2
+                continue
             if ch == quote:
                 quote = None
             buf.append(ch)
@@ -71,8 +76,16 @@ def split_segments(code):
             quote = ch
             buf.append(ch)
         elif code.startswith("$(", i):
-            out.append(("".join(buf), sep)); buf, sep = [], "$("
-            i += 2
+            # An opaque unit: keep it in the segment so the enclosing command survives.
+            depth, j = 1, i + 2
+            while j < len(code) and depth:
+                if code[j] == "(":
+                    depth += 1
+                elif code[j] == ")":
+                    depth -= 1
+                j += 1
+            buf.append(code[i:j])
+            i = j
             continue
         elif ch in "|;&":
             run = ch
@@ -109,7 +122,7 @@ SCLIENT = re.compile(r"(?:^|[\s'\"/=`(])openssl\s+s_client\b")
 # OpenSSL: "the verify operation continues after errors" unless -verify_return_error is
 # given, so a trust source alone does not make verification fatal. The negative forms
 # (-no-CAfile and friends) DISABLE trust, so they must not satisfy this.
-SCLIENT_VERIFIES = re.compile(r"(?<!-no)(?<!-no-)\B-verify_return_error\b")
+SCLIENT_VERIFIES = re.compile(r"(?:^|\s)-verify_return_error(?:\s|$)")
 SCLIENT_HELP = re.compile(r"\s-(?:help|h)\b")
 # Piping into `openssl x509` reads a certificate rather than trusting it. Printing an
 # issuer or an expiry date is a legitimate use of an unverified handshake, so it is not
@@ -118,58 +131,40 @@ SCLIENT_INSPECTS = re.compile(r"^\s*openssl\s+x509\b")
 
 
 def logical_lines(text):
-    """Yield (line_number, joined_line) for code inside Verify sections.
+    """Yield (line_number, joined_command) for every code line in the file.
 
-    Joins shell line continuations, so a flag on the next line is still part of the
-    command. Follows Markdown nesting: a deeper heading stays inside the section, only an
-    equal or shallower one leaves it. Handles backtick and tilde fences, and 4-space
-    indented blocks.
+    Scans ALL fenced and indented code blocks, not only those under a Verify heading.
+    Section tracking was removed after it produced two demonstrated bugs of its own: a
+    nested `### Verify TLS` cleared its own parent section, and a `---` thematic break
+    after a closing fence was read as a setext heading. Markdown heading semantics are not
+    worth reimplementing for this, and an insecure flag is a defect wherever it appears.
+
+    Comments are stripped BEFORE continuations are joined, because a comment ending in a
+    backslash does not continue in the shell, and joining first swallowed the next command.
     """
-    lines = text.splitlines()
-    verify_depth = None
     fence = None
     buf, buf_line = None, None
-    for i, line in enumerate(lines, 1):
+    for i, line in enumerate(text.splitlines(), 1):
         m = FENCE_RE.match(line)
         if m and not (fence and m.group(1) != fence):
             fence = None if fence else m.group(1)
             continue
-        if fence is None:
-            # Setext: the UNDERLINE names the heading, so the title is the line above.
-            s = SETEXT_RE.match(line)
-            if s and i >= 2 and lines[i - 2].strip():
-                depth = 1 if s.group(1)[0] == "=" else 2
-                if VERIFY_TITLE.search(lines[i - 2]):
-                    verify_depth = depth
-                elif verify_depth is not None and depth <= verify_depth:
-                    verify_depth = None
-                continue
-            h = VERIFY_RE.match(line)
-            if h and line.lstrip().startswith("#"):
-                depth = len(h.group(1))
-                if VERIFY_TITLE.search(h.group(2)):
-                    verify_depth = depth
-                elif verify_depth is not None and depth <= verify_depth:
-                    verify_depth = None
-                continue
-        if verify_depth is None:
-            continue
-        # Inside a Verify section: a fenced line, or a 4-space indented line, is code.
         if fence is None and not re.match(r"^(\s{4,}|\t)\S", line):
             continue
-        stripped = line.rstrip()
-        if stripped.endswith("\\"):
-            frag = stripped[:-1]
-            if buf is None:
-                buf, buf_line = frag, i
-            else:
-                buf += " " + frag.strip()
+        code = strip_comment(line).rstrip()
+        if not code.strip():
+            continue
+        if code.endswith("\\"):
+            frag = code[:-1]
+            buf = frag if buf is None else buf + " " + frag.strip()
+            if buf_line is None:
+                buf_line = i
             continue
         if buf is not None:
-            yield buf_line, buf + " " + stripped.strip()
+            yield buf_line, buf + " " + code.strip()
             buf, buf_line = None, None
         else:
-            yield i, stripped
+            yield i, code
     if buf is not None:
         yield buf_line, buf
 
@@ -246,7 +241,7 @@ def main() -> int:
         for f in findings:
             print(f"  FAIL  {f}")
         return 1
-    print(f"  ok    no Verify block in {scanned} guides matches a known TLS-bypass pattern")
+    print(f"  ok    no code block in {scanned} guides matches a known TLS-bypass pattern")
     return 0
 
 
