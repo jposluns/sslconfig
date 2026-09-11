@@ -118,16 +118,16 @@ From outside the network, every panel URL is unreachable or shows a login; a pag
 - Portainer CE install on Docker (ports 9443, 9000, 8000): https://docs.portainer.io/start/install-ce/server/docker/linux
 - Portainer initial setup (setup token, first admin, 12-character password): https://docs.portainer.io/start/install-ce/server/setup
 - Portainer authentication and OAuth providers: https://docs.portainer.io/admin/settings/authentication and https://docs.portainer.io/admin/settings/authentication/oauth
-- Coolify installation, firewall, proxy, and DNS pages: https://coolify.io/docs/get-started/installation , https://coolify.io/docs/knowledge-base/server/firewall , https://coolify.io/docs/knowledge-base/proxy/overview , https://coolify.io/docs/knowledge-base/dns-configuration , https://coolify.io/docs/knowledge-base/server/openssh
+- Coolify installation, firewall, proxy, and DNS pages: https://coolify.io/docs/start-with-self-hosted , https://coolify.io/docs/core/infrastructure/servers/firewall , https://coolify.io/docs/core/networking/proxy/overview , https://coolify.io/docs/core/networking/dns , https://coolify.io/docs/core/infrastructure/servers/openssh
 - Dokploy installation (ports 80, 443, 3000; admin setup; panel domain): https://docs.dokploy.com/docs/core/installation
 - Nginx Proxy Manager setup (port 81, default admin user): https://nginxproxymanager.com/setup/
 - Vaultwarden wiki: admin page and ADMIN_TOKEN https://github.com/dani-garcia/vaultwarden/wiki/Enabling-admin-page , registration https://github.com/dani-garcia/vaultwarden/wiki/Disable-registration-of-new-users , HTTPS https://github.com/dani-garcia/vaultwarden/wiki/Enabling-HTTPS , and the `.env.template` https://github.com/dani-garcia/vaultwarden/blob/main/.env.template
-- Kubernetes Dashboard (deprecation, port-forward, token login): https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/ ; 2.x arguments: https://github.com/kubernetes/dashboard/blob/v2.7.0/docs/common/dashboard-arguments.md
+- Kubernetes Dashboard (deprecation, port-forward, token login): https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/ ; 2.x arguments: https://github.com/kubernetes-retired/dashboard/blob/v2.7.0/docs/common/dashboard-arguments.md
 - Jenkins security: https://www.jenkins.io/doc/book/security/managing-security/ , https://www.jenkins.io/doc/book/security/access-control/ , https://www.jenkins.io/doc/book/security/csrf-protection/
 - Gitea config cheat sheet and MFA: https://docs.gitea.com/administration/config-cheat-sheet and https://docs.gitea.com/usage/user-setting/multi-factor-authentication/
 - Uptime Kuma README and reverse proxy wiki: https://github.com/louislam/uptime-kuma and https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy
 - Docker: protect the daemon socket https://docs.docker.com/engine/security/protect-access/ and remote access https://docs.docker.com/engine/daemon/remote-access/
 - Dozzle authentication (DOZZLE_AUTH_PROVIDER, users.yml, actions and shell): https://dozzle.dev/guide/authentication
 - Docker Registry deployment (default authentication, TLS requirement): https://distribution.github.io/distribution/about/deploying/
-- Filebrowser: https://filebrowser.org/
+- Filebrowser: https://github.com/filebrowser/filebrowser
 - Node-RED securing the runtime (adminAuth, credentialSecret): https://nodered.org/docs/user-guide/runtime/securing-node-red

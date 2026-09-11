@@ -138,7 +138,7 @@ kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labe
 ## Sources (checked September 2026)
 
 - Docker Dockerfile reference (`USER`): https://docs.docker.com/reference/dockerfile/
-- Docker Compose file reference (`user`, `read_only`, `cap_add`, `cap_drop`, `security_opt`): https://docs.docker.com/compose/compose-file/
+- Docker Compose file reference (`user`, `read_only`, `cap_add`, `cap_drop`, `security_opt`): https://docs.docker.com/reference/compose-file/
 - Kubernetes: Configure a security context for a Pod or Container: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 - Kubernetes: Pod Security Standards (`restricted` level, Pod Security Admission labels): https://kubernetes.io/docs/concepts/security/pod-security-standards/
 - Kubernetes: Network Policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/

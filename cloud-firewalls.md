@@ -19,5 +19,5 @@ On AWS (security groups), Google Cloud (VPC firewall rules), and Azure (network 
 ## Sources (checked September 2026)
 
 - AWS VPC and security groups: https://docs.aws.amazon.com/vpc/
-- Google Cloud VPC firewall rules: https://cloud.google.com/vpc/docs
+- Google Cloud VPC firewall rules: https://docs.cloud.google.com/vpc/docs
 - Azure virtual network security: https://learn.microsoft.com/en-us/azure/virtual-network/

@@ -81,13 +81,13 @@ curl -s -o /dev/null -w '%{http_code}\n' https://app.example.com/REPLACE_WITH_PR
 - PHP `session_regenerate_id()`: https://www.php.net/manual/en/function.session-regenerate-id.php
 - PHP `password_hash()`: https://www.php.net/manual/en/function.password-hash.php
 - PHP cURL constants (`CURLOPT_SSL_VERIFYPEER`, `CURLOPT_SSL_VERIFYHOST`, `CURLOPT_CAINFO`): https://www.php.net/manual/en/curl.constants.php
-- Laravel 12.x encryption (`APP_KEY`, `key:generate`, `APP_PREVIOUS_KEYS`): https://laravel.com/docs/12.x/encryption
-- Laravel 12.x requests (trusted proxies, trusted hosts): https://laravel.com/docs/12.x/requests
+- Laravel 12.x encryption (`APP_KEY`, `key:generate`, `APP_PREVIOUS_KEYS`): https://laravel.com/framework/docs/12.x/encryption
+- Laravel 12.x requests (trusted proxies, trusted hosts): https://laravel.com/framework/docs/12.x/requests
 - Laravel 12.x `config/session.php` defaults: https://github.com/laravel/laravel/blob/12.x/config/session.php
 - Laravel 12.x `UrlGenerator::forceHttps()` and `forceScheme()`: https://api.laravel.com/docs/12.x/Illuminate/Routing/UrlGenerator.html
-- Laravel 12.x hashing: https://laravel.com/docs/12.x/hashing
-- Laravel 12.x routing (rate limiting): https://laravel.com/docs/12.x/routing
-- Laravel 12.x starter kits (Fortify, two-factor, rate limiting): https://laravel.com/docs/12.x/starter-kits
-- Laravel 12.x Fortify: https://laravel.com/docs/12.x/fortify
-- Laravel 12.x Socialite: https://laravel.com/docs/12.x/socialite
-- Laravel 12.x deployment (nginx example, `APP_DEBUG`): https://laravel.com/docs/12.x/deployment
+- Laravel 12.x hashing: https://laravel.com/framework/docs/12.x/hashing
+- Laravel 12.x routing (rate limiting): https://laravel.com/framework/docs/12.x/routing
+- Laravel 12.x starter kits (Fortify, two-factor, rate limiting): https://laravel.com/framework/docs/12.x/starter-kits
+- Laravel 12.x Fortify: https://laravel.com/framework/docs/12.x/fortify
+- Laravel 12.x Socialite: https://laravel.com/framework/docs/12.x/socialite
+- Laravel 12.x deployment (nginx example, `APP_DEBUG`): https://laravel.com/framework/docs/12.x/deployment

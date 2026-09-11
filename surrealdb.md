@@ -63,8 +63,8 @@ https://` should show a valid certificate chain wherever TLS terminates.
 
 ## Sources (checked September 2026)
 
-- SurrealDB CLI, `surreal start`: https://surrealdb.com/docs/surrealdb/cli/start
-- SurrealDB CLI, `surreal sql`: https://surrealdb.com/docs/surrealdb/cli/sql
-- SurrealDB security overview: https://surrealdb.com/docs/surrealdb/security
+- SurrealDB CLI, `surreal start`: https://surrealdb.com/docs/reference/cli/surrealdb-cli/commands/start
+- SurrealDB CLI, `surreal sql`: https://surrealdb.com/docs/reference/cli/surrealdb-cli/commands/sql
+- SurrealDB security overview: https://surrealdb.com/docs/learn/security
 - SurrealDB authentication overview: https://surrealdb.com/docs/learn/security/authentication/overview
 - SurrealDB security best practices: https://surrealdb.com/docs/learn/security/best-practices/security-best-practices

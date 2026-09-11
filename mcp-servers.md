@@ -98,7 +98,7 @@ A token issued for a different resource (wrong audience) must also fail with `40
 
 - MCP specification 2025-11-25, Transports (stdio, Streamable HTTP, Security Warning, deprecated HTTP+SSE, `MCP-Session-Id`): https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
 - MCP specification 2025-11-25, Authorization (OPTIONAL, RFC 9728, PKCE, `resource`, audience validation, error codes): https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
-- MCP specification 2025-11-25, Security Best Practices (token passthrough, session hijacking, local server compromise): https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices
+- MCP specification 2025-11-25, Security Best Practices (token passthrough, session hijacking, local server compromise): https://modelcontextprotocol.io/docs/2025-11-25/tutorials/security/security_best_practices
 - MCP specification 2025-11-25, Lifecycle (`initialize` request shape): https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
 - Azure App Service authentication (protected resource metadata preview, `WEBSITE_AUTH_PRM_DEFAULT_WITH_SCOPES`): https://learn.microsoft.com/en-us/azure/app-service/overview-authentication-authorization
 - nginx `if` and `return` directives: https://nginx.org/en/docs/http/ngx_http_rewrite_module.html

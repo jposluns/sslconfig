@@ -109,6 +109,6 @@ path.
 - Temporal, self-hosted security (`noopAuthorizer` default, `Authorizer`, `ClaimMapper`): https://docs.temporal.io/self-hosted-guide/security
 - Temporal, Web UI configuration reference (`auth.providers`, `enabled`, `type: oidc`, `providerUrl`,
   `clientId`, `clientSecret`, `callbackUrl`, `scopes`): https://docs.temporal.io/references/web-ui-configuration
-- Temporal, CLI server reference (default frontend gRPC port 7233, Web UI port 8233): https://docs.temporal.io/cli/server
+- Temporal, CLI server reference (default frontend gRPC port 7233, Web UI port 8233): https://docs.temporal.io/cli/command-reference/server
 - Flower, configuration (`--address`, `--port` 5555 default, `--basic-auth`, `--auth_provider`, `--oauth2_key`,
   `--oauth2_secret`, `--oauth2_redirect_uri`, `--auth`): https://flower.readthedocs.io/en/latest/config.html

@@ -63,12 +63,12 @@ API keys, client secrets, and client-certificate keys that cannot be federated a
 
 ## Sources (checked September 2026)
 
-- OAuth 2.0 client credentials grant (RFC 6749 section 4.4): https://www.rfc-editor.org/rfc/rfc6749#section-4.4
-- OAuth 2.0 bearer token usage, TLS and URL rules (RFC 6750 sections 5.2 and 5.3): https://www.rfc-editor.org/rfc/rfc6750
+- OAuth 2.0 client credentials grant (RFC 6749 section 4.4): https://www.rfc-editor.org/info/rfc6749/
+- OAuth 2.0 bearer token usage, TLS and URL rules (RFC 6750 sections 5.2 and 5.3): https://www.rfc-editor.org/info/rfc6750/
 - Python `hmac.compare_digest`: https://docs.python.org/3/library/hmac.html ; Node.js `crypto.timingSafeEqual`: https://nodejs.org/api/crypto.html
 - Microsoft Entra External ID billing model (M2M add-on): https://learn.microsoft.com/en-us/entra/external-id/external-identities-pricing
-- GitHub: about security hardening with OpenID Connect (claims, subject formats): https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect
-- GitHub: configuring OpenID Connect in AWS: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services ; in Google Cloud: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform ; in Azure: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-azure
+- GitHub: about security hardening with OpenID Connect (claims, subject formats): https://docs.github.com/en/actions/concepts/security/openid-connect
+- GitHub: configuring OpenID Connect in AWS: https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws ; in Google Cloud: https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-google-cloud-platform ; in Azure: https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-azure
 - AWS IAM: configuring a role for the GitHub OIDC identity provider (trust policy, `sub` restriction): https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html
 - aws-actions/configure-aws-credentials: https://github.com/aws-actions/configure-aws-credentials
 - Google Cloud: Workload Identity Federation with deployment pipelines (GitHub Actions attribute mapping and conditions): https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines ; attribute conditions: https://docs.cloud.google.com/iam/docs/workload-identity-federation
@@ -76,5 +76,5 @@ API keys, client secrets, and client-certificate keys that cannot be federated a
 - Microsoft Entra: workload identity federation: https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation ; creating the trust on an app (subject formats, audience, exact match): https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-create-trust
 - Azure: authenticate from GitHub Actions by OpenID Connect (`azure/login`): https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect
 - SPIFFE and SPIRE: https://spiffe.io/ and https://spiffe.io/docs/latest/spire-about/
-- RFC 5280 (certificate revocation): https://www.rfc-editor.org/rfc/rfc5280
+- RFC 5280 (certificate revocation): https://www.rfc-editor.org/info/rfc5280/
 - Secret manager vendor pages: linked inline in section 5.

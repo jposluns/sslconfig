@@ -106,7 +106,7 @@ export const GET = auth(async function GET(req) {
 
 `export { auth as proxy }` in `proxy.ts` is the optimistic layer, and Auth.js says not to rely on it exclusively. MFA is not part of this configuration; enforce it at the identity provider ([mfa.md](mfa.md)).
 
-**Better Auth** (https://www.better-auth.com/docs/introduction): `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`) and `BETTER_AUTH_URL`; the placeholder default secret throws in production.
+**Better Auth** (https://better-auth.com/docs/introduction): `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`) and `BETTER_AUTH_URL`; the placeholder default secret throws in production.
 
 ```ts
 // lib/auth.ts
@@ -153,6 +153,6 @@ grep -rl "${SESSION_SECRET:0:8}" .next/static           # no output: the browser
 - Next.js environment variables: https://nextjs.org/docs/app/guides/environment-variables ; CLI (`next start` defaults): https://nextjs.org/docs/app/api-reference/cli/next ; self-hosting: https://nextjs.org/docs/app/guides/self-hosting
 - Auth.js protecting resources (Route Handler `req.auth` check): https://authjs.dev/getting-started/session-management/protecting
 - Auth.js installation: https://authjs.dev/getting-started/installation ; deployment (`AUTH_SECRET`, `AUTH_TRUST_HOST`, provider variables): https://authjs.dev/getting-started/deployment ; protecting resources: https://authjs.dev/getting-started/session-management/protecting
-- Better Auth introduction: https://www.better-auth.com/docs/introduction ; installation: https://www.better-auth.com/docs/installation ; options: https://www.better-auth.com/docs/reference/options ; Next.js integration: https://www.better-auth.com/docs/integrations/next ; two-factor plugin: https://www.better-auth.com/docs/plugins/2fa
+- Better Auth introduction: https://better-auth.com/docs/introduction ; installation: https://better-auth.com/docs/installation ; options: https://better-auth.com/docs/reference/options ; Next.js integration: https://better-auth.com/docs/integrations/next ; two-factor plugin: https://better-auth.com/docs/plugins/2fa
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
 - Vercel changelog, protect production deployments for free on every plan (9 September 2026): https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan

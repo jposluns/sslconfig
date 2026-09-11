@@ -73,9 +73,9 @@ curl -sI https://chat.example.com/                      # via the proxy: TLS, lo
 ## Sources (checked September 2026)
 
 - AnythingLLM security and access documentation: https://docs.anythingllm.com/features/security-and-access
-- LobeHub environment variables (KEY_VAULTS_SECRET): https://lobehub.com/docs/self-hosting/environment-variables/basic
-- LobeHub authentication service environment variables (Better Auth): https://lobehub.com/docs/self-hosting/environment-variables/auth
+- LobeHub environment variables (KEY_VAULTS_SECRET): https://lobehub.com/only-ai/markdown/docs/en/self-hosting/environment-variables/basic
+- LobeHub authentication service environment variables (Better Auth): https://lobehub.com/only-ai/markdown/docs/en/self-hosting/environment-variables/auth
 - Chainlit authentication overview: https://docs.chainlit.io/authentication/overview
 - Chainlit password authentication (`@cl.password_auth_callback` signature and example): https://docs.chainlit.io/authentication/password
-- OpenHands FAQs (single-user design, no built-in auth, sandboxing, hardened deployment): https://docs.openhands.dev/openhands/usage/faqs
+- OpenHands FAQs (single-user design, no built-in auth, sandboxing, hardened deployment): https://docs.openhands.dev/overview/faqs
 - OpenHands local setup (default docker port mapping): https://docs.openhands.dev/openhands/usage/run-openhands/local-setup

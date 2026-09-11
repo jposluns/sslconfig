@@ -203,7 +203,7 @@ Run the applicable checks below and the Verify steps in every selected guide. Re
 5. Authentication is enforced: an unauthenticated request to any non-public path returns `401`, `403`, or a login redirect, never data. Test the API paths as well as the home page.
 6. No default credentials remain, and no secret (password, key, token, certificate private key) is committed to the repository. Scan before pushing, for example with gitleaks.
 7. Where ACME is used, renewal is automated: `sudo certbot renew --dry-run` passes AND something is actually scheduled to run it. The dry run proves the command works, not that it will ever be invoked, so check the scheduler too: `systemctl list-timers` shows an active certbot timer with a next run, or the packaged cron entry is present. Servers that manage renewal themselves (Caddy, Traefik) need no timer; confirm a completed renewal in their logs instead.
-8. For public endpoints: scanned with the [Qualys SSL Labs test](https://www.ssllabs.com/ssltest/) or [testssl.sh](https://github.com/drwetter/testssl.sh).
+8. For public endpoints: scanned with the [Qualys SSL Labs test](https://www.ssllabs.com/ssltest/) or [testssl.sh](https://github.com/testssl/testssl.sh).
 9. Human-facing logins carry a second factor where the stack supports one; [mfa.md](mfa.md) lists the options, and the per-tool guides state what is viable.
 10. Probe from outside the deployment network, from a second host: cloud-firewall and Docker-publishing mistakes only show from outside. Shodan or Censys can corroborate, but they report what a scanner last observed rather than what is listening now, so a port published since their last pass will not appear; treat them as a second opinion, never as a substitute for a live probe. See [deployment-lifecycle.md](deployment-lifecycle.md).
 11. Where login comes from an identity provider, an authenticated identity outside the allowed tenant, domain, group, or users is denied; test with such an account, not only an anonymous request.
@@ -424,7 +424,7 @@ Self-signed certificates have no revocation and no third-party accountability, a
 
 ## Sources (checked September 2026)
 
-- OpenSSL documentation: https://www.openssl.org/docs/ ; `openssl s_client` (`-servername`, `-verify_return_error`): https://docs.openssl.org/master/man1/openssl-s_client/ ; verification options (`-verify_hostname`): https://docs.openssl.org/master/man1/openssl-verification-options/
+- OpenSSL documentation: https://docs.openssl.org/ ; `openssl s_client` (`-servername`, `-verify_return_error`): https://docs.openssl.org/master/man1/openssl-s_client/ ; verification options (`-verify_hostname`): https://docs.openssl.org/master/man1/openssl-verification-options/
 - mkcert: https://github.com/FiloSottile/mkcert
 
 ======================================================================
@@ -760,7 +760,7 @@ Machine protocols (database wire protocols, model-server APIs) have no interacti
 
 ## Standards and sources (checked September 2026)
 
-- TOTP: https://www.rfc-editor.org/rfc/rfc6238 ; HOTP: https://www.rfc-editor.org/rfc/rfc4226
+- TOTP: https://www.rfc-editor.org/info/rfc6238/ ; HOTP: https://www.rfc-editor.org/info/rfc4226/
 - `otpauth://` key URI format: https://github.com/google/google-authenticator/wiki/Key-Uri-Format
 - WebAuthn: https://www.w3.org/TR/webauthn-2/
 - Authelia proxy support matrix: https://www.authelia.com/integration/proxies/support/
@@ -994,7 +994,7 @@ Negative tests matter more than the happy path:
 
 ## Sources (checked September 2026)
 
-- RFC 9700, OAuth 2.0 Security Best Current Practice: https://www.rfc-editor.org/rfc/rfc9700
+- RFC 9700, OAuth 2.0 Security Best Current Practice: https://www.rfc-editor.org/info/rfc9700/
 - OpenID Connect Core 1.0 (ID token validation 3.1.3.7, claim stability 5.7): https://openid.net/specs/openid-connect-core-1_0.html ; Discovery 1.0: https://openid.net/specs/openid-connect-discovery-1_0.html ; RP-Initiated Logout 1.0: https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 - Google OpenID Connect (discovery URL, `hd`, `sub` versus `email`, token validation): https://developers.google.com/identity/openid-connect/openid-connect
 - Google Workspace: deploy 2-Step Verification: https://knowledge.workspace.google.com/admin/security/deploy-2-step-verification
@@ -1003,7 +1003,7 @@ Negative tests matter more than the happy path:
 - Microsoft Entra Conditional Access: require MFA for all users: https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-all-users-mfa-strength
 - GitHub OAuth apps: authorizing: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps ; creating: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app ; scopes: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
 - GitHub REST: organization members: https://docs.github.com/en/rest/orgs/members ; team members: https://docs.github.com/en/rest/teams/members
-- Okta: OAuth 2.0 and OpenID Connect overview: https://developer.okta.com/docs/concepts/oauth-openid/ ; OIDC API reference (discovery, issuer, `amr`, `groups`): https://developer.okta.com/docs/reference/api/oidc/
+- Okta: OAuth 2.0 and OpenID Connect overview: https://developer.okta.com/docs/concepts/oauth-openid/ ; OIDC API reference (discovery, issuer, `amr`, `groups`): https://developer.okta.com/docs/api/openapi/okta-oauth/guides/overview
 - Okta: add a groups claim: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/ ; sign users in to your web application: https://developer.okta.com/docs/guides/sign-into-web-app-redirect/-/main/ ; policies concept: https://developer.okta.com/docs/concepts/policies/
 - openid-client: https://github.com/panva/openid-client
 - Auth.js (installation, providers): https://authjs.dev/ ; session strategies (a JWT cannot be expired early without a blocklist): https://authjs.dev/concepts/session-strategies
@@ -1120,9 +1120,9 @@ After logging in, confirm that the app's own identity check reads the signed ass
 - Azure Container Apps authentication: https://learn.microsoft.com/en-us/azure/container-apps/authentication
 - Azure Static Web Apps authentication and authorization: https://learn.microsoft.com/en-us/azure/static-web-apps/authentication-authorization
 - Cloudflare Access, validate JWTs: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
-- ngrok traffic policy OAuth action: https://ngrok.com/docs/traffic-policy/actions/oauth/
-- ngrok traffic policy OpenID Connect action: https://ngrok.com/docs/traffic-policy/actions/oidc/
-- ngrok agent CLI (`ngrok http` flags): https://ngrok.com/docs/agent/cli/
+- ngrok traffic policy OAuth action: https://ngrok.com/docs/gateway/traffic-policy/actions/oauth
+- ngrok traffic policy OpenID Connect action: https://ngrok.com/docs/gateway/traffic-policy/actions/oidc
+- ngrok agent CLI (`ngrok http` flags): https://ngrok.com/docs/gateway/agent/cli
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
 - Vercel Authentication: https://vercel.com/docs/deployment-protection/methods-to-protect-deployments/vercel-authentication
 
@@ -1195,12 +1195,12 @@ API keys, client secrets, and client-certificate keys that cannot be federated a
 
 ## Sources (checked September 2026)
 
-- OAuth 2.0 client credentials grant (RFC 6749 section 4.4): https://www.rfc-editor.org/rfc/rfc6749#section-4.4
-- OAuth 2.0 bearer token usage, TLS and URL rules (RFC 6750 sections 5.2 and 5.3): https://www.rfc-editor.org/rfc/rfc6750
+- OAuth 2.0 client credentials grant (RFC 6749 section 4.4): https://www.rfc-editor.org/info/rfc6749/
+- OAuth 2.0 bearer token usage, TLS and URL rules (RFC 6750 sections 5.2 and 5.3): https://www.rfc-editor.org/info/rfc6750/
 - Python `hmac.compare_digest`: https://docs.python.org/3/library/hmac.html ; Node.js `crypto.timingSafeEqual`: https://nodejs.org/api/crypto.html
 - Microsoft Entra External ID billing model (M2M add-on): https://learn.microsoft.com/en-us/entra/external-id/external-identities-pricing
-- GitHub: about security hardening with OpenID Connect (claims, subject formats): https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect
-- GitHub: configuring OpenID Connect in AWS: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services ; in Google Cloud: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform ; in Azure: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-azure
+- GitHub: about security hardening with OpenID Connect (claims, subject formats): https://docs.github.com/en/actions/concepts/security/openid-connect
+- GitHub: configuring OpenID Connect in AWS: https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws ; in Google Cloud: https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-google-cloud-platform ; in Azure: https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-azure
 - AWS IAM: configuring a role for the GitHub OIDC identity provider (trust policy, `sub` restriction): https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html
 - aws-actions/configure-aws-credentials: https://github.com/aws-actions/configure-aws-credentials
 - Google Cloud: Workload Identity Federation with deployment pipelines (GitHub Actions attribute mapping and conditions): https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines ; attribute conditions: https://docs.cloud.google.com/iam/docs/workload-identity-federation
@@ -1208,7 +1208,7 @@ API keys, client secrets, and client-certificate keys that cannot be federated a
 - Microsoft Entra: workload identity federation: https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation ; creating the trust on an app (subject formats, audience, exact match): https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-create-trust
 - Azure: authenticate from GitHub Actions by OpenID Connect (`azure/login`): https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect
 - SPIFFE and SPIRE: https://spiffe.io/ and https://spiffe.io/docs/latest/spire-about/
-- RFC 5280 (certificate revocation): https://www.rfc-editor.org/rfc/rfc5280
+- RFC 5280 (certificate revocation): https://www.rfc-editor.org/info/rfc5280/
 - Secret manager vendor pages: linked inline in section 5.
 
 ======================================================================
@@ -1650,7 +1650,7 @@ curl -sI https://example.com/       # expect 401 without credentials once auth i
 ## Sources (checked September 2026)
 
 - lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
-- lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth
+- lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_auth
 - lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
 - lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions
 
@@ -2047,7 +2047,7 @@ ss -tlnp | grep node                 # behind a proxy: bound to 127.0.0.1 only
 - Node.js HTTPS module: https://nodejs.org/api/https.html
 - Express behind proxies: https://expressjs.com/en/guide/behind-proxies.html
 - express-session (MemoryStore warning, cookie.maxAge, compatible stores): https://expressjs.com/en/resources/middleware/session/
-- helmet: https://helmetjs.github.io/
+- helmet: https://helmet.js.org/
 
 ======================================================================
 ==> python.md
@@ -2142,9 +2142,9 @@ ss -tlnp | grep -E 'gunicorn|uvicorn|python'   # behind a proxy: 127.0.0.1 only
 
 ## Sources (checked September 2026)
 
-- Gunicorn documentation (settings reference): https://docs.gunicorn.org/
-- Uvicorn settings reference: https://github.com/encode/uvicorn/blob/master/docs/settings.md
-- Django deployment checklist: https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
+- Gunicorn documentation (settings reference): https://gunicorn.org/
+- Uvicorn settings reference: https://github.com/Kludex/uvicorn/blob/main/docs/settings.md
+- Django deployment checklist: https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 - argon2-cffi: https://argon2-cffi.readthedocs.io/
 - Werkzeug serving (`ssl_context="adhoc"` requires cryptography): https://werkzeug.palletsprojects.com/en/stable/serving/
 - FastAPI security reference: https://fastapi.tiangolo.com/reference/security/ ; `OpenIdConnect` source (stub warning): https://github.com/fastapi/fastapi/blob/master/fastapi/security/open_id_connect_url.py
@@ -2359,7 +2359,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/   # 401 where
 ## Sources (checked September 2026)
 
 - Ingress NGINX: Statement from the Kubernetes Steering and Security Response Committees (retirement, detection command): https://kubernetes.io/blog/2026/01/29/ingress-nginx-statement/ ; Kubernetes docs, Gateway API (successor to Ingress, migration guide): https://kubernetes.io/docs/concepts/services-networking/gateway/
-- Gateway API getting started (CRD install): https://gateway-api.sigs.k8s.io/guides/getting-started/ ; TLS: https://gateway-api.sigs.k8s.io/guides/tls/ ; HTTP routing: https://gateway-api.sigs.k8s.io/guides/http-routing/ ; redirects: https://gateway-api.sigs.k8s.io/guides/http-redirect-rewrite/
+- Gateway API getting started (CRD install): https://gateway-api.sigs.k8s.io/guides/getting-started/ ; TLS: https://gateway-api.sigs.k8s.io/guides/user-guides/tls/ ; HTTP routing: https://gateway-api.sigs.k8s.io/guides/user-guides/http-routing/ ; redirects: https://gateway-api.sigs.k8s.io/guides/user-guides/http-redirect-rewrite/
 - Envoy Gateway: https://gateway.envoyproxy.io/ ; Helm install: https://gateway.envoyproxy.io/docs/install/install-helm/ ; quickstart and its manifest (GatewayClass `controllerName`): https://gateway.envoyproxy.io/docs/tasks/quickstart/ , https://github.com/envoyproxy/gateway/releases/download/v1.9.1/quickstart.yaml
 - Envoy Gateway tasks, secure gateways (TLS listener): https://gateway.envoyproxy.io/docs/tasks/security/secure-gateways/ ; basic auth: https://gateway.envoyproxy.io/docs/tasks/security/basic-auth/ ; OIDC: https://gateway.envoyproxy.io/docs/tasks/security/oidc/ ; external authorization (`extAuth`): https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/ ; HTTP redirect: https://gateway.envoyproxy.io/docs/tasks/traffic/http-redirect/
 - Authelia: proxy integration (the proxy calls the authorization endpoint): https://www.authelia.com/integration/proxies/introduction/ ; Envoy Gateway `SecurityPolicy` example: https://www.authelia.com/integration/kubernetes/envoy/gateway/
@@ -2590,7 +2590,7 @@ kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labe
 ## Sources (checked September 2026)
 
 - Docker Dockerfile reference (`USER`): https://docs.docker.com/reference/dockerfile/
-- Docker Compose file reference (`user`, `read_only`, `cap_add`, `cap_drop`, `security_opt`): https://docs.docker.com/compose/compose-file/
+- Docker Compose file reference (`user`, `read_only`, `cap_add`, `cap_drop`, `security_opt`): https://docs.docker.com/reference/compose-file/
 - Kubernetes: Configure a security context for a Pod or Container: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 - Kubernetes: Pod Security Standards (`restricted` level, Pod Security Admission labels): https://kubernetes.io/docs/concepts/security/pod-security-standards/
 - Kubernetes: Network Policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/
@@ -2707,7 +2707,7 @@ export const GET = auth(async function GET(req) {
 
 `export { auth as proxy }` in `proxy.ts` is the optimistic layer, and Auth.js says not to rely on it exclusively. MFA is not part of this configuration; enforce it at the identity provider ([mfa.md](mfa.md)).
 
-**Better Auth** (https://www.better-auth.com/docs/introduction): `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`) and `BETTER_AUTH_URL`; the placeholder default secret throws in production.
+**Better Auth** (https://better-auth.com/docs/introduction): `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`) and `BETTER_AUTH_URL`; the placeholder default secret throws in production.
 
 ```ts
 // lib/auth.ts
@@ -2754,7 +2754,7 @@ grep -rl "${SESSION_SECRET:0:8}" .next/static           # no output: the browser
 - Next.js environment variables: https://nextjs.org/docs/app/guides/environment-variables ; CLI (`next start` defaults): https://nextjs.org/docs/app/api-reference/cli/next ; self-hosting: https://nextjs.org/docs/app/guides/self-hosting
 - Auth.js protecting resources (Route Handler `req.auth` check): https://authjs.dev/getting-started/session-management/protecting
 - Auth.js installation: https://authjs.dev/getting-started/installation ; deployment (`AUTH_SECRET`, `AUTH_TRUST_HOST`, provider variables): https://authjs.dev/getting-started/deployment ; protecting resources: https://authjs.dev/getting-started/session-management/protecting
-- Better Auth introduction: https://www.better-auth.com/docs/introduction ; installation: https://www.better-auth.com/docs/installation ; options: https://www.better-auth.com/docs/reference/options ; Next.js integration: https://www.better-auth.com/docs/integrations/next ; two-factor plugin: https://www.better-auth.com/docs/plugins/2fa
+- Better Auth introduction: https://better-auth.com/docs/introduction ; installation: https://better-auth.com/docs/installation ; options: https://better-auth.com/docs/reference/options ; Next.js integration: https://better-auth.com/docs/integrations/next ; two-factor plugin: https://better-auth.com/docs/plugins/2fa
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
 - Vercel changelog, protect production deployments for free on every plan (9 September 2026): https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan
 
@@ -3128,16 +3128,16 @@ curl -s -o /dev/null -w '%{http_code}\n' https://app.example.com/REPLACE_WITH_PR
 - PHP `session_regenerate_id()`: https://www.php.net/manual/en/function.session-regenerate-id.php
 - PHP `password_hash()`: https://www.php.net/manual/en/function.password-hash.php
 - PHP cURL constants (`CURLOPT_SSL_VERIFYPEER`, `CURLOPT_SSL_VERIFYHOST`, `CURLOPT_CAINFO`): https://www.php.net/manual/en/curl.constants.php
-- Laravel 12.x encryption (`APP_KEY`, `key:generate`, `APP_PREVIOUS_KEYS`): https://laravel.com/docs/12.x/encryption
-- Laravel 12.x requests (trusted proxies, trusted hosts): https://laravel.com/docs/12.x/requests
+- Laravel 12.x encryption (`APP_KEY`, `key:generate`, `APP_PREVIOUS_KEYS`): https://laravel.com/framework/docs/12.x/encryption
+- Laravel 12.x requests (trusted proxies, trusted hosts): https://laravel.com/framework/docs/12.x/requests
 - Laravel 12.x `config/session.php` defaults: https://github.com/laravel/laravel/blob/12.x/config/session.php
 - Laravel 12.x `UrlGenerator::forceHttps()` and `forceScheme()`: https://api.laravel.com/docs/12.x/Illuminate/Routing/UrlGenerator.html
-- Laravel 12.x hashing: https://laravel.com/docs/12.x/hashing
-- Laravel 12.x routing (rate limiting): https://laravel.com/docs/12.x/routing
-- Laravel 12.x starter kits (Fortify, two-factor, rate limiting): https://laravel.com/docs/12.x/starter-kits
-- Laravel 12.x Fortify: https://laravel.com/docs/12.x/fortify
-- Laravel 12.x Socialite: https://laravel.com/docs/12.x/socialite
-- Laravel 12.x deployment (nginx example, `APP_DEBUG`): https://laravel.com/docs/12.x/deployment
+- Laravel 12.x hashing: https://laravel.com/framework/docs/12.x/hashing
+- Laravel 12.x routing (rate limiting): https://laravel.com/framework/docs/12.x/routing
+- Laravel 12.x starter kits (Fortify, two-factor, rate limiting): https://laravel.com/framework/docs/12.x/starter-kits
+- Laravel 12.x Fortify: https://laravel.com/framework/docs/12.x/fortify
+- Laravel 12.x Socialite: https://laravel.com/framework/docs/12.x/socialite
+- Laravel 12.x deployment (nginx example, `APP_DEBUG`): https://laravel.com/framework/docs/12.x/deployment
 
 ======================================================================
 ==> ruby.md
@@ -3334,7 +3334,7 @@ On AWS (security groups), Google Cloud (VPC firewall rules), and Azure (network 
 ## Sources (checked September 2026)
 
 - AWS VPC and security groups: https://docs.aws.amazon.com/vpc/
-- Google Cloud VPC firewall rules: https://cloud.google.com/vpc/docs
+- Google Cloud VPC firewall rules: https://docs.cloud.google.com/vpc/docs
 - Azure virtual network security: https://learn.microsoft.com/en-us/azure/virtual-network/
 
 ======================================================================
@@ -3496,7 +3496,7 @@ aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
 - AWS EC2 instance metadata service configuration: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
 - AWS VPC security groups (traffic security groups do not filter, including instance metadata): https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html
 - AWS CLI `modify-instance-metadata-options`: https://docs.aws.amazon.com/cli/latest/reference/ec2/modify-instance-metadata-options.html
-- GCP metadata server overview: https://cloud.google.com/compute/docs/metadata/overview
+- GCP metadata server overview: https://docs.cloud.google.com/compute/docs/metadata/overview
 - Azure Instance Metadata Service: https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-service
 - Kubernetes NetworkPolicy: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 - Docker network create (`--internal`): https://docs.docker.com/reference/cli/docker/network/create/
@@ -3564,8 +3564,8 @@ Every port `ss` shows listening should be either closed (not exposed at the plat
 ## Sources (checked September 2026)
 
 - RunPod expose ports (proxy HTTPS, TCP forwarding): https://docs.runpod.io/pods/configuration/expose-ports
-- Vast.ai networking and ports (default ports, port mapping): https://docs.vast.ai/documentation/instances/connect/networking
-- Vast.ai Instance Portal (PORTAL_CONFIG, Caddy reverse proxy, secure-token links): https://docs.vast.ai/instance-portal
+- Vast.ai networking and ports (default ports, port mapping): https://docs.vast.ai/guides/instances/connect/networking
+- Vast.ai Instance Portal (PORTAL_CONFIG, Caddy reverse proxy, secure-token links): https://docs.vast.ai/guides/instances/connect/instance-portal
 - Lambda Cloud firewalls (default-deny inbound, SSH/ICMP exception, rule types): https://docs.lambda.ai/public-cloud/firewalls/
 - Modal proxy auth for web endpoints (Endpoints/Servers vs Web Functions defaults, headers): https://modal.com/docs/guide/webhook-proxy-auth
 
@@ -3636,7 +3636,7 @@ openssl s_client -connect app.example.com:443 -servername app.example.com </dev/
 - Shodan: https://www.shodan.io/
 - Censys: https://censys.com/
 - Vercel Deployment Protection (Standard Protection versus All Deployments scope): https://vercel.com/docs/deployment-protection
-- Cloudflare Access policies: https://developers.cloudflare.com/cloudflare-one/policies/access/
+- Cloudflare Access policies: https://developers.cloudflare.com/cloudflare-one/access-controls/policies/
 
 ======================================================================
 ==> postgresql.md
@@ -3789,7 +3789,7 @@ ss -tlnp | grep 3306        # loopback only, unless remote access is deliberate
 
 - MySQL encrypted connections: https://dev.mysql.com/doc/refman/8.0/en/using-encrypted-connections.html
 - MySQL multifactor authentication: https://dev.mysql.com/doc/refman/8.0/en/multifactor-authentication.html
-- MariaDB TLS documentation: https://mariadb.com/kb/en/secure-connections-overview/
+- MariaDB TLS documentation: https://mariadb.com/docs/server/security/encryption/data-in-transit-encryption/secure-connections-overview
 - WebAuthn pluggable authentication (MySQL 8.4): https://dev.mysql.com/doc/refman/8.4/en/webauthn-pluggable-authentication.html
 - FIDO pluggable authentication (MySQL 8.0, deprecated as of 8.0.35): https://dev.mysql.com/doc/refman/8.0/en/fido-pluggable-authentication.html
 - What is new in MySQL 8.4 (`authentication_fido` plugins removed): https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html
@@ -4067,10 +4067,10 @@ mc alias set mys3 https://s3.example.com:9000 REPLACE_WITH_ACCESS_KEY REPLACE_WI
 
 ## Sources (checked September 2026)
 
-- MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/enterprise/aistor-object-store/installation/linux/network-encryption/
-- MinIO: https://min.io/
+- MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/aistor/installation/linux/network-encryption/
+- MinIO: https://www.min.io/
 - MinIO community repository (archived 2026-04-25, successor editions): https://github.com/minio/minio
-- MinIO `mc anonymous set` (anonymous policies are set per bucket and permit actions without authentication): https://docs.min.io/enterprise/aistor-object-store/reference/cli/mc-anonymous/mc-anonymous-set/
+- MinIO `mc anonymous set` (anonymous policies are set per bucket and permit actions without authentication): https://docs.min.io/aistor/reference/cli/mc-anonymous/mc-anonymous-set/
 
 ======================================================================
 ==> rabbitmq.md
@@ -4265,7 +4265,7 @@ ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 
 ## 6. Redpanda (and other Kafka-API-compatible systems)
 
-Redpanda implements the Kafka wire protocol, so the client-side and protocol-level controls above carry over: SASL/SCRAM authentication, TLS, and ACL management through the Kafka API all work the same way against a Redpanda cluster, and the same fronting rules apply too. What does not carry over is how you wire that up on the broker: Redpanda configures brokers through `redpanda.yaml` and the `rpk` CLI, not Kafka's `server.properties`, JAAS configuration files, or `kafka-storage.sh`. Redpanda Console, its bundled web UI, ships without its own login screen: it only gains one once you configure OIDC or basic authentication, so until then anyone who reaches Console reaches the cluster behind it. Front Console the same way as any other admin panel: never public, reached through SSH forwarding, a tailnet, or an access proxy, with MFA at that layer. See the [Redpanda security documentation](https://docs.redpanda.com/current/manage/security/).
+Redpanda implements the Kafka wire protocol, so the client-side and protocol-level controls above carry over: SASL/SCRAM authentication, TLS, and ACL management through the Kafka API all work the same way against a Redpanda cluster, and the same fronting rules apply too. What does not carry over is how you wire that up on the broker: Redpanda configures brokers through `redpanda.yaml` and the `rpk` CLI, not Kafka's `server.properties`, JAAS configuration files, or `kafka-storage.sh`. Redpanda Console, its bundled web UI, ships without its own login screen: it only gains one once you configure OIDC or basic authentication, so until then anyone who reaches Console reaches the cluster behind it. Front Console the same way as any other admin panel: never public, reached through SSH forwarding, a tailnet, or an access proxy, with MFA at that layer. See the [Redpanda security documentation](https://docs.redpanda.com/streaming/current/manage/security/).
 
 ## Verify
 
@@ -4294,7 +4294,7 @@ bin/kafka-acls.sh --bootstrap-server kafka.example.com:9093 --command-config adm
 - Authorization and ACLs (source): https://raw.githubusercontent.com/apache/kafka/trunk/docs/security/authorization-and-acls.md
 - Broker configuration reference (defaults for `listeners`, `sasl.enabled.mechanisms`): https://kafka.apache.org/40/generated/kafka_config.html
 - SSL client authentication on `SASL_SSL` listeners needs the listener prefix (source, `ChannelBuilders.java`): https://raw.githubusercontent.com/apache/kafka/trunk/clients/src/main/java/org/apache/kafka/common/network/ChannelBuilders.java
-- Redpanda security documentation: https://docs.redpanda.com/current/manage/security/
+- Redpanda security documentation: https://docs.redpanda.com/streaming/current/manage/security/
 
 ======================================================================
 ==> clickhouse.md
@@ -4378,15 +4378,15 @@ clickhouse-client --host ch.example.com --port 9440 --secure --user app --passwo
 
 ## Sources (checked September 2026)
 
-- Server configuration parameters (ports, `listen_host`, `openSSL`): https://clickhouse.com/docs/operations/server-configuration-parameters/settings
+- Server configuration parameters (ports, `listen_host`, `openSSL`): https://clickhouse.com/docs/reference/settings/server-settings/settings
 - Shipped `config.xml` (`listen_host` default comment, `openSSL` block): https://raw.githubusercontent.com/ClickHouse/ClickHouse/master/programs/server/config.xml
-- User settings (`password_sha256_hex`, `networks`, `access_management`): https://clickhouse.com/docs/operations/settings/settings-users
+- User settings (`password_sha256_hex`, `networks`, `access_management`): https://clickhouse.com/docs/concepts/features/configuration/settings/settings-users
 - Shipped `users.xml` (default user, empty password, `::/0`): https://raw.githubusercontent.com/ClickHouse/ClickHouse/master/programs/server/users.xml
-- Access control and account management: https://clickhouse.com/docs/operations/access-rights
-- CREATE USER: https://clickhouse.com/docs/sql-reference/statements/create/user
-- GRANT: https://clickhouse.com/docs/sql-reference/statements/grant
-- Configuring SSL-TLS: https://clickhouse.com/docs/guides/sre/configuring-ssl
-- HTTP interface (ports, authentication): https://clickhouse.com/docs/interfaces/http
+- Access control and account management: https://clickhouse.com/docs/concepts/features/security/access-rights
+- CREATE USER: https://clickhouse.com/docs/reference/statements/create/user
+- GRANT: https://clickhouse.com/docs/reference/statements/grant
+- Configuring SSL-TLS: https://clickhouse.com/docs/concepts/features/security/tls/configuring-tls
+- HTTP interface (ports, authentication): https://clickhouse.com/docs/concepts/features/interfaces/http
 
 ======================================================================
 ==> neo4j.md
@@ -4708,12 +4708,12 @@ curl -s http://monitor.example.com:8222/connz                                   
 
 ## Sources (checked September 2026)
 
-- Securing NATS overview: https://docs.nats.io/running-a-nats-service/configuration/securing_nats
+- Securing NATS overview: https://docs.nats.io/learn/security/
 - Authentication basics (token, user/password, nkeys, no_auth_user): https://docs.nats.io/learn/security/authentication-basics
 - Authorization (subject permissions, allow/deny) and Encryption/TLS (tls block): https://docs.nats.io/learn/security/authorization and https://docs.nats.io/learn/security/encryption
-- TLS Authentication (verify vs verify_and_map): https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tls_mutual_auth
-- Monitoring (http_port/https_port, /varz, /connz, /routez, /jsz): https://docs.nats.io/running-a-nats-service/configuration/monitoring
-- JetStream concepts: https://docs.nats.io/nats-concepts/jetstream
+- TLS Authentication (verify vs verify_and_map): https://docs.nats.io/learn/security/encryption
+- Monitoring (http_port/https_port, /varz, /connz, /routez, /jsz): https://docs.nats.io/learn/monitoring/monitoring-endpoints
+- JetStream concepts: https://docs.nats.io/concepts/jetstream
 
 ======================================================================
 ==> search-engines.md
@@ -4903,9 +4903,9 @@ https://` should show a valid certificate chain wherever TLS terminates.
 
 ## Sources (checked September 2026)
 
-- SurrealDB CLI, `surreal start`: https://surrealdb.com/docs/surrealdb/cli/start
-- SurrealDB CLI, `surreal sql`: https://surrealdb.com/docs/surrealdb/cli/sql
-- SurrealDB security overview: https://surrealdb.com/docs/surrealdb/security
+- SurrealDB CLI, `surreal start`: https://surrealdb.com/docs/reference/cli/surrealdb-cli/commands/start
+- SurrealDB CLI, `surreal sql`: https://surrealdb.com/docs/reference/cli/surrealdb-cli/commands/sql
+- SurrealDB security overview: https://surrealdb.com/docs/learn/security
 - SurrealDB authentication overview: https://surrealdb.com/docs/learn/security/authentication/overview
 - SurrealDB security best practices: https://surrealdb.com/docs/learn/security/best-practices/security-best-practices
 
@@ -5223,7 +5223,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://models.example.com/invo
 - TGI launcher arguments (--hostname, --port, --api-key, --prometheus-port): https://huggingface.co/docs/text-generation-inference/reference/launcher
 - TGI router source (what --api-key enforces): https://github.com/huggingface/text-generation-inference/blob/main/router/src/server.rs
 - TGI repository (maintenance-mode notice, archived 2026-03-21): https://github.com/huggingface/text-generation-inference
-- SGLang server arguments (--host, --port, --api-key, --admin-api-key, SSL flags; docs.sglang.ai redirects here): https://docs.sglang.io/advanced_features/server_arguments.html
+- SGLang server arguments (--host, --port, --api-key, --admin-api-key, SSL flags; docs.sglang.ai redirects here): https://docs.sglang.io/docs/advanced_features/server_arguments
 - Triton secure deployment considerations: https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/deploy.html
 - Triton quickstart (default listeners on 8000, 8001, 8002): https://github.com/triton-inference-server/server/blob/main/docs/getting_started/quickstart.md
 - Triton inference protocols (gRPC SSL flags, restricted APIs): https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md
@@ -5289,7 +5289,7 @@ curl -sI https://gradio.example.com/        # succeeds over TLS
 
 ## Sources (checked September 2026)
 
-- Gradio Blocks.launch() parameters (auth, auth_message, ssl_certfile, ssl_keyfile, ssl_keyfile_password, ssl_verify, server_name, share): https://www.gradio.app/docs/gradio/blocks
+- Gradio Blocks.launch() parameters (auth, auth_message, ssl_certfile, ssl_keyfile, ssl_keyfile_password, ssl_verify, server_name, share): https://gradio.app/docs/gradio/blocks
 
 ======================================================================
 ==> streamlit.md
@@ -5430,7 +5430,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://n8n.example.com/api/v1/workflow
 - n8n deployment environment variables (N8N_LISTEN_ADDRESS, N8N_PROTOCOL, N8N_SSL_KEY, N8N_SSL_CERT, defaults): https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/deployment.md
 - n8n security policies (MFA enforcement, licensing, SSO exception): https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/manage-security-policies.md
 - n8n SSL setup: https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/set-up-ssl.md
-- n8n public API authentication (`/api/v1` base path, `X-N8N-API-KEY` header): https://docs.n8n.io/api/authentication/
+- n8n public API authentication (`/api/v1` base path, `X-N8N-API-KEY` header): https://docs.n8n.io/connect/n8n-api/authentication
 
 ======================================================================
 ==> code-server.md
@@ -5693,7 +5693,7 @@ A token issued for a different resource (wrong audience) must also fail with `40
 
 - MCP specification 2025-11-25, Transports (stdio, Streamable HTTP, Security Warning, deprecated HTTP+SSE, `MCP-Session-Id`): https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
 - MCP specification 2025-11-25, Authorization (OPTIONAL, RFC 9728, PKCE, `resource`, audience validation, error codes): https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
-- MCP specification 2025-11-25, Security Best Practices (token passthrough, session hijacking, local server compromise): https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices
+- MCP specification 2025-11-25, Security Best Practices (token passthrough, session hijacking, local server compromise): https://modelcontextprotocol.io/docs/2025-11-25/tutorials/security/security_best_practices
 - MCP specification 2025-11-25, Lifecycle (`initialize` request shape): https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
 - Azure App Service authentication (protected resource metadata preview, `WEBSITE_AUTH_PRM_DEFAULT_WITH_SCOPES`): https://learn.microsoft.com/en-us/azure/app-service/overview-authentication-authorization
 - nginx `if` and `return` directives: https://nginx.org/en/docs/http/ngx_http_rewrite_module.html
@@ -6165,11 +6165,11 @@ curl -sI https://chat.example.com/                      # via the proxy: TLS, lo
 ## Sources (checked September 2026)
 
 - AnythingLLM security and access documentation: https://docs.anythingllm.com/features/security-and-access
-- LobeHub environment variables (KEY_VAULTS_SECRET): https://lobehub.com/docs/self-hosting/environment-variables/basic
-- LobeHub authentication service environment variables (Better Auth): https://lobehub.com/docs/self-hosting/environment-variables/auth
+- LobeHub environment variables (KEY_VAULTS_SECRET): https://lobehub.com/only-ai/markdown/docs/en/self-hosting/environment-variables/basic
+- LobeHub authentication service environment variables (Better Auth): https://lobehub.com/only-ai/markdown/docs/en/self-hosting/environment-variables/auth
 - Chainlit authentication overview: https://docs.chainlit.io/authentication/overview
 - Chainlit password authentication (`@cl.password_auth_callback` signature and example): https://docs.chainlit.io/authentication/password
-- OpenHands FAQs (single-user design, no built-in auth, sandboxing, hardened deployment): https://docs.openhands.dev/openhands/usage/faqs
+- OpenHands FAQs (single-user design, no built-in auth, sandboxing, hardened deployment): https://docs.openhands.dev/overview/faqs
 - OpenHands local setup (default docker port mapping): https://docs.openhands.dev/openhands/usage/run-openhands/local-setup
 
 ======================================================================
@@ -6266,7 +6266,7 @@ that accepts spans with no credential at all.
   SSO providers, `AUTH_SESSION_MAX_AGE`, `NEXTAUTH_URL`): https://langfuse.com/self-hosting/security/authentication-and-sso
 - Langfuse, public API authentication (Basic Auth with project public/secret key): https://langfuse.com/docs/api-and-data-platform/features/public-api
 - Arize Phoenix, authentication (`PHOENIX_ENABLE_AUTH`, `PHOENIX_SECRET`, system and user API keys, `PHOENIX_API_KEY`): https://arize.com/docs/phoenix/self-hosting/features/authentication
-- Helicone, self-hosted deployment (default `test@helicone.ai` / `password` login): https://docs.helicone.ai/getting-started/self-deploy and https://docs.helicone.ai/getting-started/self-host/manual
+- Helicone, self-hosted deployment (default `test@helicone.ai` / `password` login): https://docs.helicone.ai/getting-started/self-host/manual and https://docs.helicone.ai/getting-started/self-host/manual
 - OpenTelemetry, Collector security best practices (bind addresses, TLS, authenticator extensions, minimal
   components, non-root): https://opentelemetry.io/docs/security/config-best-practices/
 - OpenTelemetry Collector Contrib, `basicauthextension` (htpasswd, `client_auth`, `auth.authenticator` wiring): https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/basicauthextension
@@ -6386,7 +6386,7 @@ path.
 - Temporal, self-hosted security (`noopAuthorizer` default, `Authorizer`, `ClaimMapper`): https://docs.temporal.io/self-hosted-guide/security
 - Temporal, Web UI configuration reference (`auth.providers`, `enabled`, `type: oidc`, `providerUrl`,
   `clientId`, `clientSecret`, `callbackUrl`, `scopes`): https://docs.temporal.io/references/web-ui-configuration
-- Temporal, CLI server reference (default frontend gRPC port 7233, Web UI port 8233): https://docs.temporal.io/cli/server
+- Temporal, CLI server reference (default frontend gRPC port 7233, Web UI port 8233): https://docs.temporal.io/cli/command-reference/server
 - Flower, configuration (`--address`, `--port` 5555 default, `--basic-auth`, `--auth_provider`, `--oauth2_key`,
   `--oauth2_secret`, `--oauth2_redirect_uri`, `--auth`): https://flower.readthedocs.io/en/latest/config.html
 
@@ -6581,18 +6581,18 @@ From outside the network, every panel URL is unreachable or shows a login; a pag
 - Portainer CE install on Docker (ports 9443, 9000, 8000): https://docs.portainer.io/start/install-ce/server/docker/linux
 - Portainer initial setup (setup token, first admin, 12-character password): https://docs.portainer.io/start/install-ce/server/setup
 - Portainer authentication and OAuth providers: https://docs.portainer.io/admin/settings/authentication and https://docs.portainer.io/admin/settings/authentication/oauth
-- Coolify installation, firewall, proxy, and DNS pages: https://coolify.io/docs/get-started/installation , https://coolify.io/docs/knowledge-base/server/firewall , https://coolify.io/docs/knowledge-base/proxy/overview , https://coolify.io/docs/knowledge-base/dns-configuration , https://coolify.io/docs/knowledge-base/server/openssh
+- Coolify installation, firewall, proxy, and DNS pages: https://coolify.io/docs/start-with-self-hosted , https://coolify.io/docs/core/infrastructure/servers/firewall , https://coolify.io/docs/core/networking/proxy/overview , https://coolify.io/docs/core/networking/dns , https://coolify.io/docs/core/infrastructure/servers/openssh
 - Dokploy installation (ports 80, 443, 3000; admin setup; panel domain): https://docs.dokploy.com/docs/core/installation
 - Nginx Proxy Manager setup (port 81, default admin user): https://nginxproxymanager.com/setup/
 - Vaultwarden wiki: admin page and ADMIN_TOKEN https://github.com/dani-garcia/vaultwarden/wiki/Enabling-admin-page , registration https://github.com/dani-garcia/vaultwarden/wiki/Disable-registration-of-new-users , HTTPS https://github.com/dani-garcia/vaultwarden/wiki/Enabling-HTTPS , and the `.env.template` https://github.com/dani-garcia/vaultwarden/blob/main/.env.template
-- Kubernetes Dashboard (deprecation, port-forward, token login): https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/ ; 2.x arguments: https://github.com/kubernetes/dashboard/blob/v2.7.0/docs/common/dashboard-arguments.md
+- Kubernetes Dashboard (deprecation, port-forward, token login): https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/ ; 2.x arguments: https://github.com/kubernetes-retired/dashboard/blob/v2.7.0/docs/common/dashboard-arguments.md
 - Jenkins security: https://www.jenkins.io/doc/book/security/managing-security/ , https://www.jenkins.io/doc/book/security/access-control/ , https://www.jenkins.io/doc/book/security/csrf-protection/
 - Gitea config cheat sheet and MFA: https://docs.gitea.com/administration/config-cheat-sheet and https://docs.gitea.com/usage/user-setting/multi-factor-authentication/
 - Uptime Kuma README and reverse proxy wiki: https://github.com/louislam/uptime-kuma and https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy
 - Docker: protect the daemon socket https://docs.docker.com/engine/security/protect-access/ and remote access https://docs.docker.com/engine/daemon/remote-access/
 - Dozzle authentication (DOZZLE_AUTH_PROVIDER, users.yml, actions and shell): https://dozzle.dev/guide/authentication
 - Docker Registry deployment (default authentication, TLS requirement): https://distribution.github.io/distribution/about/deploying/
-- Filebrowser: https://filebrowser.org/
+- Filebrowser: https://github.com/filebrowser/filebrowser
 - Node-RED securing the runtime (adminAuth, credentialSecret): https://nodered.org/docs/user-guide/runtime/securing-node-red
 
 ======================================================================
@@ -6648,7 +6648,7 @@ curl -s -o /dev/null -D - https://api.example.com/data -H "Origin: https://app.e
 
 ## Sources (checked September 2026)
 
-- MDN: Cross-Origin Resource Sharing: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+- MDN: Cross-Origin Resource Sharing: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
 
 ======================================================================
 ==> headers.md
@@ -7097,7 +7097,7 @@ bundle for the string used by your admin credentials or API keys; it should not 
 - PocketBase going to production: https://pocketbase.io/docs/going-to-production/
 - PocketBase API rules and filters: https://pocketbase.io/docs/api-rules-and-filters/
 - Appwrite self-hosting production security: https://appwrite.io/docs/advanced/self-hosting/production/security
-- Appwrite project API keys: https://appwrite.io/docs/advanced/platform/api-keys
+- Appwrite project API keys: https://appwrite.io/docs/partners/project/api-keys
 
 ======================================================================
 ==> common-mistakes.md

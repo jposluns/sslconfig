@@ -47,4 +47,4 @@ curl -s -o /dev/null -D - https://api.example.com/data -H "Origin: https://app.e
 
 ## Sources (checked September 2026)
 
-- MDN: Cross-Origin Resource Sharing: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+- MDN: Cross-Origin Resource Sharing: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS

@@ -57,7 +57,7 @@ Every port `ss` shows listening should be either closed (not exposed at the plat
 ## Sources (checked September 2026)
 
 - RunPod expose ports (proxy HTTPS, TCP forwarding): https://docs.runpod.io/pods/configuration/expose-ports
-- Vast.ai networking and ports (default ports, port mapping): https://docs.vast.ai/documentation/instances/connect/networking
-- Vast.ai Instance Portal (PORTAL_CONFIG, Caddy reverse proxy, secure-token links): https://docs.vast.ai/instance-portal
+- Vast.ai networking and ports (default ports, port mapping): https://docs.vast.ai/guides/instances/connect/networking
+- Vast.ai Instance Portal (PORTAL_CONFIG, Caddy reverse proxy, secure-token links): https://docs.vast.ai/guides/instances/connect/instance-portal
 - Lambda Cloud firewalls (default-deny inbound, SSH/ICMP exception, rule types): https://docs.lambda.ai/public-cloud/firewalls/
 - Modal proxy auth for web endpoints (Endpoints/Servers vs Web Functions defaults, headers): https://modal.com/docs/guide/webhook-proxy-auth

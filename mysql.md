@@ -71,7 +71,7 @@ ss -tlnp | grep 3306        # loopback only, unless remote access is deliberate
 
 - MySQL encrypted connections: https://dev.mysql.com/doc/refman/8.0/en/using-encrypted-connections.html
 - MySQL multifactor authentication: https://dev.mysql.com/doc/refman/8.0/en/multifactor-authentication.html
-- MariaDB TLS documentation: https://mariadb.com/kb/en/secure-connections-overview/
+- MariaDB TLS documentation: https://mariadb.com/docs/server/security/encryption/data-in-transit-encryption/secure-connections-overview
 - WebAuthn pluggable authentication (MySQL 8.4): https://dev.mysql.com/doc/refman/8.4/en/webauthn-pluggable-authentication.html
 - FIDO pluggable authentication (MySQL 8.0, deprecated as of 8.0.35): https://dev.mysql.com/doc/refman/8.0/en/fido-pluggable-authentication.html
 - What is new in MySQL 8.4 (`authentication_fido` plugins removed): https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html

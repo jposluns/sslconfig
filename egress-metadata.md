@@ -108,7 +108,7 @@ aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
 - AWS EC2 instance metadata service configuration: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
 - AWS VPC security groups (traffic security groups do not filter, including instance metadata): https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html
 - AWS CLI `modify-instance-metadata-options`: https://docs.aws.amazon.com/cli/latest/reference/ec2/modify-instance-metadata-options.html
-- GCP metadata server overview: https://cloud.google.com/compute/docs/metadata/overview
+- GCP metadata server overview: https://docs.cloud.google.com/compute/docs/metadata/overview
 - Azure Instance Metadata Service: https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-service
 - Kubernetes NetworkPolicy: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 - Docker network create (`--internal`): https://docs.docker.com/reference/cli/docker/network/create/
