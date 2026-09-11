@@ -5,6 +5,7 @@
 ## Start here
 
 - [README](https://raw.githubusercontent.com/jposluns/secureconfig/main/README.md): baseline rules for AI assistants, decision guide, index, verification checklist
+- [exposure-index](https://raw.githubusercontent.com/jposluns/secureconfig/main/exposure-index.md): look up an open port, find the guide that governs it
 - [common-mistakes](https://raw.githubusercontent.com/jposluns/secureconfig/main/common-mistakes.md): the recurring findings, each linked to its fix
 
 ## Certificates and access
