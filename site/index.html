@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>sslconfig.ai</title>
-  <meta name="description" content="TLS, strong authentication, and MFA setup guides for AI development assistants: free certificates, self-signed certificates, Cloudflare Zero Trust, and per-tool hardening.">
+  <meta name="description" content="Deployment exposure guides for AI-assisted projects: TLS, identity, MFA, secrets, and network controls for web apps, AI infrastructure, and the services behind them.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sslconfig.ai/">
   <meta property="og:site_name" content="sslconfig.ai">
   <meta property="og:title" content="sslconfig.ai">
-  <meta property="og:description" content="TLS, strong authentication, and MFA setup guides for AI development assistants.">
+  <meta property="og:description" content="Deployment exposure guides for AI-assisted projects: TLS, identity, MFA, secrets, and network controls for web apps, AI infrastructure, and the services behind them.">
   <meta name="twitter:card" content="summary">
   <style>
     :root { color-scheme: light dark; --accent: #17715a; --pad: clamp(1.25rem, 4vw, 3rem); }
@@ -94,7 +94,7 @@
     </svg>
     <h1>sslconfig.ai</h1>
   </div>
-  <p class="tagline">TLS, strong authentication, and MFA instructions for AI development assistants.</p>
+  <p class="tagline">Deployment exposure guides for AI-assisted projects: TLS, identity, MFA, secrets, and network controls for web apps, AI infrastructure, and the services behind them.</p>
   <p class="hero-links">More from <a href="https://linkedin.com/in/jposluns" target="_blank" rel="noopener noreferrer">Jeff Posluns</a>: <a href="https://grclibrary.ai" target="_blank" rel="noopener noreferrer">GRC Library</a> &middot; <a href="https://aiqt.ai" target="_blank" rel="noopener noreferrer">AIQT Guardrails</a> &middot; <a href="https://cleanlanguage.ai" target="_blank" rel="noopener noreferrer">Clean Language</a> &middot; <a href="https://vendorreplies.ai" target="_blank" rel="noopener noreferrer">Vendor Replies</a> &middot; <a href="https://github.com/jposluns" target="_blank" rel="noopener noreferrer">GitHub Projects</a></p>
 </header>
 
@@ -102,26 +102,27 @@
 <nav class="sidenav" aria-label="Guides and page contents">
   <div class="sidenav-inner">
     <p class="sidenav-h">On this page</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/README.md" target="_blank" rel="noopener noreferrer">README (start here)</a>
     <a href="#why">Why this site exists</a>
     <a href="#ai">For AI assistants</a>
     <a href="#human">For humans</a>
 
-    <p class="sidenav-h">Certificates and access</p>
+    <p class="sidenav-h">Certificates and tunnels</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/free-certificates.md" target="_blank" rel="noopener noreferrer">free-certificates</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/self-signed.md" target="_blank" rel="noopener noreferrer">self-signed</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/cloudflare.md" target="_blank" rel="noopener noreferrer">cloudflare</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/tailscale.md" target="_blank" rel="noopener noreferrer">tailscale</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/tunnels.md" target="_blank" rel="noopener noreferrer">tunnels</a>
 
-    <p class="sidenav-h">Authentication and secrets</p>
+    <p class="sidenav-h">Identity, authentication, and secrets</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/authentication.md" target="_blank" rel="noopener noreferrer">authentication</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/mfa.md" target="_blank" rel="noopener noreferrer">mfa</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/identity-providers.md" target="_blank" rel="noopener noreferrer">identity-providers</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/oidc-integration.md" target="_blank" rel="noopener noreferrer">oidc-integration</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/cloud-identity-proxies.md" target="_blank" rel="noopener noreferrer">cloud-identity-proxies</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/secrets.md" target="_blank" rel="noopener noreferrer">secrets</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/machine-auth.md" target="_blank" rel="noopener noreferrer">machine-auth</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/fronting-auth.md" target="_blank" rel="noopener noreferrer">fronting-auth</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/mfa.md" target="_blank" rel="noopener noreferrer">mfa</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/machine-auth.md" target="_blank" rel="noopener noreferrer">machine-auth</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/secrets.md" target="_blank" rel="noopener noreferrer">secrets</a>
 
     <p class="sidenav-h">Web servers and proxies</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/apache.md" target="_blank" rel="noopener noreferrer">apache</a>
@@ -131,7 +132,7 @@
     <a href="https://github.com/jposluns/sslconfig/blob/main/haproxy.md" target="_blank" rel="noopener noreferrer">haproxy</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/traefik.md" target="_blank" rel="noopener noreferrer">traefik</a>
 
-    <p class="sidenav-h">Runtimes and clusters</p>
+    <p class="sidenav-h">Languages and frameworks</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/nodejs.md" target="_blank" rel="noopener noreferrer">nodejs</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/python.md" target="_blank" rel="noopener noreferrer">python</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/nextjs.md" target="_blank" rel="noopener noreferrer">nextjs</a>
@@ -140,68 +141,76 @@
     <a href="https://github.com/jposluns/sslconfig/blob/main/java.md" target="_blank" rel="noopener noreferrer">java</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/php.md" target="_blank" rel="noopener noreferrer">php</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/ruby.md" target="_blank" rel="noopener noreferrer">ruby</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/frontend-frameworks.md" target="_blank" rel="noopener noreferrer">frontend-frameworks</a>
+
+    <p class="sidenav-h">Containers and Kubernetes</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/docker.md" target="_blank" rel="noopener noreferrer">docker</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/kubernetes.md" target="_blank" rel="noopener noreferrer">kubernetes</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/frontend-frameworks.md" target="_blank" rel="noopener noreferrer">frontend-frameworks</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/container-hardening.md" target="_blank" rel="noopener noreferrer">container-hardening</a>
 
-    <p class="sidenav-h">Hosts and platforms</p>
+    <p class="sidenav-h">Hosts and cloud platforms</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/host.md" target="_blank" rel="noopener noreferrer">host</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/cloud-firewalls.md" target="_blank" rel="noopener noreferrer">cloud-firewalls</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/paas.md" target="_blank" rel="noopener noreferrer">paas</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/egress-metadata.md" target="_blank" rel="noopener noreferrer">egress-metadata</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/gpu-clouds.md" target="_blank" rel="noopener noreferrer">gpu-clouds</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/deployment-lifecycle.md" target="_blank" rel="noopener noreferrer">deployment-lifecycle</a>
 
-    <p class="sidenav-h">Data and messaging</p>
+    <p class="sidenav-h">Databases, storage, and messaging</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/postgresql.md" target="_blank" rel="noopener noreferrer">postgresql</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/mysql.md" target="_blank" rel="noopener noreferrer">mysql</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/mongodb.md" target="_blank" rel="noopener noreferrer">mongodb</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/redis.md" target="_blank" rel="noopener noreferrer">redis</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/sqlite.md" target="_blank" rel="noopener noreferrer">sqlite</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/surrealdb.md" target="_blank" rel="noopener noreferrer">surrealdb</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/elasticsearch.md" target="_blank" rel="noopener noreferrer">elasticsearch</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/minio.md" target="_blank" rel="noopener noreferrer">minio</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/rabbitmq.md" target="_blank" rel="noopener noreferrer">rabbitmq</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/mosquitto.md" target="_blank" rel="noopener noreferrer">mosquitto</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/kafka.md" target="_blank" rel="noopener noreferrer">kafka</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/clickhouse.md" target="_blank" rel="noopener noreferrer">clickhouse</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/neo4j.md" target="_blank" rel="noopener noreferrer">neo4j</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/memcached.md" target="_blank" rel="noopener noreferrer">memcached</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/object-storage.md" target="_blank" rel="noopener noreferrer">object-storage</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/nats.md" target="_blank" rel="noopener noreferrer">nats</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/search-engines.md" target="_blank" rel="noopener noreferrer">search-engines</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/sqlite.md" target="_blank" rel="noopener noreferrer">sqlite</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/surrealdb.md" target="_blank" rel="noopener noreferrer">surrealdb</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/minio.md" target="_blank" rel="noopener noreferrer">minio</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/object-storage.md" target="_blank" rel="noopener noreferrer">object-storage</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/firebase-supabase.md" target="_blank" rel="noopener noreferrer">firebase-supabase</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/pocketbase.md" target="_blank" rel="noopener noreferrer">pocketbase</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/rabbitmq.md" target="_blank" rel="noopener noreferrer">rabbitmq</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/mosquitto.md" target="_blank" rel="noopener noreferrer">mosquitto</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/kafka.md" target="_blank" rel="noopener noreferrer">kafka</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/nats.md" target="_blank" rel="noopener noreferrer">nats</a>
 
-    <p class="sidenav-h">AI, data, and dev tools</p>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/jupyter.md" target="_blank" rel="noopener noreferrer">jupyter</a>
+    <p class="sidenav-h">AI and agent infrastructure</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/ollama.md" target="_blank" rel="noopener noreferrer">ollama</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/open-webui.md" target="_blank" rel="noopener noreferrer">open-webui</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/litellm.md" target="_blank" rel="noopener noreferrer">litellm</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/model-servers.md" target="_blank" rel="noopener noreferrer">model-servers</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/litellm.md" target="_blank" rel="noopener noreferrer">litellm</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/vector-databases.md" target="_blank" rel="noopener noreferrer">vector-databases</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/mcp-servers.md" target="_blank" rel="noopener noreferrer">mcp-servers</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/ray.md" target="_blank" rel="noopener noreferrer">ray</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/mlflow.md" target="_blank" rel="noopener noreferrer">mlflow</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/agent-builders.md" target="_blank" rel="noopener noreferrer">agent-builders</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/gradio.md" target="_blank" rel="noopener noreferrer">gradio</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/streamlit.md" target="_blank" rel="noopener noreferrer">streamlit</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/n8n.md" target="_blank" rel="noopener noreferrer">n8n</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/code-server.md" target="_blank" rel="noopener noreferrer">code-server</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/image-gen-uis.md" target="_blank" rel="noopener noreferrer">image-gen-uis</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/chat-uis.md" target="_blank" rel="noopener noreferrer">chat-uis</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/llm-observability.md" target="_blank" rel="noopener noreferrer">llm-observability</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/agent-builders.md" target="_blank" rel="noopener noreferrer">agent-builders</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/workflow-orchestrators.md" target="_blank" rel="noopener noreferrer">workflow-orchestrators</a>
 
-    <p class="sidenav-h">Web app controls</p>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/cors.md" target="_blank" rel="noopener noreferrer">cors</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/headers.md" target="_blank" rel="noopener noreferrer">headers</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/firebase-supabase.md" target="_blank" rel="noopener noreferrer">firebase-supabase</a>
+    <p class="sidenav-h">App UIs and dev tools</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/open-webui.md" target="_blank" rel="noopener noreferrer">open-webui</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/chat-uis.md" target="_blank" rel="noopener noreferrer">chat-uis</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/image-gen-uis.md" target="_blank" rel="noopener noreferrer">image-gen-uis</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/gradio.md" target="_blank" rel="noopener noreferrer">gradio</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/streamlit.md" target="_blank" rel="noopener noreferrer">streamlit</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/jupyter.md" target="_blank" rel="noopener noreferrer">jupyter</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/n8n.md" target="_blank" rel="noopener noreferrer">n8n</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/code-server.md" target="_blank" rel="noopener noreferrer">code-server</a>
+
+    <p class="sidenav-h">Dashboards and admin consoles</p>
     <a href="https://github.com/jposluns/sslconfig/blob/main/admin-uis.md" target="_blank" rel="noopener noreferrer">admin-uis</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/devops-uis.md" target="_blank" rel="noopener noreferrer">devops-uis</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/web-exposure.md" target="_blank" rel="noopener noreferrer">web-exposure</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/realtime-webhooks.md" target="_blank" rel="noopener noreferrer">realtime-webhooks</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/bi-dashboards.md" target="_blank" rel="noopener noreferrer">bi-dashboards</a>
-    <a href="https://github.com/jposluns/sslconfig/blob/main/pocketbase.md" target="_blank" rel="noopener noreferrer">pocketbase</a>
+
+    <p class="sidenav-h">Web application controls</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/cors.md" target="_blank" rel="noopener noreferrer">cors</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/headers.md" target="_blank" rel="noopener noreferrer">headers</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/realtime-webhooks.md" target="_blank" rel="noopener noreferrer">realtime-webhooks</a>
+
+    <p class="sidenav-h">Exposure and deployment operations</p>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/web-exposure.md" target="_blank" rel="noopener noreferrer">web-exposure</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/egress-metadata.md" target="_blank" rel="noopener noreferrer">egress-metadata</a>
+    <a href="https://github.com/jposluns/sslconfig/blob/main/deployment-lifecycle.md" target="_blank" rel="noopener noreferrer">deployment-lifecycle</a>
     <a href="https://github.com/jposluns/sslconfig/blob/main/common-mistakes.md" target="_blank" rel="noopener noreferrer">common-mistakes</a>
 
     <p class="sidenav-h">Reference</p>
@@ -213,24 +222,28 @@
 </nav>
 
 <main>
-  <p>This site exists as a simple pointer for the AI assistants working on your projects, to ensure that they follow simple security rules: encrypt access with TLS, require strong authentication, and add multi-factor authentication where viable. Many projects ship with services listening on plain HTTP with no login at all; the guides in the menu fix that for the most common stacks.</p>
+  <p>This site exists as a simple pointer for the AI assistants working on your projects, to ensure that they follow simple security rules: encrypt access with TLS, require strong authentication, and add multi-factor authentication where viable. Many projects ship with services listening on plain HTTP with no login at all; the guides in the menu fix that for the most common stacks. That now includes the AI stack itself: model servers, vector databases, MCP servers, and agent UIs often ship without authentication or TLS configured, their native controls vary, and their guides say exactly what to put in front of them.</p>
+
+  <p>Jump to <a href="#ai">the assistant rules</a>, <a href="#human">the copy-ready prompts</a>, or the guide menu.</p>
 
   <h2 id="why">Why this site exists</h2>
-  <p>Jeff kept reviewing AI-assisted projects that shipped without basic security details: services on plain HTTP, no authentication, no MFA. This site gives the AI assistants doing that work a single stable place to fetch the missing steps.</p>
-  <p>For security beyond these basics: the <a href="https://aiqt.ai" target="_blank" rel="noopener noreferrer">AIQT</a> standard holds an AI assistant to accuracy, integrity, and verification while it works, and the <a href="https://github.com/jposluns/grc_library" target="_blank" rel="noopener noreferrer">grc_library</a> repository (<a href="https://grclibrary.ai" target="_blank" rel="noopener noreferrer">grclibrary.ai</a>) supports deeper governance, risk, and compliance work: point your AI development assistant at it and ask it to validate gaps against the services that apply to your project.</p>
-  <p>Scope: deployment exposure (TLS, authentication, MFA, secrets, and network exposure). Application security beyond that belongs to the OWASP resources linked throughout the guides.</p>
+  <p>Jeff kept reviewing AI-assisted projects that shipped without basic security details: services on plain HTTP, no authentication, no MFA, and AI tools such as model servers and vector databases exposed with no login at all. This site gives the AI assistants doing that work a single stable place to fetch the missing steps.</p>
+  <p>Related resources: the <a href="https://aiqt.ai" target="_blank" rel="noopener noreferrer">AIQT</a> standard holds an AI assistant to accuracy, integrity, and verification while it works, and the <a href="https://github.com/jposluns/grc_library" target="_blank" rel="noopener noreferrer">grc_library</a> repository (<a href="https://grclibrary.ai" target="_blank" rel="noopener noreferrer">grclibrary.ai</a>) supports deeper governance, risk, and compliance work: point your AI development assistant at it and ask it to validate gaps against the services that apply to your project.</p>
+  <p>Scope: deployment exposure, including TLS, human and machine authentication, MFA, access restrictions, secrets, and inbound and outbound network access, from first deployment through teardown. General application security beyond that belongs to the OWASP resources linked throughout the guides.</p>
 
   <h2 id="ai">If you are an AI development assistant</h2>
   <p>Apply these rules to every service you configure, generate, or review:</p>
   <ol>
-    <li>Treat every service as internet-reachable unless confirmed otherwise. Bind to <code>127.0.0.1</code> by default and expose services only through a TLS-terminating layer that requires authentication.</li>
-    <li>Serve every exposed endpoint over TLS: free ACME certificates where a public domain exists, a Cloudflare Tunnel where inbound ports are not possible, self-signed certificates for internal work.</li>
+    <li>Treat every service as internet-reachable unless confirmed otherwise. Bind to <code>127.0.0.1</code> by default and expose only through a TLS-terminating layer that requires authentication; keep backend, admin, and AI-tool services private.</li>
+    <li>Apply every guide that fits the deployment, not just one: the service or framework, its host or platform, containers where used, plus identity, secrets, and the operational controls below.</li>
+    <li>Serve every exposed endpoint over TLS: free ACME certificates where a public domain exists, a Cloudflare Tunnel where inbound ports are not possible, Tailscale or self-signed certificates for internal work.</li>
     <li>Redirect HTTP to HTTPS, or do not listen on HTTP at all.</li>
-    <li>Require authentication on every non-public endpoint. Never ship default or hardcoded credentials.</li>
-    <li>When login comes from a provider (Google, Microsoft Entra, GitHub, or a hosted identity service), check the returned identity against an allowlist before granting access; a successful login is not authorisation. The identity-providers and oidc-integration guides cover the choice and the wiring.</li>
-    <li>Add multi-factor authentication to human logins where viable; the MFA guide lists the options per stack.</li>
-    <li>Keep secrets out of repositories; load them from the environment or a secret manager.</li>
-    <li>Run the verification checklist in the README before reporting the work as complete, and report anything you could not test.</li>
+    <li>Require authentication on every non-public endpoint. Never ship default or hardcoded credentials. Where a tool has no native login, put one in front per fronting-auth.md.</li>
+    <li>A successful login is not authorisation. Check the returned identity against an allowed tenant, domain, group, or user list before granting access; see identity-providers.md and oidc-integration.md.</li>
+    <li>Add MFA to human logins where viable; the mfa guide lists the options per stack.</li>
+    <li>Keep secrets out of the repository, load them from the environment or a secret manager, and give each service its own scoped credentials; contain outbound access and lock down cloud metadata per egress-metadata.md, and never serve dotfiles, dumps, or client secrets per web-exposure.md.</li>
+    <li>AI and data tools vary in their defaults and native controls, and many need authentication and TLS configured explicitly: keep them on loopback and apply the matching guide before any exposure.</li>
+    <li>Run the verification checklist in the README before reporting completion, and report anything you could not test.</li>
   </ol>
   <p>Fetch the full guides raw:</p>
   <pre>https://raw.githubusercontent.com/jposluns/sslconfig/main/&lt;guide&gt;.md</pre>
@@ -239,12 +252,18 @@
   <p>If a tool, service, or other addition belongs on this list, let Jeff know however you are able to reach him, and he will be happy to add it.</p>
 
   <h2 id="human">If you are a human</h2>
-  <p>Paste any of these into your AI assistant's instructions.</p>
+  <p>Browse the guide menu for your deployment, or copy a task below into your AI assistant.</p>
 
   <h3>Secure or audit this project</h3>
   <div class="copywrap">
     <pre id="secure-text">Secure this project using the guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai). Audit it first: list every listening service with its TLS and authentication state, and report the gaps as a table. Propose the fix for each gap per the matching guide (TLS on every endpoint, strong authentication, MFA where viable, and no secrets in the repository) and wait for my approval before changing anything. After approval, apply the fixes, run the README verification checklist, and report anything you could not test.</pre>
     <button class="copy-btn" type="button" data-copy="secure-text" hidden>Copy</button>
+  </div>
+
+  <h3>Review the AI and agent stack</h3>
+  <div class="copywrap">
+    <pre id="ai-stack-text">Review the deployment exposure of this project's AI and agent infrastructure using the guides at https://github.com/jposluns/sslconfig (see https://sslconfig.ai). Inventory every AI-related service present: model servers, inference proxies, vector databases, MCP servers, agent builders, chat and image-generation UIs, notebooks, workflow tools, and observability services. Record each service's transport; for stdio MCP servers and other services with no network listener, mark bind address and TLS not applicable and instead review their inherited credentials and outbound access. For each, report its bind address, TLS state, authentication state, machine credentials, and outbound access to external services and cloud metadata; many of these tools need authentication configured and their defaults vary. Report the gaps as a table and propose the fix for each per the matching guide: loopback binding, a fronting TLS and login layer where there is no native control, scoped API keys, and egress control per egress-metadata.md. Wait for my approval before changing anything, then apply the fixes and run the README verification checklist. Keep the review within deployment exposure.</pre>
+    <button class="copy-btn" type="button" data-copy="ai-stack-text" hidden>Copy</button>
   </div>
 
   <h3>Add single sign-on and MFA</h3>
