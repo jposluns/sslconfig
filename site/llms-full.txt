@@ -3983,7 +3983,16 @@ Open Elasticsearch instances produced some of the largest data leaks on record. 
 
 ```bash
 curl -s https://search.example.com:9200/            # 401 without credentials
-curl -sk https://localhost:9200/ -u elastic         # prompts; TLS answers, HTTP does not
+curl -s --cacert /path/http_ca.crt https://search.example.com:9200/ -u elastic
+                                                    # prompts, then 200 with the right password. Verify the certificate
+                                                    # against the CA your installer generated (Elasticsearch writes
+                                                    # http_ca.crt on first start; the OpenSearch demo configuration
+                                                    # installs its own) and never pass -k here: -k accepts a substituted
+                                                    # certificate exactly as readily as yours, and this line sends
+                                                    # credentials over whatever it accepted
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://search.example.com:9200/
+                                                    # plaintext must NOT answer: expect a connection failure or a
+                                                    # protocol error, never cluster JSON
 ss -tlnp | grep 9200                                # loopback/private only, unless deliberate
 ```
 
@@ -3991,8 +4000,9 @@ An unauthenticated `GET /` returning cluster JSON is the classic finding; so is 
 
 ## Sources (checked September 2026)
 
-- Elasticsearch security configuration: https://www.elastic.co/guide/en/elasticsearch/reference/current/configuring-stack-security.html
+- Elasticsearch security configuration (current docs home for cluster security): https://www.elastic.co/docs/deploy-manage/security
 - OpenSearch demo security configuration: https://docs.opensearch.org/latest/security/configuration/demo-configuration/
+- Elasticsearch, automatic TLS setup for self-managed clusters (the generated `http_ca.crt` used to verify TLS from a client): https://www.elastic.co/docs/deploy-manage/security/self-auto-setup
 
 ======================================================================
 ==> minio.md
@@ -4926,7 +4936,11 @@ Once TLS is on, connect via `https://`; the server no longer answers plain `http
 ## 4. Verify
 
 ```bash
-curl -skI https://host:8888/           # answers over TLS
+curl -s -o /dev/null -w '%{http_code}\n' --cacert /path/cert.pem https://jupyter.example.com:8888/
+                                       # answers over TLS AND the certificate verifies. Use --cacert against the
+                                       # certificate from step 2, and request it by the name that certificate
+                                       # carries. Never -k here: it accepts any certificate, so the check passes
+                                       # against a substituted one and proves nothing about your TLS
 # In a private browser window: the server asks for the password before showing any notebook.
 ss -tlnp | grep 8888                   # bound to 127.0.0.1 unless deliberately exposed
 ```
@@ -6530,7 +6544,10 @@ Without `--tlsverify` the daemon does not check client certificates. Firewall 23
 
 ```bash
 ss -tlnp | grep -E ':(9443|9000|8000|3000|81|3001|2375|2376) '   # 127.0.0.1 or absent, never 0.0.0.0
-curl -skI https://panel.example.com/                              # 401/403 or a login redirect, never a dashboard
+curl -s -o /dev/null -w '%{http_code}\n' https://panel.example.com/
+                                                                  # 401, 403, or a login redirect, never a dashboard. No -k:
+                                                                  # this panel is behind a proxy holding a real certificate, so
+                                                                  # a check that skips verification proves nothing about it
 docker -H tcp://203.0.113.10:2375 info                            # must fail: connection refused or filtered
 env -u DOCKER_HOST -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH \
   curl -sS -o /dev/null -w '%{http_code}\n' --cacert ca.pem https://203.0.113.10:2376/_ping

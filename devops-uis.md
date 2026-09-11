@@ -96,7 +96,10 @@ Without `--tlsverify` the daemon does not check client certificates. Firewall 23
 
 ```bash
 ss -tlnp | grep -E ':(9443|9000|8000|3000|81|3001|2375|2376) '   # 127.0.0.1 or absent, never 0.0.0.0
-curl -skI https://panel.example.com/                              # 401/403 or a login redirect, never a dashboard
+curl -s -o /dev/null -w '%{http_code}\n' https://panel.example.com/
+                                                                  # 401, 403, or a login redirect, never a dashboard. No -k:
+                                                                  # this panel is behind a proxy holding a real certificate, so
+                                                                  # a check that skips verification proves nothing about it
 docker -H tcp://203.0.113.10:2375 info                            # must fail: connection refused or filtered
 env -u DOCKER_HOST -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH \
   curl -sS -o /dev/null -w '%{http_code}\n' --cacert ca.pem https://203.0.113.10:2376/_ping
