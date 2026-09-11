@@ -17,9 +17,13 @@ bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
 
 # Root-level Markdown that documents the repository or governs the assistants working in it,
 # rather than a service, and so is deliberately absent from llms-full.txt and llms.txt.
+# README.sources.md is here too: it holds the citations for the README verification checklist,
+# kept out of the README so the front page stays readable. Consequence worth knowing: it is
+# therefore NOT carried in llms-full.txt, so an assistant reading only that file sees the
+# checklist without its sources.
 not_a_guide() {
   case "$1" in
-    CONTRIBUTING.md|CLAUDE.md|AGENTS.md|CHANGELOG.md) return 0 ;;
+    CONTRIBUTING.md|CLAUDE.md|AGENTS.md|CHANGELOG.md|README.sources.md) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -106,6 +110,29 @@ PY
 else
   bad "README guide-index categories do not match the site menu categories"
   printf '%s\n' "$cat_diff" | sed 's/^/          /'
+fi
+
+echo "== every guide has a Verify section and dated Sources =="
+# The structural half of the CONTRIBUTING rule that a guide must hand the reader runnable checks and
+# dated, cited sources. What a reader copies from here faces the internet, so a guide that ships with
+# no Verify step at all is a defect, not an omission. The gate deliberately does NOT claim to prove
+# that a Verify step DISCRIMINATES (fails while the service is still exposed) or that a config line
+# appears on the page it cites; both stay authoring obligations enforced by review.
+if guide_shape=$(python3 tools/check_guide_shape.py 2>&1); then
+  printf '%s\n' "$guide_shape"
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$guide_shape"; then
+  # A crash, INCLUDING one that printed some FAIL lines before dying. The gate did not
+  # finish, so its findings are incomplete and must never read as a complete verdict.
+  bad "check_guide_shape.py crashed; its findings are incomplete"
+  printf '%s\n' "$guide_shape" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$guide_shape"; then
+  # The gate reported its own findings, already in this suite's FAIL format.
+  printf '%s\n' "$guide_shape"
+  fail=1
+else
+  # Exited non-zero saying nothing useful: a kill, or an empty failure.
+  bad "check_guide_shape.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$guide_shape" | sed 's/^/          /'
 fi
 
 echo "== local links resolve =="

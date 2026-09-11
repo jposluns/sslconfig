@@ -199,6 +199,8 @@ Run the applicable checks below and the Verify steps in every selected guide. Re
 10. Probe from outside the deployment network (a second host, or check your public IP on Shodan or Censys): cloud-firewall and Docker-publishing mistakes only show from outside. See [deployment-lifecycle.md](deployment-lifecycle.md).
 11. Where login comes from an identity provider, an authenticated identity outside the allowed tenant, domain, group, or users is denied; test with such an account, not only an anonymous request.
 
+Sources for these checks are listed in [README.sources.md](README.sources.md), numbered to match the items above.
+
 ## Scope and currency
 
 The guides use placeholders (`example.com`, `app.example.com`, `203.0.113.10`) that you must replace. Configuration syntax was checked against the vendor documentation cited in each guide as of September 2026; directives and dashboard menu locations change, so verify version-specific items against the current documentation for your installed version. Each guide lists its sources.

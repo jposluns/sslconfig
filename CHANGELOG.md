@@ -10,12 +10,17 @@ are grouped by the date the change landed on `main`.
 
 - The project was renamed from `sslconfig` to `secureconfig`. The GitHub repository is now
   `jposluns/secureconfig` and the site is served at `secureconfig.ai`; GitHub redirects the old
-  repository path, and `sslconfig.ai` continues to serve until it is retired separately. Every
+  repository path. Every
   absolute repository and site URL in `site/index.html`, `site/llms.txt`, `site/robots.txt`,
   `README.md` and `scripts/build-llms-full.sh` was updated, along with the `AIQT_SITE_HOST` gate
   variable in `tools/run_all_checks.sh` and the patch notes in `.aiqt/PIN`; `site/llms-full.txt` was
   regenerated. Earlier entries in this changelog keep the old name: they record what shipped under
   it. (#8)
+
+- The `sslconfig.ai` domain was retired. Its DNS record was removed on 2026-09-11, so the old
+  hostname no longer resolves and `secureconfig.ai` is now the only site hostname. GitHub continues
+  to redirect the old `jposluns/sslconfig` repository path, but there is no redirect for the old
+  domain: URLs in the wild that point at `sslconfig.ai` fail to resolve rather than forwarding.
 
 - The README and the site front page (`site/index.html`) were realigned with the current corpus.
   One canonical description now appears in the README title, the site tagline, and both the meta and
@@ -27,6 +32,20 @@ are grouped by the date the change landed on `main`.
 
 ### Added
 
+- A gate, `tools/check_guide_shape.py`, requiring every guide to carry a Verify section with a
+  non-empty body and a `Sources (checked <month year>)` heading whose date names a real month, is not
+  in the future, and cites at least one absolute URL with a hostname. It is deterministic and offline
+  like the rest of the suite, and monotonic in time: its only date comparison can turn a failing guide
+  into a passing one as the clock advances, never the reverse, so no build can go red from the
+  calendar alone. The gate covers only the structural floor of `CONTRIBUTING.md` rule 5: it cannot
+  prove that a Verify body holds a runnable command, that a Verify step fails while the service is
+  still exposed, or that a cited page contains the line it is cited for, and it says so rather than
+  implying wider coverage. `common-mistakes.md` is the one documented exemption.
+- `README.sources.md`, holding the citations for the README verification checklist. The checklist
+  names tools, status codes and services without citing them inline, so the sources now sit in a
+  companion file and the front page stays readable. `README.md` is held to the same Verify and Sources
+  contract as any guide, resolving its Sources through that file. Nothing mechanically ties a numbered
+  check to its citation, so that correspondence is kept by reading.
 - A fifth copy-ready prompt on the site that audits the AI and agent stack. (#6)
 - A gate in `tools/run_all_checks.sh` that fails if the README guide-index category headings and the
   site menu category headings drift apart. (#6)
