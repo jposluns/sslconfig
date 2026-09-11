@@ -237,7 +237,7 @@
     <li>Serve every exposed endpoint over TLS: free ACME certificates where a public domain exists, a Cloudflare Tunnel where inbound ports are not possible, Tailscale or self-signed certificates for internal work.</li>
     <li>Redirect HTTP to HTTPS, or do not listen on HTTP at all.</li>
     <li>Require authentication on every non-public endpoint. Never ship default or hardcoded credentials. Where a tool has no native login, put one in front per fronting-auth.md.</li>
-    <li>A successful login is not authorisation. Check the returned identity against an allowed tenant, domain, group, or user list before granting access; see identity-providers.md and oidc-integration.md.</li>
+    <li>A successful login is not authorization. Check the returned identity against an allowed tenant, domain, group, or user list before granting access; see identity-providers.md and oidc-integration.md.</li>
     <li>Add MFA to human logins where viable; the mfa guide lists the options per stack.</li>
     <li>Keep secrets out of the repository, load them from the environment or a secret manager, and give each service its own scoped credentials; contain outbound access and lock down cloud metadata per egress-metadata.md, and never serve dotfiles, dumps, or client secrets per web-exposure.md.</li>
     <li>AI and data tools vary in their defaults and native controls, and many need authentication and TLS configured explicitly: keep them on loopback and apply the matching guide before any exposure.</li>
@@ -266,7 +266,7 @@
 
   <h3>Add single sign-on and MFA</h3>
   <div class="copywrap">
-    <pre id="sso-text">Add single sign-on to this project using the guides at https://github.com/jposluns/secureconfig (see https://secureconfig.ai). Read identity-providers.md to choose between Google, Microsoft Entra, GitHub, or a hosted customer-identity provider that fits this project's users and budget, then wire it per oidc-integration.md: authorization code with PKCE, exact redirect URIs, token validation, and an allowlist check of the tenant, domain, or group so that a successful login is never treated as authorisation. Enforce MFA at the provider, prefer passkeys for administrators, and run the README verification checklist before reporting completion.</pre>
+    <pre id="sso-text">Add single sign-on to this project using the guides at https://github.com/jposluns/secureconfig (see https://secureconfig.ai). Read identity-providers.md to choose between Google, Microsoft Entra, GitHub, or a hosted customer-identity provider that fits this project's users and budget, then wire it per oidc-integration.md: authorization code with PKCE, exact redirect URIs, token validation, and an allowlist check of the tenant, domain, or group so that a successful login is never treated as authorization. Enforce MFA at the provider, prefer passkeys for administrators, and run the README verification checklist before reporting completion.</pre>
     <button class="copy-btn" type="button" data-copy="sso-text" hidden>Copy</button>
   </div>
 

@@ -6,9 +6,9 @@ Every tier and price below was read from the vendor's pricing page in September 
 
 ## 1. Decide which kind of identity you need
 
-- **Workforce identity**: your team signs in with the organisation's existing accounts (Google Workspace, Microsoft Entra ID, Okta). Use it for admin panels, dashboards, internal tools, and anything only staff should reach. If your organisation already runs one of these, use it; do not buy a second directory.
+- **Workforce identity**: your team signs in with the organization's existing accounts (Google Workspace, Microsoft Entra ID, Okta). Use it for admin panels, dashboards, internal tools, and anything only staff should reach. If your organization already runs one of these, use it; do not buy a second directory.
 - **Customer identity (CIAM)**: your application's own users sign up and sign in. Use a hosted provider rather than writing password storage, MFA, recovery, and rate limiting yourself.
-- **Developer identity**: GitHub (or GitLab) login gates a tool for developers, optionally restricted to an organisation. Often the simplest correct choice for a solo or small project.
+- **Developer identity**: GitHub (or GitLab) login gates a tool for developers, optionally restricted to an organization. Often the simplest correct choice for a solo or small project.
 
 A login proves who the person is. **It does not decide whether they may use your app.** After any of the providers below, your application (or the fronting layer) still checks that the identity is on an allowlist: a tenant, a hosted domain, a group, or an explicit list of users. Accepting every Google or Microsoft account as "staff" is the recurring mistake; [oidc-integration.md](oidc-integration.md) covers the check.
 
@@ -17,8 +17,8 @@ A login proves who the person is. **It does not decide whether they may use your
 | Provider | Free tier and MFA facts (September 2026) | Fit |
 |---|---|---|
 | Microsoft Entra ID | Free tier, bundled with Azure and Microsoft 365 subscriptions, includes MFA and unlimited SSO to SaaS apps. Security defaults require every user to register MFA, enforce it for administrators, and prompt other users when Microsoft judges it necessary. P1 at $7 per user per month (annual commitment) adds Conditional Access, which is how you require MFA for everyone on every sign-in; P2 at $10 adds risk-based policies. | Any team already on Microsoft 365. |
-| Google Workspace / Cloud Identity | Sign in with Google (OIDC) costs nothing per app. Enforcing 2-Step Verification for the whole organisation is an admin-console setting in Workspace or Cloud Identity. Cloud Identity Free exists; its default licence count was not read from a Google page for this guide, so check the source. | Any team already on Workspace. |
-| Okta Workforce Identity | Okta Verify supports push, TOTP, and FastPass. A $1,500 annual contract minimum applies and there is no free production tier. | Only when your organisation already runs Okta. Not a purchase for a small project. |
+| Google Workspace / Cloud Identity | Sign in with Google (OIDC) costs nothing per app. Enforcing 2-Step Verification for the whole organization is an admin-console setting in Workspace or Cloud Identity. Cloud Identity Free exists; its default licence count was not read from a Google page for this guide, so check the source. | Any team already on Workspace. |
+| Okta Workforce Identity | Okta Verify supports push, TOTP, and FastPass. A $1,500 annual contract minimum applies and there is no free production tier. | Only when your organization already runs Okta. Not a purchase for a small project. |
 | JumpCloud, OneLogin, Ping Identity | Workforce directories in the same class. Tiers not verified for this guide. | Existing enterprise estates only. |
 
 ## 3. Customer identity providers
@@ -36,7 +36,7 @@ A login proves who the person is. **It does not decide whether they may use your
 
 ## 4. Developer identity
 
-- **GitHub OAuth**: an OAuth app gives login for any GitHub user; restrict to members of your organisation or team in the app (or with oauth2-proxy, which has a GitHub provider with org and team restrictions). GitHub Actions OIDC is a different mechanism for workloads, covered in [machine-auth.md](machine-auth.md).
+- **GitHub OAuth**: an OAuth app gives login for any GitHub user; restrict to members of your organization or team in the app (or with oauth2-proxy, which has a GitHub provider with org and team restrictions). GitHub Actions OIDC is a different mechanism for workloads, covered in [machine-auth.md](machine-auth.md).
 - **AWS IAM Identity Center**: the free workforce directory for your team's own AWS console and CLI access. It is not a general OIDC provider for Application Load Balancer authentication; for app login on AWS pair the ALB with Cognito or an OIDC provider from section 3 ([cloud-identity-proxies.md](cloud-identity-proxies.md)).
 
 ## 5. Self-hosted identity providers
@@ -51,7 +51,7 @@ Keycloak, authentik, Zitadel, Ory, and Authelia ([mfa.md](mfa.md)) give you OIDC
 
 ## 7. Poor fits for a small project
 
-Zscaler Private Access, HashiCorp Boundary, Ping Identity, OneLogin, and Okta as a new purchase are enterprise products with enterprise pricing and sales-led onboarding. They are listed so an assistant recognises them when a customer already has them, not as recommendations.
+Zscaler Private Access, HashiCorp Boundary, Ping Identity, OneLogin, and Okta as a new purchase are enterprise products with enterprise pricing and sales-led onboarding. They are listed so an assistant recognizes them when a customer already has them, not as recommendations.
 
 ## Verify
 

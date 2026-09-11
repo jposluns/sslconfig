@@ -16,7 +16,7 @@ The recurring findings behind exposed AI-assisted projects, distilled from the g
 12. **Database ports open to `0.0.0.0/0` in cloud firewalls** because a remote client needed access once. ([cloud-firewalls.md](cloud-firewalls.md))
 13. **Firebase or Supabase rules left open** (`allow read, write: if true;`, RLS disabled) because the client key "worked": the key is public by design, the rules are the security. ([firebase-supabase.md](firebase-supabase.md))
 14. **Single-factor logins on human-facing services** when the stack or a fronting layer supports MFA. ([mfa.md](mfa.md))
-15. **"Signed in with Google" treated as authorised.** Any Google or Microsoft account passes the login and nothing checks the domain, tenant, or group. ([oidc-integration.md](oidc-integration.md))
+15. **"Signed in with Google" treated as authorized.** Any Google or Microsoft account passes the login and nothing checks the domain, tenant, or group. ([oidc-integration.md](oidc-integration.md))
 16. **MCP servers on all interfaces.** An HTTP MCP server bound to `0.0.0.0` with no token or OAuth hands every tool it exposes to the network. ([mcp-servers.md](mcp-servers.md))
 17. **Unauthenticated AI infrastructure**: Ray dashboards, MLflow trackers, and vector databases with authentication off. ([ray.md](ray.md), [mlflow.md](mlflow.md), [vector-databases.md](vector-databases.md))
 18. **MFA enrolled but not enforced**: users have a second factor and a password-only session still works. ([authentication.md](authentication.md))
