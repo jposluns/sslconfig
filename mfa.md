@@ -62,7 +62,7 @@ Machine protocols (database wire protocols, model-server APIs) have no interacti
 
 ## Standards and sources (checked September 2026)
 
-- TOTP: https://www.rfc-editor.org/rfc/rfc6238 ; HOTP: https://www.rfc-editor.org/rfc/rfc4226
+- TOTP: https://www.rfc-editor.org/info/rfc6238/ ; HOTP: https://www.rfc-editor.org/info/rfc4226/
 - `otpauth://` key URI format: https://github.com/google/google-authenticator/wiki/Key-Uri-Format
 - WebAuthn: https://www.w3.org/TR/webauthn-2/
 - Authelia proxy support matrix: https://www.authelia.com/integration/proxies/support/

@@ -80,7 +80,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://models.example.com/invo
 - TGI launcher arguments (--hostname, --port, --api-key, --prometheus-port): https://huggingface.co/docs/text-generation-inference/reference/launcher
 - TGI router source (what --api-key enforces): https://github.com/huggingface/text-generation-inference/blob/main/router/src/server.rs
 - TGI repository (maintenance-mode notice, archived 2026-03-21): https://github.com/huggingface/text-generation-inference
-- SGLang server arguments (--host, --port, --api-key, --admin-api-key, SSL flags; docs.sglang.ai redirects here): https://docs.sglang.io/advanced_features/server_arguments.html
+- SGLang server arguments (--host, --port, --api-key, --admin-api-key, SSL flags; docs.sglang.ai redirects here): https://docs.sglang.io/docs/advanced_features/server_arguments
 - Triton secure deployment considerations: https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/deploy.html
 - Triton quickstart (default listeners on 8000, 8001, 8002): https://github.com/triton-inference-server/server/blob/main/docs/getting_started/quickstart.md
 - Triton inference protocols (gRPC SSL flags, restricted APIs): https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md

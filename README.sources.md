@@ -79,7 +79,7 @@ Every guide carries its own sources; this file covers only the checklist in `REA
     and Microsoft Entra uses `tid` and `groups`, documented in its
     [ID token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference).
     For proxy-enforced access see
-    [Google Cloud IAP](https://cloud.google.com/iap/docs/concepts-overview) and
+    [Google Cloud IAP](https://docs.cloud.google.com/iap/docs/concepts-overview) and
     [cloud-identity-proxies.md](cloud-identity-proxies.md).
 
 ## Verify

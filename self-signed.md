@@ -86,5 +86,5 @@ Self-signed certificates have no revocation and no third-party accountability, a
 
 ## Sources (checked September 2026)
 
-- OpenSSL documentation: https://www.openssl.org/docs/ ; `openssl s_client` (`-servername`, `-verify_return_error`): https://docs.openssl.org/master/man1/openssl-s_client/ ; verification options (`-verify_hostname`): https://docs.openssl.org/master/man1/openssl-verification-options/
+- OpenSSL documentation: https://docs.openssl.org/ ; `openssl s_client` (`-servername`, `-verify_return_error`): https://docs.openssl.org/master/man1/openssl-s_client/ ; verification options (`-verify_hostname`): https://docs.openssl.org/master/man1/openssl-verification-options/
 - mkcert: https://github.com/FiloSottile/mkcert

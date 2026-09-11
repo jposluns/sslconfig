@@ -104,8 +104,8 @@ After logging in, confirm that the app's own identity check reads the signed ass
 - Azure Container Apps authentication: https://learn.microsoft.com/en-us/azure/container-apps/authentication
 - Azure Static Web Apps authentication and authorization: https://learn.microsoft.com/en-us/azure/static-web-apps/authentication-authorization
 - Cloudflare Access, validate JWTs: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
-- ngrok traffic policy OAuth action: https://ngrok.com/docs/traffic-policy/actions/oauth/
-- ngrok traffic policy OpenID Connect action: https://ngrok.com/docs/traffic-policy/actions/oidc/
-- ngrok agent CLI (`ngrok http` flags): https://ngrok.com/docs/agent/cli/
+- ngrok traffic policy OAuth action: https://ngrok.com/docs/gateway/traffic-policy/actions/oauth
+- ngrok traffic policy OpenID Connect action: https://ngrok.com/docs/gateway/traffic-policy/actions/oidc
+- ngrok agent CLI (`ngrok http` flags): https://ngrok.com/docs/gateway/agent/cli
 - Vercel Deployment Protection: https://vercel.com/docs/deployment-protection
 - Vercel Authentication: https://vercel.com/docs/deployment-protection/methods-to-protect-deployments/vercel-authentication

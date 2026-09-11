@@ -42,7 +42,7 @@ mc alias set mys3 https://s3.example.com:9000 REPLACE_WITH_ACCESS_KEY REPLACE_WI
 
 ## Sources (checked September 2026)
 
-- MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/enterprise/aistor-object-store/installation/linux/network-encryption/
-- MinIO: https://min.io/
+- MinIO network encryption (certs directory, public.crt/private.key, --certs-dir): https://docs.min.io/aistor/installation/linux/network-encryption/
+- MinIO: https://www.min.io/
 - MinIO community repository (archived 2026-04-25, successor editions): https://github.com/minio/minio
-- MinIO `mc anonymous set` (anonymous policies are set per bucket and permit actions without authentication): https://docs.min.io/enterprise/aistor-object-store/reference/cli/mc-anonymous/mc-anonymous-set/
+- MinIO `mc anonymous set` (anonymous policies are set per bucket and permit actions without authentication): https://docs.min.io/aistor/reference/cli/mc-anonymous/mc-anonymous-set/

@@ -71,4 +71,4 @@ bundle for the string used by your admin credentials or API keys; it should not 
 - PocketBase going to production: https://pocketbase.io/docs/going-to-production/
 - PocketBase API rules and filters: https://pocketbase.io/docs/api-rules-and-filters/
 - Appwrite self-hosting production security: https://appwrite.io/docs/advanced/self-hosting/production/security
-- Appwrite project API keys: https://appwrite.io/docs/advanced/platform/api-keys
+- Appwrite project API keys: https://appwrite.io/docs/partners/project/api-keys

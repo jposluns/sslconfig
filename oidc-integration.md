@@ -90,7 +90,7 @@ Negative tests matter more than the happy path:
 
 ## Sources (checked September 2026)
 
-- RFC 9700, OAuth 2.0 Security Best Current Practice: https://www.rfc-editor.org/rfc/rfc9700
+- RFC 9700, OAuth 2.0 Security Best Current Practice: https://www.rfc-editor.org/info/rfc9700/
 - OpenID Connect Core 1.0 (ID token validation 3.1.3.7, claim stability 5.7): https://openid.net/specs/openid-connect-core-1_0.html ; Discovery 1.0: https://openid.net/specs/openid-connect-discovery-1_0.html ; RP-Initiated Logout 1.0: https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 - Google OpenID Connect (discovery URL, `hd`, `sub` versus `email`, token validation): https://developers.google.com/identity/openid-connect/openid-connect
 - Google Workspace: deploy 2-Step Verification: https://knowledge.workspace.google.com/admin/security/deploy-2-step-verification
@@ -99,7 +99,7 @@ Negative tests matter more than the happy path:
 - Microsoft Entra Conditional Access: require MFA for all users: https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-all-users-mfa-strength
 - GitHub OAuth apps: authorizing: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps ; creating: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app ; scopes: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
 - GitHub REST: organization members: https://docs.github.com/en/rest/orgs/members ; team members: https://docs.github.com/en/rest/teams/members
-- Okta: OAuth 2.0 and OpenID Connect overview: https://developer.okta.com/docs/concepts/oauth-openid/ ; OIDC API reference (discovery, issuer, `amr`, `groups`): https://developer.okta.com/docs/reference/api/oidc/
+- Okta: OAuth 2.0 and OpenID Connect overview: https://developer.okta.com/docs/concepts/oauth-openid/ ; OIDC API reference (discovery, issuer, `amr`, `groups`): https://developer.okta.com/docs/api/openapi/okta-oauth/guides/overview
 - Okta: add a groups claim: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/ ; sign users in to your web application: https://developer.okta.com/docs/guides/sign-into-web-app-redirect/-/main/ ; policies concept: https://developer.okta.com/docs/concepts/policies/
 - openid-client: https://github.com/panva/openid-client
 - Auth.js (installation, providers): https://authjs.dev/ ; session strategies (a JWT cannot be expired early without a blocklist): https://authjs.dev/concepts/session-strategies

@@ -76,12 +76,12 @@ clickhouse-client --host ch.example.com --port 9440 --secure --user app --passwo
 
 ## Sources (checked September 2026)
 
-- Server configuration parameters (ports, `listen_host`, `openSSL`): https://clickhouse.com/docs/operations/server-configuration-parameters/settings
+- Server configuration parameters (ports, `listen_host`, `openSSL`): https://clickhouse.com/docs/reference/settings/server-settings/settings
 - Shipped `config.xml` (`listen_host` default comment, `openSSL` block): https://raw.githubusercontent.com/ClickHouse/ClickHouse/master/programs/server/config.xml
-- User settings (`password_sha256_hex`, `networks`, `access_management`): https://clickhouse.com/docs/operations/settings/settings-users
+- User settings (`password_sha256_hex`, `networks`, `access_management`): https://clickhouse.com/docs/concepts/features/configuration/settings/settings-users
 - Shipped `users.xml` (default user, empty password, `::/0`): https://raw.githubusercontent.com/ClickHouse/ClickHouse/master/programs/server/users.xml
-- Access control and account management: https://clickhouse.com/docs/operations/access-rights
-- CREATE USER: https://clickhouse.com/docs/sql-reference/statements/create/user
-- GRANT: https://clickhouse.com/docs/sql-reference/statements/grant
-- Configuring SSL-TLS: https://clickhouse.com/docs/guides/sre/configuring-ssl
-- HTTP interface (ports, authentication): https://clickhouse.com/docs/interfaces/http
+- Access control and account management: https://clickhouse.com/docs/concepts/features/security/access-rights
+- CREATE USER: https://clickhouse.com/docs/reference/statements/create/user
+- GRANT: https://clickhouse.com/docs/reference/statements/grant
+- Configuring SSL-TLS: https://clickhouse.com/docs/concepts/features/security/tls/configuring-tls
+- HTTP interface (ports, authentication): https://clickhouse.com/docs/concepts/features/interfaces/http

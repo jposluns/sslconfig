@@ -87,9 +87,9 @@ ss -tlnp | grep -E 'gunicorn|uvicorn|python'   # behind a proxy: 127.0.0.1 only
 
 ## Sources (checked September 2026)
 
-- Gunicorn documentation (settings reference): https://docs.gunicorn.org/
-- Uvicorn settings reference: https://github.com/encode/uvicorn/blob/master/docs/settings.md
-- Django deployment checklist: https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
+- Gunicorn documentation (settings reference): https://gunicorn.org/
+- Uvicorn settings reference: https://github.com/Kludex/uvicorn/blob/main/docs/settings.md
+- Django deployment checklist: https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 - argon2-cffi: https://argon2-cffi.readthedocs.io/
 - Werkzeug serving (`ssl_context="adhoc"` requires cryptography): https://werkzeug.palletsprojects.com/en/stable/serving/
 - FastAPI security reference: https://fastapi.tiangolo.com/reference/security/ ; `OpenIdConnect` source (stub warning): https://github.com/fastapi/fastapi/blob/master/fastapi/security/open_id_connect_url.py

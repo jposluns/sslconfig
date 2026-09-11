@@ -49,4 +49,4 @@ curl -sI https://gradio.example.com/        # succeeds over TLS
 
 ## Sources (checked September 2026)
 
-- Gradio Blocks.launch() parameters (auth, auth_message, ssl_certfile, ssl_keyfile, ssl_keyfile_password, ssl_verify, server_name, share): https://www.gradio.app/docs/gradio/blocks
+- Gradio Blocks.launch() parameters (auth, auth_message, ssl_certfile, ssl_keyfile, ssl_keyfile_password, ssl_verify, server_name, share): https://gradio.app/docs/gradio/blocks

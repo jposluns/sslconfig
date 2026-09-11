@@ -68,6 +68,21 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   `model-servers.md`, `vector-databases.md`, `docker.md` and the database guides; `traefik.md` also
   checks published container ports. `apache.md` and `lighttpd.md` serve content directly and front
   no backend, so the check does not apply to them and they were left alone.
+- 82 citations that had silently moved (#16). An audit of all 767 URLs cited in the corpus found no
+  broken links and 84 redirects to a different path. The weekly link sweep counts a redirect as
+  passing, so a citation whose vendor reorganized its documentation stays green while pointing away
+  from the syntax it supports. ClickHouse, Coolify, NATS, the GitHub Actions OIDC pages, Gateway API
+  and Google Cloud all restructured; `encode/uvicorn` moved to `Kludex/uvicorn` and
+  `kubernetes/dashboard` to `kubernetes-retired/dashboard`. Every replacement target was fetched and
+  confirmed to resolve to itself, and where a redirect collapsed to a bare documentation root the
+  real successor page was found instead. Two of the refreshed citations had been added earlier the
+  same day, in #12 and #13. This also settles the disagreement between `README.md` and
+  `README.sources.md` over the testssl.sh URL.
+- Two URLs were deliberately left pointing at what looks like a stale target, because neither is a
+  citation (#16). `cloud-identity-proxies.md` keeps `https://cloud.google.com/iap` as the JWT `iss`
+  claim a reader validates Google IAP tokens against, and `egress-metadata.md` keeps
+  `https://sts.amazonaws.com/` as the positive-control probe in its Verify block, which is the
+  endpoint a workload calls for role credentials rather than a page to read.
 
 ### Changed
 

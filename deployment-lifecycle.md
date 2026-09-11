@@ -61,4 +61,4 @@ openssl s_client -connect app.example.com:443 -servername app.example.com </dev/
 - Shodan: https://www.shodan.io/
 - Censys: https://censys.com/
 - Vercel Deployment Protection (Standard Protection versus All Deployments scope): https://vercel.com/docs/deployment-protection
-- Cloudflare Access policies: https://developers.cloudflare.com/cloudflare-one/policies/access/
+- Cloudflare Access policies: https://developers.cloudflare.com/cloudflare-one/access-controls/policies/
