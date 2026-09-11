@@ -67,7 +67,26 @@ Path matches are exact, and `/admin/*` alone does not match `/admin` itself, so 
 
 `basic_auth` is single-factor. For human-facing sites, add MFA with the `forward_auth` directive (Caddy 2.5.1 and later) pointed at an [Authelia](https://www.authelia.com/) portal, or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 4. Verify
+## 4. Bound the expensive endpoints
+
+Caddy caps request bodies natively. **It has no rate limiting in the standard build**: `rate_limit` is
+not a Caddyfile directive, and rate limiting requires the community `caddy-ratelimit` module compiled in
+with xcaddy, or a layer in front of Caddy. Do not assume a stock Caddy is rate limited, and do not
+follow a `rate_limit` example without checking that your binary has that module.
+
+Add `request_body` to the site block you already have, rather than pasting a fresh one: the `basic_auth`
+directive from section 3 lives in that block, and a site block without it is a public route.
+
+```caddy
+# add to the existing app.example.com site block from sections 1 and 3.
+# Do not replace that block: basic_auth lives there, and a site block
+# without it is a public route.
+request_body {
+    max_size 10MB
+}
+```
+
+## 5. Verify
 
 ```bash
 caddy validate --config /etc/caddy/Caddyfile
@@ -75,6 +94,18 @@ curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin     # 401 with the @admin matcher
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/admin/x   # 401 as well
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://app.example.com/
+                                     # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
+                                     # 413. Supply credentials: an unauthenticated probe returns 401 and
+                                     # tells you nothing about max_size. Caddy's default order puts
+                                     # request_body ahead of basic_auth, but the limit is enforced when a
+                                     # later handler reads past it, and authentication stops the proxy
+                                     # handler reading at all. A backend with its own limit returns the
+                                     # same code, so attributing the refusal needs an isolated
+                                     # environment with request_body removed
+rm -f /tmp/under.bin /tmp/over.bin
 ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0.0.0. Every check above
                                      # passes while the app also answers directly on port 3000, which
                                      # bypasses Caddy's TLS and its authentication
@@ -89,6 +120,9 @@ ss -tlnp | grep 3000                 # the app itself: 127.0.0.1 only, never 0.0
 ## Sources (checked September 2026)
 
 - Automatic HTTPS: https://caddyserver.com/docs/automatic-https
+- `request_body` directive (`max_size`): https://caddyserver.com/docs/caddyfile/directives/request_body
+- Caddyfile directive list, which carries no `rate_limit` entry: https://caddyserver.com/docs/caddyfile/directives
+- caddy-ratelimit, the community module that adds rate limiting: https://github.com/mholt/caddy-ratelimit
 - basic_auth directive: https://caddyserver.com/docs/caddyfile/directives/basic_auth
 - tls directive: https://caddyserver.com/docs/caddyfile/directives/tls
 - Request matchers (path, wildcards, multiple paths): https://caddyserver.com/docs/caddyfile/matchers

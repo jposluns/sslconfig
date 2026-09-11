@@ -142,6 +142,21 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 
 ### Added
 
+- A "Bound the expensive endpoints" section in each of the four proxy guides (#20).
+  `realtime-webhooks.md` and `authentication.md` both require request-size, concurrency and timeout
+  limits on inference, upload and job-submission endpoints, naming denial of wallet as the failure
+  mode, and `realtime-webhooks.md` recorded that the proxy guides did not carry those directives.
+  They do now, and that sentence is rewritten to state what each proxy actually enforces rather than
+  implying parity: nginx carries all four controls, Traefik body size, concurrency and rate but no
+  timeout, HAProxy timeouts with an aggregate connection cap and a Content-Length body check, and
+  Caddy body size only, with no rate limiting in its standard build. Two of those are CONTRIBUTING
+  rule 3 statements rather than directives, since the control does not exist to configure. The change
+  took four cross-family review rounds, three of them returning DO NOT SHIP from both families: the
+  directives were correct throughout, while the snippets and the verification claims were not. Two
+  snippets would have dropped a security directive if pasted over an existing block, so every snippet
+  is now an explicit fragment, and the Verify steps report what they observe rather than asserting
+  which limiter fired, because a backend returning the same status explains the result with no proxy
+  limit present.
 - `exposure-index.md`, a lookup from an observed listening port to the guides worth reading (#19). The
   corpus routes from a known mistake to its fix in `common-mistakes.md`; this routes from an observed
   symptom, which is the direction a reader arrives from. It claims deliberately little. A port does not

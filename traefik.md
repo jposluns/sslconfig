@@ -76,15 +76,57 @@ http:
 
 basicAuth is single-factor. For human-facing sites, add MFA with the `forwardAuth` middleware pointed at [Authelia](https://www.authelia.com/) or [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy), or front the site with Cloudflare Access; options in [mfa.md](mfa.md).
 
-## 4. Verify
+## 4. Bound the expensive endpoints
+
+Three middlewares, attached to the router alongside the auth middleware from section 3.
+
+```yaml
+    # ADD these to the labels you already have. Do not replace that list:
+    # section 2 carries the router rule, entrypoints, certresolver and service
+    # port, and section 3 carries basicauth.users. A labels block without them
+    # breaks routing and authentication.
+    labels:
+      - traefik.http.middlewares.app-body.buffering.maxRequestBodyBytes=10485760
+      - traefik.http.middlewares.app-inflight.inflightreq.amount=10
+      - traefik.http.middlewares.app-rate.ratelimit.average=10
+      - traefik.http.middlewares.app-rate.ratelimit.burst=20
+      # replace the section 3 middlewares= line with this one
+      - traefik.http.routers.app.middlewares=app-auth,app-rate,app-inflight,app-body
+```
+
+Order matters here. `buffering` reads the request into memory or disk before forwarding it, so it must
+come after the admission controls; placed first, an accepted upload consumes the buffer before
+`ratelimit` or `inflightreq` has considered it. `maxRequestBodyBytes` sets the largest body accepted;
+`memRequestBodyBytes`, which defaults to 1048576, is the separate threshold at which buffering moves
+from memory to disk. Raising the first increases what you will buffer, not where that buffer lives. `ratelimit` is per source by default, while `inflightreq` caps concurrent
+in-flight requests rather than their rate, and its `sourceCriterion` defaults to the request host rather
+than the client, so set it explicitly if you want a per-client cap.
+
+## 5. Verify
 
 ```bash
 curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
+head -c 1M /dev/zero > /tmp/under.bin && head -c 11M /dev/zero > /tmp/over.bin
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/under.bin https://app.example.com/
+                                     # positive control: under the limit, must NOT be 413
+curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD --data-binary @/tmp/over.bin  https://app.example.com/
+                                     # 413. Credentials matter: app-auth is first in the middleware
+                                     # chain, so an unauthenticated probe stops at 401 before any limit
+                                     # sees the body. A backend with its own limit returns the same
+                                     # code, so attributing the refusal needs an isolated environment
+                                     # with app-body removed
+seq 1 40 | xargs -P 40 -I{} curl -s -o /dev/null -w '%{http_code}\n' -u admin:REPLACE_WITH_PASSWORD https://app.example.com/ | sort | uniq -c
+                                     # A 429 appeared. That is all this shows. inflightreq also returns
+                                     # 429, and an upstream under load can too, so this does not
+                                     # establish that ratelimit fired. Attributing it needs an isolated
+                                     # environment with both disabled as a baseline, then each enabled
+                                     # alone, with the arrival rate actually measured
+rm -f /tmp/under.bin /tmp/over.bin
 docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
-ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. Both checks above
-                                     # pass while the app is published directly, which bypasses Traefik's
-                                     # TLS and its authentication middleware
+ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. The TLS and auth
+                                     # checks above pass while the app is published directly, which
+                                     # bypasses Traefik's TLS and its authentication middleware
 ```
 
 Check the Traefik log for ACME errors on first start; issuance failures otherwise surface as a self-signed "TRAEFIK DEFAULT CERT" in the browser.
@@ -98,3 +140,6 @@ Check the Traefik log for ACME errors on first start; issuance failures otherwis
 ## Sources (checked September 2026)
 
 - Traefik documentation: https://doc.traefik.io/traefik/ (HTTPS/ACME, routers, and basicAuth middleware sections)
+- Buffering middleware (`maxRequestBodyBytes`, `memRequestBodyBytes`): https://doc.traefik.io/traefik/middlewares/http/buffering/
+- InFlightReq middleware (`amount`): https://doc.traefik.io/traefik/middlewares/http/inflightreq/
+- RateLimit middleware (`average`, `burst`, `period`): https://doc.traefik.io/traefik/middlewares/http/ratelimit/
