@@ -29,6 +29,9 @@ respelled without breaking the link. The placeholder check skips CHANGELOG.md, b
 entry recording a placeholder replacement has to name the old value, and a changelog line
 is not something a reader pastes into a server.
 
+NOT ON THE LIST, deliberately: `analyse` and `paralyse`. Oxford English keeps those. They
+are not -ize verbs, and an earlier version of this file wrongly flagged `analyse`.
+
 WHAT THIS DOES NOT PROVE: that the prose is otherwise correct, that -ize was applied to
 words outside this list, or that a placeholder outside this list is safe. Both checks are
 closed lists, and a closed list only catches what it names. The first version of this file
@@ -62,7 +65,7 @@ ISE_STEMS = (
     "standardis", "summaris", "utilis", "optimis", "serialis", "deserialis",
     "sanitis", "virtualis", "containeris", "paramateris", "parameteris",
     "tokenis", "anonymis", "pseudonymis", "capitalis", "centralis", "generalis",
-    "localis", "modernis", "specialis", "visualis", "analys" + "e",  # analyse, not analysis
+    "localis", "modernis", "specialis", "visualis",
 )
 ISE_RE = re.compile(r"\b(" + "|".join(ISE_STEMS) + r")(e|es|ed|ing|ation|ations|er|ers)?\b", re.I)
 
@@ -104,7 +107,15 @@ def main() -> int:
         except Exception as exc:
             findings.append(f"{path.relative_to(root)}: unreadable ({exc})")
             continue
+        in_fence = False
         for lineno, line in enumerate(text.splitlines(), 1):
+            if line.lstrip().startswith(("```", "~~~")):
+                in_fence = not in_fence
+                continue
+            # A fenced block holds code, where `serialise` is an identifier and not prose.
+            # A block quotation holds someone else's words, which must not be respelled.
+            if in_fence or line.lstrip().startswith(">"):
+                continue
             # Spelling ignores quoted spans; placeholders do not, since a placeholder
             # inside backticks is the normal case rather than a quotation.
             m = ISE_RE.search(unquoted(line))
@@ -114,6 +125,10 @@ def main() -> int:
                     f"use the Oxford -ize form"
                 )
             p = None if path.name in NO_PLACEHOLDER_CHECK else BAD_PLACEHOLDERS.search(line)
+            # A host UNDER example.com is a house placeholder whatever its left label, so
+            # `yourdomain.com.example.com` is fine and must not match on the substring.
+            if p and line[p.end():p.end() + 12].startswith(".example.com"):
+                p = None
             if p:
                 findings.append(
                     f"{path.relative_to(root)}:{lineno}: placeholder '{p.group(0)}' is outside the "

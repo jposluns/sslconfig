@@ -41,7 +41,14 @@ The management plugin's web UI is an admin panel: keep it off public interfaces 
 
 ```bash
 ss -tlnp | grep -E '5671|5672|15672'      # 5672 gone once listeners.tcp = none; UI private
-openssl s_client -connect mq.example.com:5671 -CAfile ca.pem </dev/null   # TLS handshake
+openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
+  -verify_hostname mq.example.com -verify_return_error </dev/null
+                                                                         # prints Verification: OK.
+                                                                         # Without -verify_return_error
+                                                                         # the handshake completes even
+                                                                         # when the certificate fails to
+                                                                         # verify, so -CAfile alone
+                                                                         # proves only that TLS is on
 # Remote login attempt as guest fails: "user 'guest' can only connect via localhost"
 ```
 

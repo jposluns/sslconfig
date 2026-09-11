@@ -57,18 +57,22 @@ CHECKS = (
     ("NODE_TLS_REJECT_UNAUTHORIZED zero",
      re.compile(r"\bNODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['\"]?0['\"]?")),
     ("httpie --verify=no",
-     re.compile(r"\bhttp\b[^\n]*?--verify[= ]\s*(?:no|false)\b", re.I)),
+     re.compile(r"\bhttps?\b[^\n]*?--verify[= ]\s*(?:no|false)\b", re.I)),
     ("git http.sslVerify false",
-     re.compile(r"http\.sslVerify\s*=\s*false", re.I)),
+     re.compile(r"http\.sslVerify[\s=]+false", re.I)),
 )
 
 # openssl s_client verifies nothing unless one of these appears.
 SCLIENT = re.compile(r"(?:^|[\s'\"/=])openssl\s+s_client\b")
-SCLIENT_VERIFIES = re.compile(r"-(?:CAfile|CApath|verify_return_error|verify_hostname|verifyCAfile)\b")
+# OpenSSL: "the verify operation continues after errors" unless -verify_return_error is
+# given, so a trust source alone does not make verification fatal. The negative forms
+# (-no-CAfile and friends) DISABLE trust, so they must not satisfy this.
+SCLIENT_VERIFIES = re.compile(r"(?<!-no)(?<!-no-)\B-verify_return_error\b")
+SCLIENT_HELP = re.compile(r"\s-(?:help|h)\b")
 # Piping into `openssl x509` reads a certificate rather than trusting it. Printing an
 # issuer or an expiry date is a legitimate use of an unverified handshake, so it is not
 # flagged; asserting that the handshake proves the certificate is what this catches.
-SCLIENT_INSPECTS = re.compile(r"\|\s*openssl\s+x509\b")
+SCLIENT_INSPECTS = re.compile(r"^\s*openssl\s+x509\b")
 
 
 def logical_lines(text):
@@ -139,14 +143,22 @@ def strip_comment(line):
 
 
 def findings_for(code):  # noqa: C901
-    """Return a list of labels for every insecure pattern in one command line."""
+    """Return a list of labels for every insecure pattern in one command line.
+
+    Segments are examined in order, because the openssl exemption is about ADJACENCY: an
+    s_client piped straight into `openssl x509` is reading a certificate, while an
+    unrelated `openssl x509` later in the line says nothing about the handshake.
+    """
     hits = []
-    for segment in SEGMENT_SPLIT.split(code):
+    segments = SEGMENT_SPLIT.split(code)
+    for idx, segment in enumerate(segments):
+        nxt = segments[idx + 1] if idx + 1 < len(segments) else ""
         if INSECURE_CURL.search(segment) and CURL_FLAG.search(segment):
             hits.append("curl -k / --insecure")
         if (SCLIENT.search(segment) and not SCLIENT_VERIFIES.search(segment)
-                and not SCLIENT_INSPECTS.search(code)):
-            hits.append("openssl s_client asserts a handshake it does not verify")
+                and not SCLIENT_HELP.search(segment)
+                and not SCLIENT_INSPECTS.search(nxt)):
+            hits.append("openssl s_client without -verify_return_error: errors are not fatal")
         for label, pattern in CHECKS:
             if pattern.search(segment):
                 hits.append(label)
