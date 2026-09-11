@@ -122,11 +122,11 @@ SCLIENT = re.compile(r"(?:^|[\s'\"/=`(])openssl\s+s_client\b")
 # OpenSSL: "the verify operation continues after errors" unless -verify_return_error is
 # given, so a trust source alone does not make verification fatal. The negative forms
 # (-no-CAfile and friends) DISABLE trust, so they must not satisfy this.
-SCLIENT_VERIFIES = re.compile(r"(?:^|\s)-verify_return_error(?:\s|$)")
+SCLIENT_VERIFIES = re.compile(r"(?:^|\s)-verify_return_error(?:[\s<>|)]|$)")
 SCLIENT_HELP = re.compile(r"\s-(?:help|h)\b")
 # Chain verification without an identity check binds nothing to the endpoint: it accepts
 # any unexpired certificate that CA signed, for any hostname. self-signed.md says so.
-SCLIENT_BINDS = re.compile(r"(?:^|\s)-verify_(?:hostname|ip|email)(?:\s|$)")
+SCLIENT_BINDS = re.compile(r"(?:^|\s)-verify_(?:hostname|ip|email)(?:[\s<>|)=]|$)")
 
 
 def logical_lines(text):

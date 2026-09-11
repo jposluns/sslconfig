@@ -135,11 +135,11 @@ else
   printf '%s\n' "$guide_shape" | sed 's/^/          /'
 fi
 
-echo "== no Verify block disables TLS verification =="
+echo "== no code block disables TLS verification =="
 # Three Verify blocks passed curl -k before anything checked, while three other files in this corpus
 # told the reader not to. A probe that skips certificate verification is satisfied by a substituted
 # certificate as readily as by the right one, so the TLS half of such a check certifies nothing. This
-# gate reads only fenced blocks inside Verify sections, so a guide may still NAME the flag in prose to
+# gate reads only fenced code blocks, never prose, so a guide may still NAME the flag in a sentence to
 # warn against it.
 if verify_safety=$(python3 tools/check_verify_safety.py 2>&1); then
   printf '%s\n' "$verify_safety"

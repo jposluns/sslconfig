@@ -66,7 +66,7 @@ ISE_STEMS = (
     "authoris", "organis", "recognis", "randomis", "normalis", "synchronis",
     "initialis", "customis", "minimis", "maximis", "categoris", "prioritis",
     "standardis", "summaris", "utilis", "optimis", "serialis", "deserialis",
-    "sanitis", "virtualis", "containeris", "paramateris", "parameteris",
+    "sanitis", "virtualis", "parameteris",
     "tokenis", "anonymis", "pseudonymis", "capitalis", "centralis", "generalis",
     "localis", "modernis", "specialis", "visualis", "finalis", "dockeris",
     "stabilis", "modularis", "operationalis", "containeris",
@@ -97,6 +97,25 @@ def unquoted(line):
     return QUOTED_RE.sub(lambda m: " " * len(m.group(0)), blanked)
 
 
+def _fence_comment(line):
+    """The comment part of a line inside a fence, or "" if it has none.
+
+    A comment `#` follows whitespace. A URL fragment `#` does not, so splitting on the
+    first `#` stripped the scheme off `https://host/tls#minimise-exposure` and handed the
+    fragment to the spelling check as prose.
+    """
+    quote = None
+    for idx, ch in enumerate(line):
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "'\"":
+            quote = ch
+        elif ch == "#" and idx and line[idx - 1].isspace():
+            return line[idx:]
+    return ""
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     findings = []
@@ -116,10 +135,11 @@ def main() -> int:
         except Exception as exc:
             findings.append(f"{path.relative_to(root)}: unreadable ({exc})")
             continue
-        in_fence = False
+        in_fence = None
         for lineno, line in enumerate(text.splitlines(), 1):
-            if line.lstrip().startswith(("```", "~~~")):
-                in_fence = not in_fence
+            fm = re.match(r"^\s*(```|~~~)", line)
+            if fm and not (in_fence and fm.group(1) != in_fence):
+                in_fence = None if in_fence else fm.group(1)
                 continue
             # A fenced block holds code, where `serialise` is an identifier and not prose,
             # and a block quotation holds someone else's words. Both are exempt from the
@@ -132,8 +152,7 @@ def main() -> int:
             # Inside a fence, only a trailing comment is prose. `def serialise(value)` is
             # an identifier; `# ports are randomised at startup` is a sentence a reader
             # reads, and the comments in this corpus carry real explanation.
-            spell_target = line if prose else (
-                "#" + line.split("#", 1)[1] if "#" in line else "")
+            spell_target = line if prose else _fence_comment(line)
             m = ISE_RE.search(unquoted(spell_target))
             if m:
                 findings.append(
