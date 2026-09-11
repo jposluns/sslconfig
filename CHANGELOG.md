@@ -83,6 +83,16 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   claim a reader validates Google IAP tokens against, and `egress-metadata.md` keeps
   `https://sts.amazonaws.com/` as the positive-control probe in its Verify block, which is the
   endpoint a workload calls for role credentials rather than a page to read.
+- Four citations from #16 whose refreshed target stopped matching its own description (#17).
+  `machine-auth.md` promised RFC 6749 section 4.4 while the new URL dropped the `#section-4.4` fragment,
+  and now cites the IETF datatracker copy, which serves anchors. `python.md` promised a settings
+  reference while the new URL landed on Gunicorn's home page; Gunicorn restructured its documentation and
+  the reference is now at `/reference/settings/`, confirmed to carry `bind`, `certfile`, `keyfile` and
+  `ca_certs`. Helicone and NATS each merged two pages into one, so `llm-observability.md` cited the same
+  URL twice in a single bullet and `nats.md` cited one page from two bullets; both are now cited once.
+  The detection gap worth recording: the audit flagged redirects that lost path depth, which catches a
+  page collapsing to a documentation root, but not `docs.gunicorn.org/` redirecting to `gunicorn.org/`,
+  where the depth is unchanged and only the host differs.
 
 ### Changed
 
