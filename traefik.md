@@ -81,6 +81,10 @@ basicAuth is single-factor. For human-facing sites, add MFA with the `forwardAut
 ```bash
 curl -sI http://app.example.com/     # expect a redirect to https://
 curl -sI https://app.example.com/    # expect 401 without credentials once auth is on
+docker compose ps                    # only Traefik publishes ports; the app's 3000 must NOT be published
+ss -tlnp | grep 3000                 # and nothing answers on port 3000 from the host. Both checks above
+                                     # pass while the app is published directly, which bypasses Traefik's
+                                     # TLS and its authentication middleware
 ```
 
 Check the Traefik log for ACME errors on first start; issuance failures otherwise surface as a self-signed "TRAEFIK DEFAULT CERT" in the browser.

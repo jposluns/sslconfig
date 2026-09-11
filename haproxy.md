@@ -64,6 +64,9 @@ Basic authentication here is single-factor. For human-facing sites, add MFA with
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 401 without credentials once auth is on
+ss -tlnp | grep 3000                # the backend itself: 127.0.0.1 only, never 0.0.0.0. Both checks
+                                    # above pass while the backend also answers directly on port 3000,
+                                    # which bypasses HAProxy's TLS and its authentication
 ```
 
 ## Common mistakes

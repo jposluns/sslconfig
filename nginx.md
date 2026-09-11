@@ -75,6 +75,11 @@ sudo nginx -t && sudo systemctl reload nginx
 curl -sI http://example.com/        # expect 301 with a https:// Location
 curl -sI https://example.com/       # expect 200 without -k
 curl -s  https://example.com/api    # expect 401/403 without credentials
+ss -tlnp | grep 3000                # the app itself: 127.0.0.1 only, never 0.0.0.0. All three checks
+                                    # above pass while the app also answers directly on port 3000,
+                                    # which bypasses this proxy's TLS and its authentication. That
+                                    # bypass is the first common mistake below, and the first item in
+                                    # common-mistakes.md
 ```
 
 ## Common mistakes
