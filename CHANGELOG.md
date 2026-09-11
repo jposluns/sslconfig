@@ -1,8 +1,13 @@
 # Changelog
 
-secureconfig is published continuously and carries no version number: there is no release artifact to
-version, and each guide is dated by its own "Sources (checked <month year>)" section. Entries here
-are grouped by the date the change landed on `main`.
+secureconfig is published continuously and versions as `1.0.<pull request number>`, where the number is
+that of the most recently merged pull request. The current value is in the `VERSION` file at the
+repository root. There is no release artifact, so the version names a state of `main` rather than a
+downloadable build, and each guide remains dated by its own "Sources (checked <month year>)" section.
+Entries here are grouped by the date the change landed on `main`. Note that nothing in the gate suite
+can check `VERSION` against GitHub: the suite is deliberately offline so that no outside service can
+turn the build red, and a pull request number is only knowable from outside. Keeping `VERSION` in step
+with the merged pull request is therefore an authoring obligation, not an enforced one.
 
 ## 2026-09-11
 
