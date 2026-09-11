@@ -27,6 +27,7 @@ one of them is the application's.
 | Port | May be | Documented in |
 | --- | --- | --- |
 | 22 | SSH, which should not be publicly reachable | [cloud-firewalls.md](cloud-firewalls.md), [host.md](host.md) |
+| 53 | Cluster DNS, in the Kubernetes NetworkPolicy egress rules, over both UDP and TCP | [container-hardening.md](container-hardening.md) |
 | 80, 443 | Usually the TLS proxy, but also native HTTPS listeners in the language guides, and Vaultwarden's container port 80 | [nginx.md](nginx.md), [caddy.md](caddy.md), [haproxy.md](haproxy.md), [traefik.md](traefik.md), [apache.md](apache.md), [lighttpd.md](lighttpd.md), [go.md](go.md), [dotnet.md](dotnet.md), [devops-uis.md](devops-uis.md) |
 | 81 | Nginx Proxy Manager admin UI (the proxy itself is on 80 and 443) | [devops-uis.md](devops-uis.md) |
 | 1234 | LM Studio local server | [model-servers.md](model-servers.md) |
@@ -71,7 +72,7 @@ one of them is the application's.
 | 8443 | ClickHouse HTTPS, the Kubernetes Dashboard forwarding example, and the configured HTTPS listeners in the Gradio, Python, Java and Ruby guides | [clickhouse.md](clickhouse.md), [devops-uis.md](devops-uis.md), [gradio.md](gradio.md), [python.md](python.md), [java.md](java.md), [ruby.md](ruby.md) |
 | 8501 | Streamlit | [streamlit.md](streamlit.md) |
 | 8883 | MQTT over TLS | [mosquitto.md](mosquitto.md) |
-| 8888 | Jupyter, including the Vast.ai and RunPod deployments | [jupyter.md](jupyter.md), [gpu-clouds.md](gpu-clouds.md) |
+| 8888 | Jupyter, including RunPod deployments. The Vast.ai Jupyter launch mode uses 8080 instead | [jupyter.md](jupyter.md), [gpu-clouds.md](gpu-clouds.md) |
 | 9000 | ClickHouse native TCP (plaintext), MinIO's S3 API, PHP-FPM, TGI's Prometheus listener, or Portainer's legacy HTTP port | [clickhouse.md](clickhouse.md), [minio.md](minio.md), [php.md](php.md), [model-servers.md](model-servers.md), [devops-uis.md](devops-uis.md) |
 | 9004, 9005, 9009, 9010 | ClickHouse MySQL compatibility, PostgreSQL compatibility, and interserver replica traffic over HTTP and HTTPS | [clickhouse.md](clickhouse.md) |
 | 9090 | InvokeAI. Prometheus also defaults here, though its guide does not state the number | [image-gen-uis.md](image-gen-uis.md), [admin-uis.md](admin-uis.md) |
