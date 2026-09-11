@@ -1918,7 +1918,7 @@ the maximum per-process concurrent connections and in a frontend caps that front
 
 HAProxy has **no single request-body-size directive**. The rule below uses the `req.body_size` fetch,
 which the manual defines as the *advertised* length of the body, so for a request carrying
-`Content-Length` it reads that value and refuses before the body arrives. Two limits are worth knowing.
+`Content-Length` it reads that value and can reject without waiting for the request body. Two limits are worth knowing.
 It needs no request buffering; do not add `option http-buffer-request` for it, because the manual says
 that option waits until either the whole body is received or the request buffer is full, which buffers
 the upload you are trying to refuse. And for a chunked request, which advertises no length, the manual
