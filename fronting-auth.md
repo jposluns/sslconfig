@@ -13,14 +13,30 @@ Many self-hosted apps (internal tools, dashboards, webhook receivers) ship with 
 
 Core flags (env vars use the `OAUTH2_PROXY_` prefix): `--provider` (`oidc`, `google`, `github`, and others), `--client-id`/`--client-secret` from the IdP, `--email-domain` (a domain, or `*` for any authenticated user), `--upstream` (the app address, or `static://202` when a forward-auth proxy handles the actual proxying), and `--cookie-secret`, which must be exactly 16, 24, or 32 bytes, optionally base64-encoded: `openssl rand -base64 32 | tr -- '+/' '-_'`.
 
-nginx uses `auth_request`:
+nginx uses `auth_request`, which requires oauth2-proxy's `--reverse-proxy` flag; forwarding the identity headers below also requires `--set-xauthrequest` (it makes oauth2-proxy set `X-Auth-Request-User` and `X-Auth-Request-Email` on its own `/oauth2/auth` response, which the `auth_request_set` lines then read):
 
 ```nginx
+location /oauth2/ {
+    proxy_pass       http://127.0.0.1:4180;
+    proxy_set_header Host                    $host;
+    proxy_set_header X-Real-IP               $remote_addr;
+    proxy_set_header X-Auth-Request-Redirect $request_uri;
+}
+location = /oauth2/auth {
+    proxy_pass       http://127.0.0.1:4180;
+    proxy_set_header Host             $host;
+    proxy_set_header X-Real-IP        $remote_addr;
+    proxy_set_header X-Forwarded-Uri  $request_uri;
+    proxy_set_header Content-Length   "";
+    proxy_pass_request_body           off;
+}
 location / {
     auth_request /oauth2/auth;
     error_page 401 = @oauth2_signin;
-    auth_request_set $user $upstream_http_x_auth_request_user;
-    proxy_set_header X-User $user;
+    auth_request_set $user  $upstream_http_x_auth_request_user;
+    auth_request_set $email $upstream_http_x_auth_request_email;
+    proxy_set_header X-User  $user;
+    proxy_set_header X-Email $email;
     proxy_pass http://127.0.0.1:3000;
 }
 location @oauth2_signin {
@@ -44,10 +60,23 @@ http:
 
 Authelia is a login portal with built-in TOTP and WebAuthn, sitting behind the proxy rather than replacing it. Per its support page, nginx, Traefik, Caddy (2.5.1+), HAProxy (via a Lua module), Envoy, Skipper, NGINX Proxy Manager, and SWAG are supported; Apache and IIS are documented as having no compatible module and are not supported.
 
-nginx calls a dedicated `auth-request` endpoint (its `auth_request` module cannot forward the method and body the way the others' forward-auth middlewares do):
+nginx calls a dedicated `auth-request` endpoint (its `auth_request` module cannot forward the method and body the way the others' forward-auth middlewares do). That endpoint must be defined; Authelia's own snippets (`authelia-location.conf` and `authelia-authrequest.conf`) show it as:
 
 ```nginx
-auth_request /internal/authelia/authz;      # proxies to http://authelia:9091/api/authz/auth-request
+set $upstream_authelia http://authelia:9091/api/authz/auth-request;
+location /internal/authelia/authz {
+    internal;
+    proxy_pass $upstream_authelia;
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Original-URL $scheme://$host$request_uri;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Content-Length "";
+    proxy_set_header Connection "";
+    proxy_pass_request_body off;
+}
+
+# in the protected location block:
+auth_request /internal/authelia/authz;
 auth_request_set $redirection_url $upstream_http_location;
 error_page 401 =302 $redirection_url;
 ```
@@ -81,11 +110,11 @@ oauth2-proxy's MFA is whatever its OIDC/OAuth provider enforces; Pomerium's is w
 ```bash
 ss -tlnp | grep 3000                          # app on 127.0.0.1 only
 curl -sI http://203.0.113.10:3000/            # from another host: connection refused
-curl -sI https://app.example.com/             # no session: redirected to the sign-in page
-curl -sI -H 'X-Auth-Request-User: admin' https://app.example.com/    # forged header dropped en route
+curl -sI -H 'X-Auth-Request-User: admin' http://203.0.113.10:3000/   # forged header, straight at the app: still connection refused
+curl -sI https://app.example.com/             # no session: redirected to the sign-in page, or a 401
 ```
 
-After a real login, confirm the app-side log shows the identity header the proxy set. A forged header sent straight at the app's own bound address must never be treated as authentication; that is why the app must be unreachable except through the proxy.
+After a real login through the proxy, confirm a session reaches the app and the app-side log shows the identity header the proxy set, not the forged one above. The forged header is never a bypass because the app is reachable only through the proxy; it is refused at the network level, not read and discarded.
 
 ## Common mistakes
 

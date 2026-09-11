@@ -30,7 +30,7 @@ Where proxy auth is enabled, callers authenticate with a Token ID and Token Secr
 
 ## The pattern, whatever the platform
 
-The platform's own controls (RunPod's proxy TLS, Vast.ai's portal token, Lambda's firewall rules, Modal's proxy auth) are necessary but not sufficient on their own. Keep the model server itself on loopback behind the platform's proxy or firewall, and require the server's own API key on top, exactly as [ollama.md](ollama.md) and [model-servers.md](model-servers.md) describe. A platform-level control that goes away later, a firewall rule deleted, a template rebuilt without a flag, should not be the only thing standing between the listener and the internet.
+The platform's own controls (RunPod's proxy TLS, Vast.ai's portal token, Lambda's firewall rules, Modal's proxy auth) are necessary but not sufficient on their own. How to bind the model server depends on which kind of proxy is in front of it. RunPod's HTTP proxy reaches the pod over its exposed network interface rather than through a local backend, so the service must bind `0.0.0.0` inside the pod; RunPod's own troubleshooting guidance is explicit that binding to `localhost` only will keep the proxy from reaching it. Vast.ai's Instance Portal is the opposite case: it is a local reverse proxy (Caddy) running on the instance itself, so the app it forwards to can stay on loopback behind it, the same pattern as an authenticating proxy on your own hardware. Whichever binding the platform's proxy needs, require the server's own API key on top as well, exactly as [ollama.md](ollama.md) and [model-servers.md](model-servers.md) describe. A platform-level control that goes away later, a firewall rule deleted, a template rebuilt without a flag, should not be the only thing standing between the listener and the internet.
 
 MFA: none of these platforms add a second factor to the workload itself. The account you log into RunPod, Vast.ai, Lambda, or Modal with should have MFA enabled ([mfa.md](mfa.md)); an API key or proxy-auth token secures a machine client, and is a separate control from your platform login.
 
@@ -39,7 +39,7 @@ MFA: none of these platforms add a second factor to the workload itself. The acc
 ```bash
 ss -tlnp                                   # enumerate every listening port on the box
 curl -s http://127.0.0.1:8888/             # notebook: 403/redirect without its token in the URL/header
-curl -s https://<pod-or-endpoint-host>/    # 401 without credentials, once auth is configured
+curl -s "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/"    # 401 without credentials, once auth is configured (RunPod's proxy hostname form; substitute the equivalent for your platform)
 ```
 
 Every port `ss` shows listening should be either closed (not exposed at the platform layer) or authenticated (the listener itself demands a key, token, or login). A Jupyter server that answers without its token is a finding, whichever of these platforms it runs on.

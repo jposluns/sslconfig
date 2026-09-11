@@ -36,8 +36,11 @@ LiteFS replicates a SQLite file across a cluster's nodes rather than to object s
 curl -sI https://app.example.com/app.db      # 404, never 200
 git check-ignore -v app.db                    # prints a matching .gitignore rule
 stat -c '%a %U' /var/lib/myapp/app.db         # 600, owned by the app user, not world-readable
-grep -rl "TURSO_AUTH_TOKEN\|turso://" build dist .next/static 2>/dev/null   # no output: token never reached a client bundle
+grep -rn "REPLACE_WITH_ACTUAL_TOKEN_VALUE" build dist .next/static; echo "exit: $?"                             # search for the literal token value copied from the secret store, not the env-var name a bundler already inlined away; exit 1 is the goal
+grep -rnE "eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}" build dist .next/static; echo "exit: $?"                  # a JWT-shaped token (Turso/libSQL tokens are JWTs) is a finding wherever it turns up; exit 2 means a path did not exist, not a clean result
 ```
+
+A clean result here is evidence, not proof: it means neither pattern matched in the paths searched, not that the token cannot be present in some other form. A bundler could split, encode, or otherwise transform it, and a missing or misspelled directory can produce the same silence as a genuinely clean scan, so check the exit code and confirm the directories exist, not just the absence of output.
 
 ## Sources (checked September 2026)
 

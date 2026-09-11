@@ -23,7 +23,7 @@ The common failure this order prevents: an unclaimed setup wizard is a race to b
 
 ## 3. Previews and clones get production posture
 
-A preview deployment or a database clone is not lower stakes just because it is temporary. Vercel's Deployment Protection illustrates the gap: Standard Protection, available on every plan, gates preview and generated deployment URLs but leaves the production domain open by default; protecting production too needs the All Deployments scope (Pro and Enterprise) ([paas.md](paas.md); as of September 2026, per Vercel's Deployment Protection docs). Where the platform's own gate does not cover a hostname, front it the same way as production, for example a Cloudflare Access policy scoped to that preview hostname. Either way, treat a clone's data the same as the original: rotate any credential a clone inherited if the clone is less trusted than the source.
+A preview deployment or a database clone is not lower stakes just because it is temporary. Vercel's Deployment Protection illustrates the gap: Standard Protection, available on every plan, gates preview and generated deployment URLs but leaves the production domain open by default; the All Deployments scope closes that gap too, and Vercel's September 9, 2026 change made pairing it with Vercel Authentication free on every plan rather than Pro and Enterprise only ([paas.md](paas.md); per Vercel's Deployment Protection changelog, at the time of writing; the configuration reference page itself still listed All Deployments as Pro and Enterprise only when checked, so confirm current availability in your own dashboard). Where the platform's own gate does not cover a hostname, front it the same way as production, for example a Cloudflare Access policy scoped to that preview hostname. Either way, treat a clone's data the same as the original: rotate any credential a clone inherited if the clone is less trusted than the source.
 
 ## 4. Teardown: DNS before the app, then revoke the rest
 
@@ -32,6 +32,10 @@ Retiring a deployment in the wrong order leaves a dangling DNS record pointing a
 ## 5. Re-verify after anything changes
 
 Rerun the outside-in checks in section 1 and the negative auth tests from [authentication.md](authentication.md) after an upgrade, a backup restore (which can reintroduce a default account or reset a feature flag), or any change to network policy or auth configuration. Monitor certificate expiry from outside the host too: a renewal cron can silently fail while the host's own view still looks fine, so an external check (a scheduled `openssl s_client` from another machine, or a third-party uptime/certificate monitor) catches what a local `certbot renew --dry-run` cannot.
+
+## 6. Offboarding
+
+When a person leaves, revoke access at every layer they touched, not only their password: identity-provider membership (the SSO or directory account), proxy-level sessions (Cloudflare Access or equivalent), application-level sessions on each service, and any personal access tokens or API keys issued to them. Where a system cannot revoke immediately, such as a session cached until its own expiry, know that system's maximum time-to-revoke and treat the number as something to shrink, not accept. [mfa.md](mfa.md) covers revoking the second factor alongside the account.
 
 ## Common mistakes
 
@@ -44,7 +48,7 @@ Rerun the outside-in checks in section 1 and the negative auth tests from [authe
 ```bash
 # From a second network, not the host itself:
 nmap -p- 203.0.113.10                                  # only the intended ports answer
-nmap -p- 2001:db8::10                                  # same, over the public IPv6 address
+nmap -6 -p- 2001:db8::10                               # same, over the public IPv6 address
 curl -sI https://retired-preview.example.com/          # expect DNS failure or connection error
 dig +short retired-preview.example.com                 # expect no record, not a dangling CNAME
 openssl s_client -connect app.example.com:443 -servername app.example.com </dev/null \

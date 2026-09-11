@@ -70,7 +70,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [cloud-firewalls.md](cloud-firewalls.md) | Security groups and VPC rules: no 0.0.0.0/0 on databases, SSH posture |
 | [paas.md](paas.md) | Render, Fly.io, Vercel, and similar: platform TLS, your auth and secrets |
 | [egress-metadata.md](egress-metadata.md) | Egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials |
-| [gpu-clouds.md](gpu-clouds.md) | RunPod, Vast.ai, Lambda, Modal: rented GPUs have no default-deny firewall |
+| [gpu-clouds.md](gpu-clouds.md) | RunPod, Vast.ai, Lambda, Modal: exposed ports and differing firewall and auth defaults per platform |
 | [deployment-lifecycle.md](deployment-lifecycle.md) | Verify from outside, safe first-run order, previews, and teardown |
 | [kubernetes.md](kubernetes.md) | Gateway API with a maintained controller, cert-manager TLS, entry-point authentication; ingress-nginx is retired |
 | [elasticsearch.md](elasticsearch.md) | Elasticsearch and OpenSearch: keep the built-in security on |
@@ -95,10 +95,10 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [agent-builders.md](agent-builders.md) | Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS |
 | [n8n.md](n8n.md) | n8n: listen address, native TLS, owner setup, MFA enforcement |
 | [code-server.md](code-server.md) | code-server: SSH forwarding first, password auth, TLS |
-| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: no native auth; loopback and a proxy |
+| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: exposed by default; keep on loopback and add a login |
 | [chat-uis.md](chat-uis.md) | AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login |
 | [llm-observability.md](llm-observability.md) | Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys |
-| [workflow-orchestrators.md](workflow-orchestrators.md) | Prefect, Dagster, Airflow, Temporal, Flower: no auth by default |
+| [workflow-orchestrators.md](workflow-orchestrators.md) | Prefect, Dagster, Airflow, Temporal, Flower: keep off the public internet and require auth |
 | [admin-uis.md](admin-uis.md) | phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus: never public |
 | [devops-uis.md](devops-uis.md) | Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public |
 | [bi-dashboards.md](bi-dashboards.md) | Metabase, Superset, Redash: never public; least-privilege database user |

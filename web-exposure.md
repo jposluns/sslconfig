@@ -26,13 +26,21 @@ challenge path is served before the dotfile deny is reached (`allow`/`deny`: `ng
 ## Apache
 
 ```apache
-<FilesMatch "(^\.|\.git$|\.sql$|\.dump$|\.bak$)">
+<DirectoryMatch "/\.(?!well-known)">
+    Require all denied
+</DirectoryMatch>
+
+<FilesMatch "(^\.|\.sql$|\.dump$|\.bak$)">
     Require all denied
 </FilesMatch>
 ```
 
-`<FilesMatch>` matches the request's filename, not its full path, so `/.well-known/acme-challenge/TOKEN` is
-not caught by the leading `^\.` (the matched name is the token, not the directory); no exception is needed.
+`<FilesMatch>` matches the request's basename, not its full path, so it alone does not catch
+`/.git/config`: the matched name is `config`, which does not start with a dot (per the core module
+documentation). The `<DirectoryMatch>` rule above matches any dot-prefixed path segment (`.git`, `.svn`,
+and similar), with a negative lookahead that carves out `.well-known` so the ACME challenge path still
+resolves; keep the `<FilesMatch>` rule as a backstop for `.sql`, `.dump`, and `.bak` basenames and for
+top-level dotfiles like `/.env`.
 
 ## Caddy
 
@@ -81,7 +89,7 @@ Any backup path known to have existed on the server should also 404 at the deplo
 - nginx core module (`location`, `^~` modifier, matching order): https://nginx.org/en/docs/http/ngx_http_core_module.html
 - nginx access module (`allow`, `deny`): https://nginx.org/en/docs/http/ngx_http_access_module.html
 - Apache mod_authz_core (`Require all denied`): https://httpd.apache.org/docs/2.4/mod/mod_authz_core.html
-- Apache core module (`<FilesMatch>`): https://httpd.apache.org/docs/2.4/mod/core.html#filesmatch
+- Apache core module (`<FilesMatch>`, `<DirectoryMatch>`): https://httpd.apache.org/docs/2.4/mod/core.html#filesmatch, https://httpd.apache.org/docs/2.4/mod/core.html#directorymatch
 - Caddy `respond` directive: https://caddyserver.com/docs/caddyfile/directives/respond
 - Caddy matchers: https://caddyserver.com/docs/caddyfile/matchers
 - Next.js environment variables (`NEXT_PUBLIC_`): https://nextjs.org/docs/pages/guides/environment-variables

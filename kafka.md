@@ -81,7 +81,7 @@ ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 
 ## 6. Redpanda (and other Kafka-API-compatible systems)
 
-Redpanda implements the Kafka wire protocol, so the SASL_SSL listener, SCRAM credentials, and ACL configuration above apply to a Redpanda cluster unchanged; the same fronting rules apply too. Redpanda Console, its bundled web UI, ships without its own login screen: it only gains one once you configure OIDC or basic authentication, so until then anyone who reaches Console reaches the cluster behind it. Front Console the same way as any other admin panel: never public, reached through SSH forwarding, a tailnet, or an access proxy, with MFA at that layer. See the [Redpanda security documentation](https://docs.redpanda.com/current/manage/security/).
+Redpanda implements the Kafka wire protocol, so the client-side and protocol-level controls above carry over: SASL/SCRAM authentication, TLS, and ACL management through the Kafka API all work the same way against a Redpanda cluster, and the same fronting rules apply too. What does not carry over is how you wire that up on the broker: Redpanda configures brokers through `redpanda.yaml` and the `rpk` CLI, not Kafka's `server.properties`, JAAS configuration files, or `kafka-storage.sh`. Redpanda Console, its bundled web UI, ships without its own login screen: it only gains one once you configure OIDC or basic authentication, so until then anyone who reaches Console reaches the cluster behind it. Front Console the same way as any other admin panel: never public, reached through SSH forwarding, a tailnet, or an access proxy, with MFA at that layer. See the [Redpanda security documentation](https://docs.redpanda.com/current/manage/security/).
 
 ## Verify
 

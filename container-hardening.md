@@ -42,7 +42,13 @@ spec:
 
 `runAsNonRoot: true` refuses to start the container if its effective user is root; pin `runAsUser` too. `seccompProfile.type: RuntimeDefault` applies the runtime's default syscall filter instead of running unconfined.
 
-Enforce this cluster-wide with Pod Security Admission's `restricted` level, set as the namespace label `pod-security.kubernetes.io/enforce: restricted` (per the Pod Security Standards documentation). `restricted` requires, among its controls: no privileged containers, no host namespaces or host ports, non-root execution, a read-only root filesystem, all capabilities dropped, and a seccomp profile that is not `Unconfined`. A Pod violating any of these is rejected at admission, not merely flagged.
+Enforce this with Pod Security Admission's `restricted` level, set as the namespace label
+`pod-security.kubernetes.io/enforce: restricted` (per the Pod Security Standards documentation); the label
+applies to that namespace only, not the whole cluster. `restricted` requires, among its controls: no
+privileged containers, no host namespaces or host ports, non-root execution, all capabilities dropped, and a
+seccomp profile that is not `Unconfined`. A Pod violating any of these is rejected at admission, not merely
+flagged. The `readOnlyRootFilesystem: true` setting above is a separate, per-container recommendation this
+guide makes; it is good practice, but it is not one of the controls `restricted` itself requires.
 
 ## Network segmentation
 
@@ -58,7 +64,19 @@ spec:
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: { name: allow-app-to-db }
+metadata: { name: allow-app-egress-to-db }
+spec:
+  podSelector: { matchLabels: { role: app } }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } } }]
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to: [{ podSelector: { matchLabels: { role: db } } }]
+      ports: [{ protocol: TCP, port: 5432 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-db-ingress-from-app }
 spec:
   podSelector: { matchLabels: { role: db } }
   policyTypes: [Ingress]
@@ -67,7 +85,12 @@ spec:
       ports: [{ protocol: TCP, port: 5432 }]
 ```
 
-With both applied, the database pod accepts connections only from pods labeled `role: app` on port 5432; everything else is refused. Databases still need their own TLS and auth on top ([postgresql.md](postgresql.md), [mysql.md](mysql.md), [mongodb.md](mongodb.md), [redis.md](redis.md)); a NetworkPolicy is a layer, not a substitute.
+A connection needs both sides to allow it: the egress policy on the source pod and the ingress policy on
+the destination pod (per the Kubernetes NetworkPolicy documentation). With all three policies applied, an
+`app` pod can resolve names through the cluster's DNS and reach the `db` pod on port 5432; the `db` pod
+accepts connections only from pods labeled `role: app` on port 5432; every other path is refused. Databases
+still need their own TLS and auth on top ([postgresql.md](postgresql.md), [mysql.md](mysql.md),
+[mongodb.md](mongodb.md), [redis.md](redis.md)); a NetworkPolicy is a layer, not a substitute.
 
 ## Verify
 
@@ -75,8 +98,16 @@ With both applied, the database pod accepts connections only from pods labeled `
 docker exec app id                                  # uid is not 0
 docker exec app sh -c 'touch /x'                    # read-only fs: fails
 kubectl get pod app -o jsonpath='{.spec.containers[0].securityContext}'
-kubectl run probe --rm -it --image=busybox --restart=Never -- \
-  wget -T 3 -qO- db:5432                             # from outside the allowlist: times out
+
+# a probe pod needs its own admission-compliant securityContext under the restricted PSA level, and a
+# real TCP connect to the db's actual port (a Postgres port does not speak HTTP, so wget cannot test it)
+SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3","db","5432"]}]}}'
+
+kubectl run probe-permitted --rm -it --restart=Never --image=busybox:1.36 --labels=role=app \
+  --overrides="$SC" -- true                          # from a pod labeled role=app: must succeed
+
+kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labels=role=other \
+  --overrides="$SC" -- true                          # from a pod without that label: must time out
 ```
 
 ## Sources (checked September 2026)

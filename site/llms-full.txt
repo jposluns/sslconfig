@@ -79,7 +79,7 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [cloud-firewalls.md](cloud-firewalls.md) | Security groups and VPC rules: no 0.0.0.0/0 on databases, SSH posture |
 | [paas.md](paas.md) | Render, Fly.io, Vercel, and similar: platform TLS, your auth and secrets |
 | [egress-metadata.md](egress-metadata.md) | Egress control and cloud metadata (IMDSv2), stop an agent exfiltrating credentials |
-| [gpu-clouds.md](gpu-clouds.md) | RunPod, Vast.ai, Lambda, Modal: rented GPUs have no default-deny firewall |
+| [gpu-clouds.md](gpu-clouds.md) | RunPod, Vast.ai, Lambda, Modal: exposed ports and differing firewall and auth defaults per platform |
 | [deployment-lifecycle.md](deployment-lifecycle.md) | Verify from outside, safe first-run order, previews, and teardown |
 | [kubernetes.md](kubernetes.md) | Gateway API with a maintained controller, cert-manager TLS, entry-point authentication; ingress-nginx is retired |
 | [elasticsearch.md](elasticsearch.md) | Elasticsearch and OpenSearch: keep the built-in security on |
@@ -104,10 +104,10 @@ Fetch guides raw with `https://raw.githubusercontent.com/jposluns/sslconfig/<def
 | [agent-builders.md](agent-builders.md) | Dify, Flowise, Langflow, LibreChat: admin setup, API keys, fronting TLS |
 | [n8n.md](n8n.md) | n8n: listen address, native TLS, owner setup, MFA enforcement |
 | [code-server.md](code-server.md) | code-server: SSH forwarding first, password auth, TLS |
-| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: no native auth; loopback and a proxy |
+| [image-gen-uis.md](image-gen-uis.md) | ComfyUI, A1111, InvokeAI, Fooocus: exposed by default; keep on loopback and add a login |
 | [chat-uis.md](chat-uis.md) | AnythingLLM, LobeChat, Chainlit, OpenHands: open by default; front with login |
 | [llm-observability.md](llm-observability.md) | Langfuse, Phoenix, Helicone, OpenTelemetry Collector: they hold prompts and keys |
-| [workflow-orchestrators.md](workflow-orchestrators.md) | Prefect, Dagster, Airflow, Temporal, Flower: no auth by default |
+| [workflow-orchestrators.md](workflow-orchestrators.md) | Prefect, Dagster, Airflow, Temporal, Flower: keep off the public internet and require auth |
 | [admin-uis.md](admin-uis.md) | phpMyAdmin, pgAdmin, mongo-express, Grafana, Prometheus: never public |
 | [devops-uis.md](devops-uis.md) | Portainer, Coolify, Dokploy, Nginx Proxy Manager, Vaultwarden, Kubernetes Dashboard, Jenkins, Gitea, Uptime Kuma, Docker API: never public |
 | [bi-dashboards.md](bi-dashboards.md) | Metabase, Superset, Redash: never public; least-privilege database user |
@@ -520,7 +520,7 @@ auth.token = "REPLACE_WITH_LONG_RANDOM_VALUE"
 
 frp also supports `auth.method = "oidc"`, authenticating both sides against an OIDC provider's Client Credentials Grant instead of a shared token, useful for centralizing frp auth behind an identity provider.
 
-Enable TLS between `frpc` and `frps` and set `tls.force = true` on the server so it only accepts TLS-enabled client connections; without it, the token and all tunneled traffic cross the network in the clear.
+From frp v0.50.0, `transport.tls.enable` defaults to `true`, so the connection between `frpc` and `frps` is encrypted out of the box; the gap is verification, not encryption. `frpc` still does not verify `frps`'s certificate by default, so it will encrypt to whatever server answers on `serverAddr`, genuine or not. Set `transport.tls.certFile`/`transport.tls.keyFile` on the server and `transport.tls.trustedCaFile` on every client so `frpc` verifies the server's certificate against a trusted CA, and set `transport.tls.force = true` on the server so it refuses any client that did not negotiate TLS at all.
 
 The `auth` block is schema-optional, and the frp documentation does not state what a server does when it is left out entirely. Treat an unconfigured token as an open door rather than assuming a safe default: always set `auth.token` (or OIDC) before exposing `bindPort` to the internet, and never rely on frp for anything without one.
 
@@ -529,6 +529,7 @@ The `auth` block is schema-optional, and the frp documentation does not state wh
 WireGuard has no username or password; identity is a base64-encoded key pair, generated per peer:
 
 ```bash
+umask 077
 wg genkey | tee privatekey | wg pubkey > publickey
 ```
 
@@ -538,7 +539,11 @@ The private key never leaves the peer that generated it; only the public key goe
 wg set wg0 listen-port 51820 private-key /path/to/private-key peer "REPLACE_WITH_PEER_PUBLIC_KEY" allowed-ips 192.168.88.0/24 endpoint 203.0.113.10:51820
 ```
 
-`AllowedIPs` is dual-purpose "Cryptokey Routing": on the sending side it "behaves as a sort of routing table," picking which peer a destination IP goes to; on the receiving side it "behaves as a sort of access control list," dropping a decrypted packet whose source IP does not match that peer's `AllowedIPs`. Scope it to exactly the address or subnet a peer should reach or be reached from, never `0.0.0.0/0` unless that peer is genuinely meant to be a full-tunnel gateway.
+`AllowedIPs` is dual-purpose "Cryptokey Routing," but the two purposes are not symmetric. On the sending side it "behaves as a sort of routing table," picking which peer a destination IP goes to. On the receiving side it "behaves as a sort of access control list" for the packet's source address only, dropping a decrypted packet whose source IP does not match the sending peer's configured `AllowedIPs`; it is a spoofing check, not a destination filter. Once a peer is authenticated, its `AllowedIPs` entry places no limit on which destinations that peer is allowed to reach if the server is willing to forward the traffic there. Scope `AllowedIPs` to exactly the address or subnet a peer should be reached at, never `0.0.0.0/0` unless that peer is genuinely meant to be a full-tunnel gateway, and restrict which destinations a peer can reach through the server with a firewall rule on the server itself, for example an nftables rule dropping forwarded packets from that peer to anything outside its intended subnet:
+
+```bash
+nft add rule inet filter forward iifname "wg0" ip saddr 192.168.88.2 ip daddr != 192.168.88.0/24 drop
+```
 
 By default WireGuard "tries to be as silent as possible when not being used," so the only inbound port a firewall needs to open is the single WireGuard UDP `ListenPort`; everything else on the host stays closed per [host.md](host.md).
 
@@ -550,13 +555,13 @@ frpc -c frpc-wrongtoken.toml   # expect an authentication failure, no proxy regi
 
 ss -ulnp | grep 51820          # WireGuard: only the one UDP port listening
 sudo ufw status verbose        # no other inbound rule added for the tunneled service
-ping -c1 203.0.113.20   # from that peer, an address outside its AllowedIPs: unreachable
+ping -c1 192.168.99.50         # from that peer, a destination outside its intended subnet: blocked by the server-side firewall rule above, not by AllowedIPs
 ```
 
 ## Sources (checked September 2026)
 
 - frp documentation (setup, server reference): https://gofrp.org/en/docs/
-- frp server configuration reference (`bindPort`, `auth.token`, `tls.force`): https://gofrp.org/en/docs/reference/server-configures/
+- frp server configuration reference (`bindPort`, `auth.token`, `transport.tls.force`): https://gofrp.org/en/docs/reference/server-configures/
 - frp authentication (`auth.token`, `auth.method = "oidc"`): https://gofrp.org/en/docs/features/common/authentication/
 - WireGuard quickstart (`wg genkey`, `wg pubkey`, `wg set`, silent-protocol behavior): https://www.wireguard.com/quickstart/
 - WireGuard Cryptokey Routing (`AllowedIPs` on send and receive): https://www.wireguard.com/
@@ -942,7 +947,7 @@ An identity-aware proxy puts a login page in front of an application without cha
 2. **The app never trusts a plain identity header.** Where the proxy provides a signed assertion (AWS, Google Cloud, Cloudflare), verify its signature, issuer, audience, and expiry before using any claim. Where the platform documents that clients cannot set the identity headers (Azure), that guarantee holds only for requests that arrived through the platform.
 3. **MFA comes from the identity provider behind the proxy.** None of these proxies adds a second factor of its own; enforce it at the IdP and the proxy inherits it ([mfa.md](mfa.md), [identity-providers.md](identity-providers.md)).
 4. Authorization is still yours: the proxy proves who the user is, and the app or the proxy policy decides what they may do ([authentication.md](authentication.md)).
-5. **Fail closed.** An auth layer must deny when it cannot decide: missing auth configuration, an unreachable authorization service, and an unmatched route must never fall through to the app unauthenticated. Test this both at startup and across a proxy reload.
+5. **Fail closed.** The auth layer must deny when it cannot reach a decision: missing auth configuration, an unreachable authorization service, and an unmatched route must never fall through to the app unauthenticated. Test this with a fresh, unauthenticated request against a protected route while the authorization service is unreachable, and require denial, not pass-through; an already-authenticated session is a separate question, since a proxy is not guaranteed to recheck the identity provider on every request.
 
 ## 2. AWS Application Load Balancer
 
@@ -1018,7 +1023,7 @@ curl -s -H "x-amzn-oidc-identity: admin" \
 
 After logging in, confirm that the app's own identity check reads the signed assertion (`x-amzn-oidc-data`, `x-goog-iap-jwt-assertion`, `Cf-Access-Jwt-Assertion`) and rejects a request carrying a tampered one.
 
-- With the identity provider or the proxy's own auth service stopped, a request to a protected route is denied, not passed through to the app.
+- Stop the authorization service, or break its configuration, and send a fresh, unauthenticated request to a protected route: it must be denied, never passed through to the app. This checks that an undecidable auth state fails closed; it does not test whether an already-established session survives the outage, since a proxy is not required to recheck the identity provider on every request.
 
 ## Common mistakes
 
@@ -1148,14 +1153,30 @@ Many self-hosted apps (internal tools, dashboards, webhook receivers) ship with 
 
 Core flags (env vars use the `OAUTH2_PROXY_` prefix): `--provider` (`oidc`, `google`, `github`, and others), `--client-id`/`--client-secret` from the IdP, `--email-domain` (a domain, or `*` for any authenticated user), `--upstream` (the app address, or `static://202` when a forward-auth proxy handles the actual proxying), and `--cookie-secret`, which must be exactly 16, 24, or 32 bytes, optionally base64-encoded: `openssl rand -base64 32 | tr -- '+/' '-_'`.
 
-nginx uses `auth_request`:
+nginx uses `auth_request`, which requires oauth2-proxy's `--reverse-proxy` flag; forwarding the identity headers below also requires `--set-xauthrequest` (it makes oauth2-proxy set `X-Auth-Request-User` and `X-Auth-Request-Email` on its own `/oauth2/auth` response, which the `auth_request_set` lines then read):
 
 ```nginx
+location /oauth2/ {
+    proxy_pass       http://127.0.0.1:4180;
+    proxy_set_header Host                    $host;
+    proxy_set_header X-Real-IP               $remote_addr;
+    proxy_set_header X-Auth-Request-Redirect $request_uri;
+}
+location = /oauth2/auth {
+    proxy_pass       http://127.0.0.1:4180;
+    proxy_set_header Host             $host;
+    proxy_set_header X-Real-IP        $remote_addr;
+    proxy_set_header X-Forwarded-Uri  $request_uri;
+    proxy_set_header Content-Length   "";
+    proxy_pass_request_body           off;
+}
 location / {
     auth_request /oauth2/auth;
     error_page 401 = @oauth2_signin;
-    auth_request_set $user $upstream_http_x_auth_request_user;
-    proxy_set_header X-User $user;
+    auth_request_set $user  $upstream_http_x_auth_request_user;
+    auth_request_set $email $upstream_http_x_auth_request_email;
+    proxy_set_header X-User  $user;
+    proxy_set_header X-Email $email;
     proxy_pass http://127.0.0.1:3000;
 }
 location @oauth2_signin {
@@ -1179,10 +1200,23 @@ http:
 
 Authelia is a login portal with built-in TOTP and WebAuthn, sitting behind the proxy rather than replacing it. Per its support page, nginx, Traefik, Caddy (2.5.1+), HAProxy (via a Lua module), Envoy, Skipper, NGINX Proxy Manager, and SWAG are supported; Apache and IIS are documented as having no compatible module and are not supported.
 
-nginx calls a dedicated `auth-request` endpoint (its `auth_request` module cannot forward the method and body the way the others' forward-auth middlewares do):
+nginx calls a dedicated `auth-request` endpoint (its `auth_request` module cannot forward the method and body the way the others' forward-auth middlewares do). That endpoint must be defined; Authelia's own snippets (`authelia-location.conf` and `authelia-authrequest.conf`) show it as:
 
 ```nginx
-auth_request /internal/authelia/authz;      # proxies to http://authelia:9091/api/authz/auth-request
+set $upstream_authelia http://authelia:9091/api/authz/auth-request;
+location /internal/authelia/authz {
+    internal;
+    proxy_pass $upstream_authelia;
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Original-URL $scheme://$host$request_uri;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Content-Length "";
+    proxy_set_header Connection "";
+    proxy_pass_request_body off;
+}
+
+# in the protected location block:
+auth_request /internal/authelia/authz;
 auth_request_set $redirection_url $upstream_http_location;
 error_page 401 =302 $redirection_url;
 ```
@@ -1216,11 +1250,11 @@ oauth2-proxy's MFA is whatever its OIDC/OAuth provider enforces; Pomerium's is w
 ```bash
 ss -tlnp | grep 3000                          # app on 127.0.0.1 only
 curl -sI http://203.0.113.10:3000/            # from another host: connection refused
-curl -sI https://app.example.com/             # no session: redirected to the sign-in page
-curl -sI -H 'X-Auth-Request-User: admin' https://app.example.com/    # forged header dropped en route
+curl -sI -H 'X-Auth-Request-User: admin' http://203.0.113.10:3000/   # forged header, straight at the app: still connection refused
+curl -sI https://app.example.com/             # no session: redirected to the sign-in page, or a 401
 ```
 
-After a real login, confirm the app-side log shows the identity header the proxy set. A forged header sent straight at the app's own bound address must never be treated as authentication; that is why the app must be unreachable except through the proxy.
+After a real login through the proxy, confirm a session reaches the app and the app-side log shows the identity header the proxy set, not the forged one above. The forged header is never a bypass because the app is reachable only through the proxy; it is refused at the network level, not read and discarded.
 
 ## Common mistakes
 
@@ -2253,15 +2287,15 @@ HOST=127.0.0.1 PORT=3000 node build
 
 Behind a reverse proxy, set `ORIGIN` (for example `ORIGIN=https://app.example.com`) so SvelteKit computes the correct origin for redirects and cookies. `PROTOCOL_HEADER` and `HOST_HEADER` (for example `x-forwarded-proto` and `x-forwarded-host`) let it read the real scheme and host from the proxy; the docs caution to set these only behind a trusted reverse proxy, since an untrusted client could otherwise spoof them. `ADDRESS_HEADER` and `XFF_DEPTH` do the same for the client's real IP.
 
-CSRF: `csrf.checkOrigin` (default `true`) rejects a POST, PUT, PATCH, or DELETE whose `Origin` header does not match, with "Cross-site POST form submissions are forbidden."
+CSRF: `csrf.checkOrigin` (default `true`, deprecated in the current reference) checks the `Origin` header for a POST, PUT, PATCH, or DELETE form submission whose `Content-Type` is `application/x-www-form-urlencoded`, `multipart/form-data`, or `text/plain`, rejecting a mismatch with "Cross-site POST form submissions are forbidden." It does not inspect a JSON body or any other content type reaching a `+server.js` endpoint or form action, so those still need their own origin or session check. The docs point to `csrf.trustedOrigins` instead: an allowlist (default empty) of specific origins permitted to submit forms cross site; only `'*'` trusts every origin, and the docs call that generally not recommended.
 
 Public env: only variables prefixed `PUBLIC_` (`env.publicPrefix`) are "statically injected into your bundle at build time" and reachable from `$env/static/public`; anything else throws if imported from client code. Keep secrets in modules SvelteKit treats as server-only, either `$env/static/private` / `$env/dynamic/private`, a `.server.js` filename, or anything under `$lib/server/` ([secrets.md](secrets.md)); SvelteKit statically traces import chains and fails the build if client code imports one, even through a dynamic `import()`.
 
-None of this gates a request for you: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a proxy-layer redirect alone.
+None of this gates a request for you by default: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). The `handle` hook in `hooks.server.js` can enforce access, since it runs on every request and may return a `Response` before `resolve` renders the route, but only when it actually checks the session and blocks; using it just to redirect an unauthenticated page navigation, or just to attach identity onto `event.locals` for other handlers to read, still leaves a directly reached `+server.js` endpoint or form action open. Do not base the authorization decision on `event.url`, `route`, or `params` inside `handle`, since those are client supplied and can be manipulated; check the session instead. Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a client-side redirect alone.
 
 ## Nuxt (Nitro server routes)
 
-Files under `server/api/`, `server/routes/`, and `server/middleware/` are auto-registered Nitro handlers exported with `defineEventHandler()`. Nuxt ships no built-in authentication: a middleware handler can attach `event.context.auth`, but every handler that reads it still has to check it itself, since middleware alone does not stop the request:
+Files under `server/api/`, `server/routes/`, and `server/middleware/` are auto-registered Nitro handlers exported with `defineEventHandler()`, and a handler in `server/middleware/` runs before every other server route. Nuxt ships no built-in authentication. A middleware handler can enforce access if it throws (for example `createError` with a 401 or 403) or otherwise ends the request there; one that only attaches `event.context.auth` for other handlers to read has not enforced anything, and every handler that reads it still has to check it itself:
 
 ```ts
 // server/api/admin.ts: the route checks for itself; the middleware only sets event.context.auth
@@ -2285,15 +2319,19 @@ Both are development tooling, not a production server: the `vite preview` docs s
 
 ```bash
 curl -si https://app.example.com/api/private | head -1   # 401 with no session cookie, on all three frameworks
-grep -rl "REPLACE_WITH_LONG_RANDOM_VALUE" build dist .output 2>/dev/null   # no output: no private value in the client build
+ls build dist .output 2>/dev/null                          # confirm which output directory your build actually produced
+grep -rl "REPLACE_WITH_YOUR_ACTUAL_SECRET_VALUE" build dist .output 2>/dev/null
+                                                            # any line here is a leaked value; treat no output as clean only
+                                                            # if the ls above found a real directory, since a missing one
+                                                            # also produces no output from grep
 curl -si https://app.example.com/ -H "Host: evil.example.com" | head -1   # a spoofed Host is not trusted
 ```
 
-Behind a reverse proxy, confirm cookies still carry `Secure` and redirects use an `https://` `Location` once `ORIGIN` (SvelteKit) or `NUXT_PUBLIC_` (Nuxt) values are set; without them, the app often builds an `http://` URL even though the browser connection is TLS.
+Behind a reverse proxy, confirm cookies still carry `Secure` and redirects use an `https://` `Location` once `ORIGIN` (SvelteKit) is set; without it, SvelteKit often builds an `http://` URL even though the browser connection is TLS. `NUXT_PUBLIC_...` is the public runtime-config prefix, exposed straight to the client bundle; it is not a trusted-proxy or secure-cookie setting and does nothing for this check. Nuxt's own trusted-proxy and origin handling come from its deployment preset and hosting platform rather than one documented app-level variable, so verify the equivalent behavior against whichever adapter you deploy with.
 
 ## Common mistakes
 
-- Checking auth only in a SvelteKit `hooks.server.js` redirect or a Nuxt `server/middleware/`, while the `+server.js` endpoint or `server/api/` route trusts that it already happened.
+- Treating a SvelteKit `handle` hook that only redirects an unauthenticated page navigation, or a Nuxt `server/middleware/` that only attaches `event.context.auth`, as if it already enforced access, while the `+server.js` endpoint, form action, or `server/api/` route trusts that it happened and skips its own check.
 - Leaving `server.allowedHosts` at `true`, or `server.host` wide open, past a local demo.
 - Naming a secret `PUBLIC_...` or `NUXT_PUBLIC_...` out of habit from a genuinely public value.
 
@@ -2356,7 +2394,13 @@ spec:
 
 `runAsNonRoot: true` refuses to start the container if its effective user is root; pin `runAsUser` too. `seccompProfile.type: RuntimeDefault` applies the runtime's default syscall filter instead of running unconfined.
 
-Enforce this cluster-wide with Pod Security Admission's `restricted` level, set as the namespace label `pod-security.kubernetes.io/enforce: restricted` (per the Pod Security Standards documentation). `restricted` requires, among its controls: no privileged containers, no host namespaces or host ports, non-root execution, a read-only root filesystem, all capabilities dropped, and a seccomp profile that is not `Unconfined`. A Pod violating any of these is rejected at admission, not merely flagged.
+Enforce this with Pod Security Admission's `restricted` level, set as the namespace label
+`pod-security.kubernetes.io/enforce: restricted` (per the Pod Security Standards documentation); the label
+applies to that namespace only, not the whole cluster. `restricted` requires, among its controls: no
+privileged containers, no host namespaces or host ports, non-root execution, all capabilities dropped, and a
+seccomp profile that is not `Unconfined`. A Pod violating any of these is rejected at admission, not merely
+flagged. The `readOnlyRootFilesystem: true` setting above is a separate, per-container recommendation this
+guide makes; it is good practice, but it is not one of the controls `restricted` itself requires.
 
 ## Network segmentation
 
@@ -2372,7 +2416,19 @@ spec:
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: { name: allow-app-to-db }
+metadata: { name: allow-app-egress-to-db }
+spec:
+  podSelector: { matchLabels: { role: app } }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } } }]
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to: [{ podSelector: { matchLabels: { role: db } } }]
+      ports: [{ protocol: TCP, port: 5432 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-db-ingress-from-app }
 spec:
   podSelector: { matchLabels: { role: db } }
   policyTypes: [Ingress]
@@ -2381,7 +2437,12 @@ spec:
       ports: [{ protocol: TCP, port: 5432 }]
 ```
 
-With both applied, the database pod accepts connections only from pods labeled `role: app` on port 5432; everything else is refused. Databases still need their own TLS and auth on top ([postgresql.md](postgresql.md), [mysql.md](mysql.md), [mongodb.md](mongodb.md), [redis.md](redis.md)); a NetworkPolicy is a layer, not a substitute.
+A connection needs both sides to allow it: the egress policy on the source pod and the ingress policy on
+the destination pod (per the Kubernetes NetworkPolicy documentation). With all three policies applied, an
+`app` pod can resolve names through the cluster's DNS and reach the `db` pod on port 5432; the `db` pod
+accepts connections only from pods labeled `role: app` on port 5432; every other path is refused. Databases
+still need their own TLS and auth on top ([postgresql.md](postgresql.md), [mysql.md](mysql.md),
+[mongodb.md](mongodb.md), [redis.md](redis.md)); a NetworkPolicy is a layer, not a substitute.
 
 ## Verify
 
@@ -2389,8 +2450,16 @@ With both applied, the database pod accepts connections only from pods labeled `
 docker exec app id                                  # uid is not 0
 docker exec app sh -c 'touch /x'                    # read-only fs: fails
 kubectl get pod app -o jsonpath='{.spec.containers[0].securityContext}'
-kubectl run probe --rm -it --image=busybox --restart=Never -- \
-  wget -T 3 -qO- db:5432                             # from outside the allowlist: times out
+
+# a probe pod needs its own admission-compliant securityContext under the restricted PSA level, and a
+# real TCP connect to the db's actual port (a Postgres port does not speak HTTP, so wget cannot test it)
+SC='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"probe","image":"busybox:1.36","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"command":["nc","-z","-w","3","db","5432"]}]}}'
+
+kubectl run probe-permitted --rm -it --restart=Never --image=busybox:1.36 --labels=role=app \
+  --overrides="$SC" -- true                          # from a pod labeled role=app: must succeed
+
+kubectl run probe-forbidden --rm -it --restart=Never --image=busybox:1.36 --labels=role=other \
+  --overrides="$SC" -- true                          # from a pod without that label: must time out
 ```
 
 ## Sources (checked September 2026)
@@ -3166,7 +3235,7 @@ Managed databases from these platforms come with TLS endpoints; require verified
 
 ## 5. Hugging Face Spaces
 
-A new Space is public by default: anyone can view the source and reach the running app. Visibility can be changed to "protected" (the source stays private to the owner and collaborators, but the running app is still public through its embed URL or custom domain) or "private" (both the source and the running app are restricted to the owner and collaborators). Space secrets belong in the Settings tab's secrets store, never in the repository or its README metadata; anything set as a "variable" instead of a "secret" is still publicly readable. Dev Mode opens an SSH and VS Code endpoint straight into the running container, which is materially more access than the app itself, so treat an unattended Dev Mode session the same as any other exposed admin path. For serverless GPU platforms, see [gpu-clouds.md](gpu-clouds.md).
+A new Space is public by default: anyone can view the source and reach the running app. Visibility can be changed to "protected" (the source stays private to the owner and collaborators, but the running app is still public through its embed URL or custom domain) or "private" (both the source and the running app are restricted to the owner and collaborators); protected visibility requires a paid plan, PRO for personal accounts or Team/Enterprise for organizations, at the time of writing. Space secrets belong in the Settings tab's secrets store, never in the repository or its README metadata; anything set as a "variable" instead of a "secret" is still publicly readable. That secrets store is not a safe place for backend or provider credentials on a Static Space: Hugging Face exposes both variables and secrets to client-side JavaScript there, through `window.huggingface.variables`, so anything placed in a Static Space's secrets still reaches the browser. Keep server-side credentials in a server-side service, such as a Docker or Gradio Space or a separate backend, instead. Dev Mode opens an SSH and VS Code endpoint straight into the running container, which is materially more access than the app itself, so treat an unattended Dev Mode session the same as any other exposed admin path. For serverless GPU platforms, see [gpu-clouds.md](gpu-clouds.md).
 
 ## 6. Verify
 
@@ -3193,8 +3262,12 @@ An AI agent, RAG fetcher, or webhook handler that retrieves URLs can be steered 
 ## AWS: require IMDSv2 and cap the hop limit
 
 The instance metadata service listens on `169.254.169.254`. IMDSv2 requires a session token obtained with a
-`PUT` before any `GET` succeeds, and by default the token's response has a hop limit of 1 at the IP protocol
-level, so a request relayed through a proxy will not reach it. Enforce IMDSv2 and keep the hop limit at 1:
+`PUT` before any `GET` succeeds. By default, the response to that `PUT`, the token itself, has a hop limit
+of 1 at the IP protocol level: the token cannot travel more than one network hop back to the requester (per
+the AWS instance metadata service documentation). A containerized application sitting one hop from the
+host, for example behind the container network's own routing, will not receive the token and so cannot
+complete an IMDSv2 request; this is a limit on the token response reaching that far, not a guarantee that no
+proxy anywhere can reach the metadata service itself. Enforce IMDSv2 and keep the hop limit at 1:
 
 ```bash
 aws ec2 modify-instance-metadata-options \
@@ -3215,7 +3288,10 @@ GCP's metadata server answers at `metadata.google.internal` or `169.254.169.254`
 - **Cloud firewall / security group egress rules** (the inbound side of the same tools is in
   [cloud-firewalls.md](cloud-firewalls.md)): default outbound rules on most providers allow everything out;
   add explicit egress rules that permit only DNS and the specific provider APIs the application calls, and
-  deny the rest.
+  deny the rest. On AWS, security groups do not filter traffic to or from the instance metadata address,
+  `169.254.169.254` (per the security groups documentation); they are not a backstop for metadata access.
+  Keep egress rules for every other destination, and rely on IMDSv2, the hop limit, and disabling the
+  metadata endpoint where it is unused to control reachability of the metadata service itself.
 - **Kubernetes NetworkPolicy egress**: a pod is unrestricted for egress until a `NetworkPolicy` with `Egress`
   in its `policyTypes` selects it, after which only listed destinations are reachable. This has no effect
   unless the cluster's network plugin (CNI) implements `NetworkPolicy`; confirm enforcement before relying
@@ -3253,9 +3329,15 @@ curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/latest/meta-data
 curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/computeMetadata/v1/instance/
 # Azure, no Metadata: true header: must fail, must not return metadata
 curl -s -o /dev/null -w '%{http_code}\n' 'http://169.254.169.254/metadata/instance?api-version=2025-04-07'
-# from the workload, to a host not on the egress allow list: must fail or time out
-curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://an-unlisted-host.example.com/ \
-  || echo "blocked or timed out"
+# positive control: a host on the egress allow list, for example the AWS STS endpoint used for role
+# credentials, must succeed
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://sts.amazonaws.com/
+
+# negative control: a known-live host outside the egress allow list must be blocked, not merely
+# unresolved; curl reports a DNS failure differently from a network-level block
+curl -sv --max-time 5 https://www.example.com/ 2>&1 | grep -q "Could not resolve host" \
+  && echo "DNS failure, not a policy block: confirm this host still resolves before retrying" \
+  || echo "blocked past DNS resolution, or timed out: this is the egress policy taking effect"
 # confirm the metadata options actually took effect
 aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
   --query 'Reservations[].Instances[].MetadataOptions'
@@ -3265,6 +3347,7 @@ aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
 ## Sources (checked September 2026)
 
 - AWS EC2 instance metadata service configuration: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
+- AWS VPC security groups (traffic security groups do not filter, including instance metadata): https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html
 - AWS CLI `modify-instance-metadata-options`: https://docs.aws.amazon.com/cli/latest/reference/ec2/modify-instance-metadata-options.html
 - GCP metadata server overview: https://cloud.google.com/compute/docs/metadata/overview
 - Azure Instance Metadata Service: https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-service
@@ -3307,7 +3390,7 @@ Where proxy auth is enabled, callers authenticate with a Token ID and Token Secr
 
 ## The pattern, whatever the platform
 
-The platform's own controls (RunPod's proxy TLS, Vast.ai's portal token, Lambda's firewall rules, Modal's proxy auth) are necessary but not sufficient on their own. Keep the model server itself on loopback behind the platform's proxy or firewall, and require the server's own API key on top, exactly as [ollama.md](ollama.md) and [model-servers.md](model-servers.md) describe. A platform-level control that goes away later, a firewall rule deleted, a template rebuilt without a flag, should not be the only thing standing between the listener and the internet.
+The platform's own controls (RunPod's proxy TLS, Vast.ai's portal token, Lambda's firewall rules, Modal's proxy auth) are necessary but not sufficient on their own. How to bind the model server depends on which kind of proxy is in front of it. RunPod's HTTP proxy reaches the pod over its exposed network interface rather than through a local backend, so the service must bind `0.0.0.0` inside the pod; RunPod's own troubleshooting guidance is explicit that binding to `localhost` only will keep the proxy from reaching it. Vast.ai's Instance Portal is the opposite case: it is a local reverse proxy (Caddy) running on the instance itself, so the app it forwards to can stay on loopback behind it, the same pattern as an authenticating proxy on your own hardware. Whichever binding the platform's proxy needs, require the server's own API key on top as well, exactly as [ollama.md](ollama.md) and [model-servers.md](model-servers.md) describe. A platform-level control that goes away later, a firewall rule deleted, a template rebuilt without a flag, should not be the only thing standing between the listener and the internet.
 
 MFA: none of these platforms add a second factor to the workload itself. The account you log into RunPod, Vast.ai, Lambda, or Modal with should have MFA enabled ([mfa.md](mfa.md)); an API key or proxy-auth token secures a machine client, and is a separate control from your platform login.
 
@@ -3316,7 +3399,7 @@ MFA: none of these platforms add a second factor to the workload itself. The acc
 ```bash
 ss -tlnp                                   # enumerate every listening port on the box
 curl -s http://127.0.0.1:8888/             # notebook: 403/redirect without its token in the URL/header
-curl -s https://<pod-or-endpoint-host>/    # 401 without credentials, once auth is configured
+curl -s "https://REPLACE_WITH_POD_ID-REPLACE_WITH_PORT.proxy.runpod.net/"    # 401 without credentials, once auth is configured (RunPod's proxy hostname form; substitute the equivalent for your platform)
 ```
 
 Every port `ss` shows listening should be either closed (not exposed at the platform layer) or authenticated (the listener itself demands a key, token, or login). A Jupyter server that answers without its token is a finding, whichever of these platforms it runs on.
@@ -3365,7 +3448,7 @@ The common failure this order prevents: an unclaimed setup wizard is a race to b
 
 ## 3. Previews and clones get production posture
 
-A preview deployment or a database clone is not lower stakes just because it is temporary. Vercel's Deployment Protection illustrates the gap: Standard Protection, available on every plan, gates preview and generated deployment URLs but leaves the production domain open by default; protecting production too needs the All Deployments scope (Pro and Enterprise) ([paas.md](paas.md); as of September 2026, per Vercel's Deployment Protection docs). Where the platform's own gate does not cover a hostname, front it the same way as production, for example a Cloudflare Access policy scoped to that preview hostname. Either way, treat a clone's data the same as the original: rotate any credential a clone inherited if the clone is less trusted than the source.
+A preview deployment or a database clone is not lower stakes just because it is temporary. Vercel's Deployment Protection illustrates the gap: Standard Protection, available on every plan, gates preview and generated deployment URLs but leaves the production domain open by default; the All Deployments scope closes that gap too, and Vercel's September 9, 2026 change made pairing it with Vercel Authentication free on every plan rather than Pro and Enterprise only ([paas.md](paas.md); per Vercel's Deployment Protection changelog, at the time of writing; the configuration reference page itself still listed All Deployments as Pro and Enterprise only when checked, so confirm current availability in your own dashboard). Where the platform's own gate does not cover a hostname, front it the same way as production, for example a Cloudflare Access policy scoped to that preview hostname. Either way, treat a clone's data the same as the original: rotate any credential a clone inherited if the clone is less trusted than the source.
 
 ## 4. Teardown: DNS before the app, then revoke the rest
 
@@ -3374,6 +3457,10 @@ Retiring a deployment in the wrong order leaves a dangling DNS record pointing a
 ## 5. Re-verify after anything changes
 
 Rerun the outside-in checks in section 1 and the negative auth tests from [authentication.md](authentication.md) after an upgrade, a backup restore (which can reintroduce a default account or reset a feature flag), or any change to network policy or auth configuration. Monitor certificate expiry from outside the host too: a renewal cron can silently fail while the host's own view still looks fine, so an external check (a scheduled `openssl s_client` from another machine, or a third-party uptime/certificate monitor) catches what a local `certbot renew --dry-run` cannot.
+
+## 6. Offboarding
+
+When a person leaves, revoke access at every layer they touched, not only their password: identity-provider membership (the SSO or directory account), proxy-level sessions (Cloudflare Access or equivalent), application-level sessions on each service, and any personal access tokens or API keys issued to them. Where a system cannot revoke immediately, such as a session cached until its own expiry, know that system's maximum time-to-revoke and treat the number as something to shrink, not accept. [mfa.md](mfa.md) covers revoking the second factor alongside the account.
 
 ## Common mistakes
 
@@ -3386,7 +3473,7 @@ Rerun the outside-in checks in section 1 and the negative auth tests from [authe
 ```bash
 # From a second network, not the host itself:
 nmap -p- 203.0.113.10                                  # only the intended ports answer
-nmap -p- 2001:db8::10                                  # same, over the public IPv6 address
+nmap -6 -p- 2001:db8::10                               # same, over the public IPv6 address
 curl -sI https://retired-preview.example.com/          # expect DNS failure or connection error
 dig +short retired-preview.example.com                 # expect no record, not a dangling CNAME
 openssl s_client -connect app.example.com:443 -servername app.example.com </dev/null \
@@ -4013,7 +4100,7 @@ ssl.key.password=REPLACE_WITH_LONG_RANDOM_VALUE
 
 ## 6. Redpanda (and other Kafka-API-compatible systems)
 
-Redpanda implements the Kafka wire protocol, so the SASL_SSL listener, SCRAM credentials, and ACL configuration above apply to a Redpanda cluster unchanged; the same fronting rules apply too. Redpanda Console, its bundled web UI, ships without its own login screen: it only gains one once you configure OIDC or basic authentication, so until then anyone who reaches Console reaches the cluster behind it. Front Console the same way as any other admin panel: never public, reached through SSH forwarding, a tailnet, or an access proxy, with MFA at that layer. See the [Redpanda security documentation](https://docs.redpanda.com/current/manage/security/).
+Redpanda implements the Kafka wire protocol, so the client-side and protocol-level controls above carry over: SASL/SCRAM authentication, TLS, and ACL management through the Kafka API all work the same way against a Redpanda cluster, and the same fronting rules apply too. What does not carry over is how you wire that up on the broker: Redpanda configures brokers through `redpanda.yaml` and the `rpk` CLI, not Kafka's `server.properties`, JAAS configuration files, or `kafka-storage.sh`. Redpanda Console, its bundled web UI, ships without its own login screen: it only gains one once you configure OIDC or basic authentication, so until then anyone who reaches Console reaches the cluster behind it. Front Console the same way as any other admin panel: never public, reached through SSH forwarding, a tailnet, or an access proxy, with MFA at that layer. See the [Redpanda security documentation](https://docs.redpanda.com/current/manage/security/).
 
 ## Verify
 
@@ -4439,10 +4526,11 @@ The HTTP monitoring endpoint is off unless configured (`http_port: 8222` in the 
 ## Verify
 
 ```bash
-ss -tlnp | grep -E ':(4222|8222) '                       # 4222 as intended, 8222 loopback/private only
-nats pub test.subject hello                              # fails without valid credentials
-nats pub test.subject hello --creds REPLACE_WITH_CREDS_FILE  # succeeds once authenticated
-curl -s http://monitor.example.com:8222/connz             # connection refused/timeout from outside
+ss -tlnp | grep -E ':(4222|8222) '                                                                                                                          # 4222 as intended, 8222 loopback/private only
+nats pub orders.created hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE --user order-svc --password REPLACE_WITH_LONG_RANDOM_PASSWORD   # allowed subject, valid credentials: succeeds
+nats pub other.subject hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE --user order-svc --password REPLACE_WITH_LONG_RANDOM_PASSWORD     # subject outside the allow list: fails
+nats pub orders.created hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE                                                                  # no --user/--password: fails
+curl -s http://monitor.example.com:8222/connz                                                                                                               # connection refused/timeout from outside
 ```
 
 ## Common mistakes
@@ -4470,15 +4558,15 @@ Both back RAG pipelines and site search, both ship a keyless dev mode meant for 
 
 ## Meilisearch
 
-Meilisearch runs in two modes. In development mode it answers without a key at all. Production mode requires setting `MEILI_MASTER_KEY` (at least 16 bytes) and launching with `--env production`; the master key is the credential everything else derives from.
+Meilisearch runs in two modes. In development mode it answers without a key by default, but development mode can still be protected by launching with `MEILI_MASTER_KEY` set; production mode requires it, together with `--env production`. Either way the master key (at least 16 bytes) is the credential everything else derives from.
 
-From it, Meilisearch generates two default API keys, an admin key (full control, including index and settings management) and a search key (search only), and it also supports scoped API keys you create yourself and tenant tokens: "short-lived, client-side tokens derived from API keys" for per-end-user search restrictions without shipping a standing key to each user. Use the default (or a scoped) search key in front-end code; never the admin key or the master key.
+From it, Meilisearch generates four default API keys: a Default Search API Key (search only, all indexes), a Default Admin API Key (full access except key management), a Default Read-Only Admin API Key (read-only access to all indexes, documents, and settings), and a Default Chat API Key (search and chat completions). It also supports scoped API keys you create yourself and tenant tokens: "short-lived, client-side tokens derived from API keys" for per-end-user search restrictions without shipping a standing key to each user. Use the Default Search API Key (or a scoped key) in front-end code; never an admin key, the read-only admin key, or the master key.
 
 Meilisearch does not terminate HTTPS itself in the typical deployment, so put a reverse proxy or your platform's TLS in front ([nginx.md](nginx.md), [caddy.md](caddy.md), [cloudflare.md](cloudflare.md)) and restrict network access with firewall rules as an additional layer ([cloud-firewalls.md](cloud-firewalls.md)).
 
 ## Typesense
 
-Typesense starts from a bootstrap key set with the `--api-key` server parameter; that key has "admin permissions on all endpoints and data." Use it only to create a permanent admin key through the `/keys` API, then stop using the bootstrap key day to day so it can be rotated without a restart-time outage.
+Typesense requires a bootstrap key at startup, set with the `--api-key` server parameter (a required parameter; the server will not start without it); that key has "admin permissions on all endpoints and data." Use it only to create a permanent admin key through the `/keys` API, then stop using the bootstrap key day to day so it can be rotated without a restart-time outage.
 
 For anything that runs in a browser, generate a scoped, search-only key through the same `/keys` endpoint:
 
@@ -4491,7 +4579,7 @@ For anything that runs in a browser, generate a scoped, search-only key through 
 
 Narrow `collections` to a name or regex to limit a key to specific collections, embed a `filter_by` clause in a scoped key to restrict it to specific documents (Typesense: "Users will not be able to override the filter embedded inside the scoped API Key"), and use `include_fields`/`exclude_fields` to hide sensitive fields such as billing data from a given key. Typesense's own guidance is direct: "Never expose your Admin API Key or Bootstrap API Key to your frontend application as anyone with access to it will be able to write data into your collection." Set `expires_at` on browser-facing keys so a leaked one has a shelf life.
 
-Typesense's cloud offering terminates TLS for you; a self-managed cluster needs the same reverse-proxy or platform TLS pattern as Meilisearch above.
+Typesense's cloud offering terminates TLS for you. A self-managed cluster can also terminate TLS natively with the `--ssl-certificate` and `--ssl-certificate-key` server parameters, which Typesense documents as sufficient for direct internet exposure; this guide still defaults to the same reverse-proxy or platform TLS pattern as Meilisearch above for consistency and because a proxy already handles certificate renewal, but native termination is a documented, supported alternative.
 
 ## The pattern, either engine
 
@@ -4500,13 +4588,13 @@ The credential that goes into a browser must be search-only and, ideally, scoped
 ## Verify
 
 ```bash
-curl -s http://search.example.com:7700/indexes                 # Meilisearch, no key: fails in production mode
-curl -s http://search.example.com:7700/indexes -H "Authorization: Bearer REPLACE_WITH_SEARCH_KEY"  # search works
-curl -s http://search.example.com:7700/indexes -X POST -H "Authorization: Bearer REPLACE_WITH_SEARCH_KEY"  # write: denied
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://search.example.com/indexes/movies/search -H 'Content-Type: application/json' --data-raw '{"q":"ninja"}'                                             # Meilisearch, no key: 401
+curl -s -X POST https://search.example.com/indexes/movies/search -H "Authorization: Bearer REPLACE_WITH_SEARCH_KEY" -H 'Content-Type: application/json' --data-raw '{"q":"ninja"}'                          # search key: search works
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://search.example.com/indexes -H "Authorization: Bearer REPLACE_WITH_SEARCH_KEY" -H 'Content-Type: application/json' --data-raw '{"uid":"movies"}'     # search key attempting to create an index: 403
 
-curl -s http://search.example.com:8108/collections               # Typesense, no key: fails
-curl -s http://search.example.com:8108/collections -H "X-TYPESENSE-API-KEY: REPLACE_WITH_SEARCH_ONLY_KEY"  # search works
-curl -s http://search.example.com:8108/collections -X POST -H "X-TYPESENSE-API-KEY: REPLACE_WITH_SEARCH_ONLY_KEY"  # write: denied
+curl -s -o /dev/null -w '%{http_code}\n' "https://search.example.com/collections/products/documents/search?q=stark&query_by=company_name"                                                                    # Typesense, no key: 401
+curl -s "https://search.example.com/collections/products/documents/search?q=stark&query_by=company_name" -H "X-TYPESENSE-API-KEY: REPLACE_WITH_SEARCH_ONLY_KEY"                                              # search-only key: search works
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://search.example.com/collections -H "X-TYPESENSE-API-KEY: REPLACE_WITH_SEARCH_ONLY_KEY" -H 'Content-Type: application/json' --data-raw '{"name":"products"}'  # search-only key attempting to create a collection: 403
 ```
 
 Grep the client bundle and repository history for the admin/master/bootstrap key; it should never appear outside the server-side secret store.
@@ -4564,8 +4652,11 @@ LiteFS replicates a SQLite file across a cluster's nodes rather than to object s
 curl -sI https://app.example.com/app.db      # 404, never 200
 git check-ignore -v app.db                    # prints a matching .gitignore rule
 stat -c '%a %U' /var/lib/myapp/app.db         # 600, owned by the app user, not world-readable
-grep -rl "TURSO_AUTH_TOKEN\|turso://" build dist .next/static 2>/dev/null   # no output: token never reached a client bundle
+grep -rn "REPLACE_WITH_ACTUAL_TOKEN_VALUE" build dist .next/static; echo "exit: $?"                             # search for the literal token value copied from the secret store, not the env-var name a bundler already inlined away; exit 1 is the goal
+grep -rnE "eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}" build dist .next/static; echo "exit: $?"                  # a JWT-shaped token (Turso/libSQL tokens are JWTs) is a finding wherever it turns up; exit 2 means a path did not exist, not a clean result
 ```
+
+A clean result here is evidence, not proof: it means neither pattern matched in the paths searched, not that the token cannot be present in some other form. A bundler could split, encode, or otherwise transform it, and a missing or misspelled directory can produce the same silence as a genuinely clean scan, so check the exit code and confirm the directories exist, not just the absence of output.
 
 ## Sources (checked September 2026)
 
@@ -5739,7 +5830,7 @@ If you run any of these in a container, do not stop at the network boundary: a c
 
 `--listen` with no argument binds to `0.0.0.0,::` (every IPv4 and IPv6 interface); given an address it binds only there. The default with the flag absent is `127.0.0.1`, and the default port is `8188`. There is no built-in login: the server accepts any workflow from anyone who can reach it.
 
-Custom nodes are the bigger risk. They run as plain Python with the same privileges as the server process; ComfyUI's own security update warns that `eval`/`exec` calls in a node are "direct attack vectors" for remote code execution. ComfyUI-Manager (the default node installer) had its own unauthenticated-RCE advisory, CVE-2025-67303: versions before v3.38 left the manager's data and configuration directories insufficiently protected by ComfyUI's web API access control, letting an attacker upload arbitrary files for full system compromise with no credentials at all. Keep ComfyUI-Manager at v3.38 or later, and only install nodes you trust regardless.
+Custom nodes are the bigger risk. They run as plain Python with the same privileges as the server process; ComfyUI's own security update warns that `eval`/`exec` calls in a node are "direct attack vectors" for remote code execution. ComfyUI-Manager (the default node installer) had its own unauthenticated-RCE advisory, CVE-2025-67303 (GHSA-95pq-hr8p-f5g7): an unprotected alternate channel left the manager's data and configuration directories insufficiently protected by ComfyUI's web API access control, letting an attacker upload arbitrary files for full system compromise with no credentials at all. The fix spans both projects and needs both minimums together: ComfyUI v0.3.76 or later (adds the protected-directory API the fix depends on) and ComfyUI-Manager v3.38 or later (contains the fix itself). Keep both at or above those versions, and only install nodes you trust regardless.
 
 ```bash
 python main.py --listen 127.0.0.1 --port 8188
@@ -5752,24 +5843,23 @@ Front it with a TLS proxy that adds login before anything reaches port 8188. If 
 `--listen` launches gradio bound to `0.0.0.0` (default `False`, i.e. loopback); `--port` defaults to `7860`. `--gradio-auth user:pass` (comma-delimited for multiple users) or `--gradio-auth-path /path/to/file` requires a login before the UI loads; `--api-auth` does the same for the API. `--share` registers a public `*.gradio.live` relay URL, documented as intended for Colab, not a deployment mechanism, and it bypasses your network boundary entirely. `--enable-insecure-extension-access` reopens the extensions tab regardless of other flags and should stay off on anything reachable beyond loopback.
 
 ```bash
-python launch.py --listen --port 7860 --gradio-auth "admin:REPLACE_WITH_LONG_RANDOM_VALUE"
+python launch.py --port 7860 --gradio-auth "admin:REPLACE_WITH_LONG_RANDOM_VALUE"
 ```
 
 Even with `--gradio-auth` set, put TLS in front; the flag alone only gates plaintext HTTP. `--server-name` sets an explicit hostname if you bind somewhere other than the default.
 
 ## InvokeAI
 
-The `Web Server` section of `invokeai.yaml` sets `host` (default `127.0.0.1`) and `port` (default `9090`); setting `host: 0.0.0.0` serves the local network with no login at all in the default single-user mode. `INVOKEAI_HOST` and `INVOKEAI_PORT` override the same settings from the environment.
+InvokeAI's `invokeai.yaml` uses a flat schema (current as of InvokeAI 6.14.1, `schema_version: 4.0.2`): `host` (default `127.0.0.1`) and `port` (default `9090`) are top-level keys, not nested under a `Web Server` or `InvokeAI` section. Setting `host: 0.0.0.0` serves the local network with no login at all in the default single-user mode. `INVOKEAI_HOST` and `INVOKEAI_PORT` override the same settings from the environment.
 
 An experimental multi-user mode exists: add `multiuser: true` to `invokeai.yaml` to require per-user login (username and password, stateless JWT sessions), and `strict_password_checking: true` to enforce a minimum password (8+ characters, upper, lower, and a digit) rather than just warning on a weak one. Restarting the server logs every user out. Outside multi-user mode, treat InvokeAI as having no login and keep it on loopback regardless.
 
 ```yaml
-InvokeAI:
-  Web Server:
-    host: 127.0.0.1
-    port: 9090
-  multiuser: true
-  strict_password_checking: true
+# invokeai.yaml, flat schema (schema_version 4.0.2, InvokeAI 6.14.1 and later)
+host: 127.0.0.1
+port: 9090
+multiuser: true
+strict_password_checking: true
 ```
 
 ## Fooocus
@@ -5789,6 +5879,9 @@ ss -tlnp | grep -E '8188|7860|9090'                 # each service on 127.0.0.1 
 curl -s http://203.0.113.10:8188/                    # ComfyUI from another host: connection refused
 curl -s http://203.0.113.10:7860/                    # Stable Diffusion WebUI: connection refused
 curl -s http://203.0.113.10:9090/                    # InvokeAI: connection refused
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9090/api/v1/boards/
+                                                       # from the host itself, InvokeAI multiuser mode: 401
+                                                       # without a Bearer token, never the app itself
 curl -sI https://imagegen.example.com/                # via the proxy: TLS, and a login prompt
                                                        # or 401 without credentials, before the UI loads
 ```
@@ -5806,9 +5899,10 @@ curl -sI https://imagegen.example.com/                # via the proxy: TLS, and 
 - ComfyUI Startup Flags (`--listen`, `--port` defaults): https://docs.comfy.org/development/comfyui-server/startup-flags
 - ComfyUI custom node security standards (eval/exec prohibited): https://docs.comfy.org/registry/standards
 - ComfyUI 2025 Jan Security Update (custom node code-execution risk): https://blog.comfy.org/p/comfyui-2025-jan-security-update
+- ComfyUI-Manager security advisory, CVE-2025-67303, GHSA-95pq-hr8p-f5g7 (both minimum versions): https://github.com/Comfy-Org/ComfyUI-Manager/security/advisories/GHSA-95pq-hr8p-f5g7
 - AUTOMATIC1111 Command Line Arguments and Settings wiki: https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Command-Line-Arguments-and-Settings
 - InvokeAI YAML Config (host/port defaults): https://invoke.ai/configuration/invokeai-yaml/
-- InvokeAI Multi-User Administrator Guide: http://invoke.ai/features/multi-user-mode/admin-guide/
+- InvokeAI Multi-User Administrator Guide: https://invoke.ai/features/multi-user-mode/admin-guide/
 - Fooocus repository README (`--listen`, `--share`, auth.json): https://github.com/lllyasviel/Fooocus
 
 ======================================================================
@@ -5831,7 +5925,7 @@ Keep it on loopback regardless of which mode you choose, and put the proxy's own
 
 ## LobeChat
 
-`KEY_VAULTS_SECRET` is documented as the password that gates access to the deployment (it also encrypts stored provider credentials, so once set, never change it or previously encrypted data becomes unreadable). For real per-user accounts, LobeChat's Better Auth service takes over: `AUTH_SECRET` (required) signs sessions, `AUTH_SSO_PROVIDERS` lists enabled SSO providers (for example `google,github,microsoft`), and `AUTH_DISABLE_EMAIL_PASSWORD=1` forces SSO-only login, hiding the password form entirely. `AUTH_ALLOWED_EMAILS` restricts registration to specific addresses or domains.
+`KEY_VAULTS_SECRET` is the key that encrypts stored provider credentials (AES-GCM); generate it with `openssl rand -base64 32`, and once set, never change it, or previously encrypted data becomes unreadable. LobeHub's own basic-variables page describes it loosely as "a password to access the LobeHub service", but its own warning on the same entry says the key is used to encrypt sensitive data: treat it as the encryption key, not the deployment's login gate. Real per-user login comes from LobeChat's Better Auth service: `AUTH_SECRET` (required, generated the same way) signs sessions, `AUTH_SSO_PROVIDERS` lists enabled SSO providers (for example `google,github,microsoft`) alongside the matching provider credentials each one needs (for example `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`), and `AUTH_DISABLE_EMAIL_PASSWORD=1` forces SSO-only login, hiding the password form entirely. `AUTH_ALLOWED_EMAILS` restricts registration to specific addresses or domains, but it defaults to empty, which allows every email through, so set it explicitly rather than relying on federation alone to gate access.
 
 ```bash
 docker run -d -p 127.0.0.1:3210:3210 \
@@ -5839,6 +5933,9 @@ docker run -d -p 127.0.0.1:3210:3210 \
   -e AUTH_SECRET=REPLACE_WITH_LONG_RANDOM_VALUE \
   -e AUTH_DISABLE_EMAIL_PASSWORD=1 \
   -e AUTH_SSO_PROVIDERS=google \
+  -e AUTH_GOOGLE_ID=REPLACE_WITH_GOOGLE_OAUTH_CLIENT_ID \
+  -e AUTH_GOOGLE_SECRET=REPLACE_WITH_GOOGLE_OAUTH_CLIENT_SECRET \
+  -e AUTH_ALLOWED_EMAILS=admin@example.com,example.com \
   lobehub/lobe-chat
 ```
 
@@ -5871,6 +5968,8 @@ ss -tlnp | grep -E '3001|3210|3000'                    # each UI on 127.0.0.1 on
 curl -s http://203.0.113.10:3210/                       # from another host: connection refused
 curl -s https://chat.example.com/api/some-endpoint      # without a key/token: 401
 curl -sI https://chat.example.com/                      # via the proxy: TLS, login required
+# LobeChat SSO: sign in with a Google account NOT listed in AUTH_ALLOWED_EMAILS
+#   expect rejection after the Google redirect, before any session is created
 ```
 
 ## Common mistakes
@@ -6234,19 +6333,19 @@ Without `--tlsverify` the daemon does not check client certificates. Firewall 23
 ## Dozzle
 
 - Dozzle reads the Docker socket to show logs, the same host-level access the Docker API section above describes ([docker.md](docker.md)); a Dozzle login is a login to the host.
-- Authentication is off unless configured. Set `DOZZLE_AUTH_PROVIDER=simple` with a generated `users.yml` (`docker run -it --rm amir20/dozzle generate <username> --password <password>`), or `DOZZLE_AUTH_PROVIDER=forward-proxy` to delegate login to a fronting proxy such as Authelia, Authentik, or Cloudflare Access.
+- Authentication is off unless configured. Generate a `users.yml` with `docker run -it --rm amir20/dozzle generate admin > users.yml` (omit `--password` and Dozzle prompts for it on stdin, so it never lands in shell history), mount that file into the container, and set `DOZZLE_AUTH_PROVIDER=simple`; or set `DOZZLE_AUTH_PROVIDER=forward-proxy` to delegate login to a fronting proxy such as Authelia, Authentik, or Cloudflare Access.
 - Container actions (start, stop, recreate) and shell access into a running container can be turned on; leave both off unless a specific workflow needs them, since either turns a log viewer into remote command execution on the host.
 - Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer, like every panel above.
 
 ## Docker Registry (`registry:2`)
 
 - The reference registry image ships with no authentication at all: anyone who reaches the port can push and pull every image, and TLS must be configured before any authentication scheme works, since credentials would otherwise cross the wire in clear text.
-- Put a proxy in front with htpasswd basic authentication (bcrypt only; `htpasswd -B`, since the registry rejects any other hash format) or a token server, or run a registry distribution that has its own authentication built in.
+- Restrict access with htpasswd basic authentication, a token server, or a registry distribution that has its own authentication built in. If using the registry's own native htpasswd auth provider (set directly in the registry's `config.yml`), credentials must be bcrypt-hashed (`htpasswd -B`); the registry rejects any other hash format. If instead a reverse proxy sits in front and does its own basic authentication from its own htpasswd file, that proxy's own hashing rules apply, not the registry's.
 - Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer.
 
 ## Filebrowser
 
-- Ships with a default administrator account created on first run (historically `admin`/`admin`; some current packagings instead default to or auto-generate `admin`/`admin123`, shown once). Change it immediately, before the instance is reachable by anyone else. The project's own repository (archived, unmaintained as of August 2026) says not to expose it directly to the internet.
+- Ships with a default administrator account created on first run (historically `admin`/`admin`). Change it immediately, before the instance is reachable by anyone else. The project's own repository (archived on September 1, 2026) says not to expose it directly to the internet.
 - Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer; never publish a file-serving admin panel.
 
 ## Node-RED
@@ -6476,13 +6575,21 @@ challenge path is served before the dotfile deny is reached (`allow`/`deny`: `ng
 ## Apache
 
 ```apache
-<FilesMatch "(^\.|\.git$|\.sql$|\.dump$|\.bak$)">
+<DirectoryMatch "/\.(?!well-known)">
+    Require all denied
+</DirectoryMatch>
+
+<FilesMatch "(^\.|\.sql$|\.dump$|\.bak$)">
     Require all denied
 </FilesMatch>
 ```
 
-`<FilesMatch>` matches the request's filename, not its full path, so `/.well-known/acme-challenge/TOKEN` is
-not caught by the leading `^\.` (the matched name is the token, not the directory); no exception is needed.
+`<FilesMatch>` matches the request's basename, not its full path, so it alone does not catch
+`/.git/config`: the matched name is `config`, which does not start with a dot (per the core module
+documentation). The `<DirectoryMatch>` rule above matches any dot-prefixed path segment (`.git`, `.svn`,
+and similar), with a negative lookahead that carves out `.well-known` so the ACME challenge path still
+resolves; keep the `<FilesMatch>` rule as a backstop for `.sql`, `.dump`, and `.bak` basenames and for
+top-level dotfiles like `/.env`.
 
 ## Caddy
 
@@ -6531,7 +6638,7 @@ Any backup path known to have existed on the server should also 404 at the deplo
 - nginx core module (`location`, `^~` modifier, matching order): https://nginx.org/en/docs/http/ngx_http_core_module.html
 - nginx access module (`allow`, `deny`): https://nginx.org/en/docs/http/ngx_http_access_module.html
 - Apache mod_authz_core (`Require all denied`): https://httpd.apache.org/docs/2.4/mod/mod_authz_core.html
-- Apache core module (`<FilesMatch>`): https://httpd.apache.org/docs/2.4/mod/core.html#filesmatch
+- Apache core module (`<FilesMatch>`, `<DirectoryMatch>`): https://httpd.apache.org/docs/2.4/mod/core.html#filesmatch, https://httpd.apache.org/docs/2.4/mod/core.html#directorymatch
 - Caddy `respond` directive: https://caddyserver.com/docs/caddyfile/directives/respond
 - Caddy matchers: https://caddyserver.com/docs/caddyfile/matchers
 - Next.js environment variables (`NEXT_PUBLIC_`): https://nextjs.org/docs/pages/guides/environment-variables
@@ -6551,7 +6658,7 @@ Streaming an LLM response commonly rides a WebSocket or an SSE stream, and integ
 The browser `WebSocket()` constructor takes only a URL and an optional `protocols` list; it has no argument for request headers, so a page cannot attach `Authorization: Bearer ...` to the handshake (per MDN's WebSocket API reference). Two verified patterns fill the gap:
 
 - **Cookie plus Origin check.** The handshake is still an HTTP request, so a session cookie the server already set is sent automatically. That alone is not enough: any page on any origin can open a WebSocket to your endpoint and ride the visitor's cookie, which is cross-site WebSocket hijacking (CSWSH). OWASP's WebSocket Security Cheat Sheet is explicit: validate the `Origin` header on every handshake against an allowlist, not a denylist, since wildcard or substring matching is error-prone. Reject the upgrade server-side before any application logic runs if `Origin` is missing or not on the list.
-- **A token in the subprotocol or the first message.** `Sec-WebSocket-Protocol` (the `protocols` argument) is meant for subprotocol negotiation, but OWASP recommends token-based authentication as the stronger option for exactly this case: pass a short-lived token as a subprotocol value or as the first message after the socket opens, verify it before treating the connection as authenticated, and rotate tokens on long-lived connections.
+- **A token in the first message after the socket opens.** OWASP recommends token-based authentication as the stronger option for exactly this case: pass a short-lived token as a message right after the socket opens, verify it before treating the connection as authenticated, and rotate tokens on long-lived connections. Keep the token out of the URL query string and out of `Sec-WebSocket-Protocol` (the `protocols` argument, meant for subprotocol negotiation, not credentials); both are more likely than a message payload to end up in access logs or proxy logs.
 
 Do both where you can: Origin validation stops the hijack, and a token means a stolen cookie alone is not a working credential against the socket.
 
@@ -6566,19 +6673,24 @@ A webhook has no session and no browser to enforce Origin, so the check is a sig
 - **GitHub** signs deliveries with `X-Hub-Signature-256`: an HMAC-SHA256 hex digest of the payload using your webhook's secret, prefixed `sha256=`. Recompute it yourself and compare with a constant-time function (`crypto.timingSafeEqual` in Node.js, `secure_compare` in Ruby); a plain `==` leaks timing.
 - **Stripe** signs events with `Stripe-Signature`, formatted `t=<timestamp>,v1=<signature>`. The signed payload is the timestamp concatenated with `.` and the raw body, HMAC-SHA256 with the endpoint's `whsec_...` secret. Verify with an official library where one exists; reject if the timestamp is older than your tolerance (Stripe's libraries default to 5 minutes, and Stripe warns never to set the tolerance to 0, which disables the recency check entirely).
 
-Apply both lessons everywhere: use a distinct secret per endpoint (rotating one does not break every integration at once), and reject a request whose signature does not match or whose timestamp is stale, before your handler touches it. Both providers require the exact raw bytes; a framework that parses and re-serializes JSON before your verification code runs will break the check, so verify signatures against the body as received. Where a webhook route must be exempt from a site-wide CSRF filter, scope that exemption to that one route and method only, never to a whole controller or prefix.
+Apply the shared lesson everywhere: use a distinct secret per endpoint (rotating one does not break every integration at once), and reject a request whose signature does not match before your handler touches it. Replay handling itself is provider specific, not a single universal timestamp check: GitHub's signed payload carries no timestamp, so track the `X-GitHub-Delivery` id and refuse to reprocess a delivery you have already handled; Stripe signs a timestamp as part of the signed payload, so also reject a request whose timestamp is older than your tolerance window, and never set that tolerance to zero, which disables the recency check entirely. Both providers require the exact raw bytes; a framework that parses and re-serializes JSON before your verification code runs will break the check, so verify signatures against the body as received. Where a webhook route must be exempt from a site-wide CSRF filter, scope that exemption to that one route and method only, never to a whole controller or prefix.
 
 ## 4. Bound the expensive endpoints too
 
-Inference, upload, and job-submission endpoints are usually the ones behind these transports, and an authenticated caller can still exhaust them. Enforce, at the proxy in front of the app rather than only in application code: a maximum request/body size, a concurrency cap per client, a request timeout matched to realistic response time, and a per-client rate limit. [authentication.md](authentication.md) covers the identity side these limits key off; the proxy guides (nginx, Caddy, Traefik) carry the directives for each.
+Inference, upload, and job-submission endpoints are usually the ones behind these transports, and an authenticated caller can still exhaust them. Two layers need separate limits. At the proxy in front of the app: a maximum request or body size, a connection concurrency cap per client, and a request timeout matched to realistic response time bound the HTTP connection itself; this repository's nginx, Caddy, and Traefik guides do not yet carry those specific directives, so set them directly from each proxy's own documentation. After a WebSocket upgrade, a single accepted connection can still carry unlimited messages or job submissions, which the connection-level limits above do not touch; OWASP's WebSocket Security Cheat Sheet calls for message-level authorization (checking that each individual message is allowed, not only the handshake) and message-level rate limiting (capping messages per connection per time window) as the separate control that applies once the socket is open. [authentication.md](authentication.md) covers the identity side these limits key off.
 
 ## Verify
 
 ```bash
-# No session, no token: refused before any data streams
+# Handshake-time auth (a cookie or Origin gate at the proxy or app): rejected before the upgrade completes
 curl -i --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" \
   -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" \
   https://app.example.com/ws                       # expect 401/403, not 101
+
+# Post-connect auth (first-message token): the handshake itself succeeds, so this is
+# not a curl-only test. Open the socket with a WebSocket client and send no token:
+# expect a 101 upgrade, then no protected data and a close once the grace period for
+# the first message elapses, proving the server withholds data until the token lands.
 
 # Cross-origin handshake: rejected on Origin even with a valid cookie
 curl -i --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Origin: https://evil.example" \
@@ -6703,9 +6815,10 @@ domain automatically, or put it behind your own reverse proxy per [nginx.md](ngi
 
 PocketBase 0.38 and later can restrict superuser sessions by IP: set the allowed list under
 Settings > Application > Superuser IPs, or from the console with
-`./pocketbase superuser ips 127.0.0.1 10.0.0.0 --dir=/path/to/your/pb_data`. The same settings panel
-can require an additional one-time code (email-delivered) when authenticating as a superuser. Both
-are worth enabling for any instance reachable beyond your own machine.
+`./pocketbase superuser ips 127.0.0.1 10.0.0.0 --dir=/path/to/your/pb_data`. Superuser MFA is a
+separate setting: open the `_superusers` collection and enable its MFA and OTP options there, which
+adds an email-delivered one-time code requirement when authenticating as a superuser. Both are worth
+enabling for any instance reachable beyond your own machine.
 
 None of that replaces the actual access control: every collection's API rules (`listRule`,
 `viewRule`, `createRule`, `updateRule`, `deleteRule`) decide what non-superusers can do. A rule left
@@ -6722,9 +6835,12 @@ prefer HTTPS over HTTP in production environments." Front it per [nginx.md](ngin
 Appwrite itself.
 
 By default only the first user can register through the console; every account after that has to be
-invited. Lock this down further with `_APP_CONSOLE_WHITELIST_ROOT` (only that first user can ever
-self-register), `_APP_CONSOLE_WHITELIST_EMAILS`, or `_APP_CONSOLE_WHITELIST_IPS` to restrict who can
-reach the console dashboard at all.
+invited. `_APP_CONSOLE_WHITELIST_ROOT`, `_APP_CONSOLE_WHITELIST_EMAILS`, and `_APP_CONSOLE_WHITELIST_IPS`
+narrow who can create a console account (the first restricts self-registration to that one first user;
+the other two add an email or IP allowlist to registration), not who can reach or log into the console
+dashboard. If the dashboard itself needs to stay unreachable from the open internet, put a separate
+network or access boundary in front of it, such as a firewall rule, VPN, or the reverse-proxy controls in
+[caddy.md](caddy.md) or [fronting-auth.md](fronting-auth.md).
 
 Project API keys are scoped rather than all-or-nothing; grant only the scopes a given key needs, and
 treat any key with `keys.write` as equivalent to an admin credential, since it can change or delete
@@ -6740,9 +6856,10 @@ curl -sI https://backend.example.com/console       # Appwrite console: login pag
 
 After bootstrap, confirm the console no longer offers public signup (only invitation), that a
 collection or resource with no rule set denies every request from a non-admin client, and that the
-key or token embedded in your client bundle is a scoped key, never a superuser token or an
-admin/`keys.write` API key. Grep the client bundle for the string used by your admin credentials; it
-should not appear.
+client bundle carries only an end-user session or auth token, never a PocketBase superuser token or
+an Appwrite API key of any scope; Appwrite API keys are a server credential regardless of scope, and
+client code should authenticate with an end-user session from the client SDK instead. Grep the client
+bundle for the string used by your admin credentials or API keys; it should not appear.
 
 ## Sources (checked September 2026)
 

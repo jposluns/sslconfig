@@ -58,10 +58,11 @@ The HTTP monitoring endpoint is off unless configured (`http_port: 8222` in the 
 ## Verify
 
 ```bash
-ss -tlnp | grep -E ':(4222|8222) '                       # 4222 as intended, 8222 loopback/private only
-nats pub test.subject hello                              # fails without valid credentials
-nats pub test.subject hello --creds REPLACE_WITH_CREDS_FILE  # succeeds once authenticated
-curl -s http://monitor.example.com:8222/connz             # connection refused/timeout from outside
+ss -tlnp | grep -E ':(4222|8222) '                                                                                                                          # 4222 as intended, 8222 loopback/private only
+nats pub orders.created hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE --user order-svc --password REPLACE_WITH_LONG_RANDOM_PASSWORD   # allowed subject, valid credentials: succeeds
+nats pub other.subject hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE --user order-svc --password REPLACE_WITH_LONG_RANDOM_PASSWORD     # subject outside the allow list: fails
+nats pub orders.created hello --tlsca /etc/nats/certs/ca.pem --tlscert REPLACE_WITH_CLIENT_CERT_FILE --tlskey REPLACE_WITH_CLIENT_KEY_FILE                                                                  # no --user/--password: fails
+curl -s http://monitor.example.com:8222/connz                                                                                                               # connection refused/timeout from outside
 ```
 
 ## Common mistakes

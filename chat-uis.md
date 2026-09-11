@@ -14,7 +14,7 @@ Keep it on loopback regardless of which mode you choose, and put the proxy's own
 
 ## LobeChat
 
-`KEY_VAULTS_SECRET` is documented as the password that gates access to the deployment (it also encrypts stored provider credentials, so once set, never change it or previously encrypted data becomes unreadable). For real per-user accounts, LobeChat's Better Auth service takes over: `AUTH_SECRET` (required) signs sessions, `AUTH_SSO_PROVIDERS` lists enabled SSO providers (for example `google,github,microsoft`), and `AUTH_DISABLE_EMAIL_PASSWORD=1` forces SSO-only login, hiding the password form entirely. `AUTH_ALLOWED_EMAILS` restricts registration to specific addresses or domains.
+`KEY_VAULTS_SECRET` is the key that encrypts stored provider credentials (AES-GCM); generate it with `openssl rand -base64 32`, and once set, never change it, or previously encrypted data becomes unreadable. LobeHub's own basic-variables page describes it loosely as "a password to access the LobeHub service", but its own warning on the same entry says the key is used to encrypt sensitive data: treat it as the encryption key, not the deployment's login gate. Real per-user login comes from LobeChat's Better Auth service: `AUTH_SECRET` (required, generated the same way) signs sessions, `AUTH_SSO_PROVIDERS` lists enabled SSO providers (for example `google,github,microsoft`) alongside the matching provider credentials each one needs (for example `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`), and `AUTH_DISABLE_EMAIL_PASSWORD=1` forces SSO-only login, hiding the password form entirely. `AUTH_ALLOWED_EMAILS` restricts registration to specific addresses or domains, but it defaults to empty, which allows every email through, so set it explicitly rather than relying on federation alone to gate access.
 
 ```bash
 docker run -d -p 127.0.0.1:3210:3210 \
@@ -22,6 +22,9 @@ docker run -d -p 127.0.0.1:3210:3210 \
   -e AUTH_SECRET=REPLACE_WITH_LONG_RANDOM_VALUE \
   -e AUTH_DISABLE_EMAIL_PASSWORD=1 \
   -e AUTH_SSO_PROVIDERS=google \
+  -e AUTH_GOOGLE_ID=REPLACE_WITH_GOOGLE_OAUTH_CLIENT_ID \
+  -e AUTH_GOOGLE_SECRET=REPLACE_WITH_GOOGLE_OAUTH_CLIENT_SECRET \
+  -e AUTH_ALLOWED_EMAILS=admin@example.com,example.com \
   lobehub/lobe-chat
 ```
 
@@ -54,6 +57,8 @@ ss -tlnp | grep -E '3001|3210|3000'                    # each UI on 127.0.0.1 on
 curl -s http://203.0.113.10:3210/                       # from another host: connection refused
 curl -s https://chat.example.com/api/some-endpoint      # without a key/token: 401
 curl -sI https://chat.example.com/                      # via the proxy: TLS, login required
+# LobeChat SSO: sign in with a Google account NOT listed in AUTH_ALLOWED_EMAILS
+#   expect rejection after the Google redirect, before any session is created
 ```
 
 ## Common mistakes

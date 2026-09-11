@@ -5,8 +5,12 @@ An AI agent, RAG fetcher, or webhook handler that retrieves URLs can be steered 
 ## AWS: require IMDSv2 and cap the hop limit
 
 The instance metadata service listens on `169.254.169.254`. IMDSv2 requires a session token obtained with a
-`PUT` before any `GET` succeeds, and by default the token's response has a hop limit of 1 at the IP protocol
-level, so a request relayed through a proxy will not reach it. Enforce IMDSv2 and keep the hop limit at 1:
+`PUT` before any `GET` succeeds. By default, the response to that `PUT`, the token itself, has a hop limit
+of 1 at the IP protocol level: the token cannot travel more than one network hop back to the requester (per
+the AWS instance metadata service documentation). A containerized application sitting one hop from the
+host, for example behind the container network's own routing, will not receive the token and so cannot
+complete an IMDSv2 request; this is a limit on the token response reaching that far, not a guarantee that no
+proxy anywhere can reach the metadata service itself. Enforce IMDSv2 and keep the hop limit at 1:
 
 ```bash
 aws ec2 modify-instance-metadata-options \
@@ -27,7 +31,10 @@ GCP's metadata server answers at `metadata.google.internal` or `169.254.169.254`
 - **Cloud firewall / security group egress rules** (the inbound side of the same tools is in
   [cloud-firewalls.md](cloud-firewalls.md)): default outbound rules on most providers allow everything out;
   add explicit egress rules that permit only DNS and the specific provider APIs the application calls, and
-  deny the rest.
+  deny the rest. On AWS, security groups do not filter traffic to or from the instance metadata address,
+  `169.254.169.254` (per the security groups documentation); they are not a backstop for metadata access.
+  Keep egress rules for every other destination, and rely on IMDSv2, the hop limit, and disabling the
+  metadata endpoint where it is unused to control reachability of the metadata service itself.
 - **Kubernetes NetworkPolicy egress**: a pod is unrestricted for egress until a `NetworkPolicy` with `Egress`
   in its `policyTypes` selects it, after which only listed destinations are reachable. This has no effect
   unless the cluster's network plugin (CNI) implements `NetworkPolicy`; confirm enforcement before relying
@@ -65,9 +72,15 @@ curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/latest/meta-data
 curl -s -o /dev/null -w '%{http_code}\n' http://169.254.169.254/computeMetadata/v1/instance/
 # Azure, no Metadata: true header: must fail, must not return metadata
 curl -s -o /dev/null -w '%{http_code}\n' 'http://169.254.169.254/metadata/instance?api-version=2025-04-07'
-# from the workload, to a host not on the egress allow list: must fail or time out
-curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://an-unlisted-host.example.com/ \
-  || echo "blocked or timed out"
+# positive control: a host on the egress allow list, for example the AWS STS endpoint used for role
+# credentials, must succeed
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 https://sts.amazonaws.com/
+
+# negative control: a known-live host outside the egress allow list must be blocked, not merely
+# unresolved; curl reports a DNS failure differently from a network-level block
+curl -sv --max-time 5 https://www.example.com/ 2>&1 | grep -q "Could not resolve host" \
+  && echo "DNS failure, not a policy block: confirm this host still resolves before retrying" \
+  || echo "blocked past DNS resolution, or timed out: this is the egress policy taking effect"
 # confirm the metadata options actually took effect
 aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
   --query 'Reservations[].Instances[].MetadataOptions'
@@ -77,6 +90,7 @@ aws ec2 describe-instances --instance-ids i-0123456789abcdef0 \
 ## Sources (checked September 2026)
 
 - AWS EC2 instance metadata service configuration: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
+- AWS VPC security groups (traffic security groups do not filter, including instance metadata): https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html
 - AWS CLI `modify-instance-metadata-options`: https://docs.aws.amazon.com/cli/latest/reference/ec2/modify-instance-metadata-options.html
 - GCP metadata server overview: https://cloud.google.com/compute/docs/metadata/overview
 - Azure Instance Metadata Service: https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-service

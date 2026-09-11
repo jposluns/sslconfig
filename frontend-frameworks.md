@@ -12,15 +12,15 @@ HOST=127.0.0.1 PORT=3000 node build
 
 Behind a reverse proxy, set `ORIGIN` (for example `ORIGIN=https://app.example.com`) so SvelteKit computes the correct origin for redirects and cookies. `PROTOCOL_HEADER` and `HOST_HEADER` (for example `x-forwarded-proto` and `x-forwarded-host`) let it read the real scheme and host from the proxy; the docs caution to set these only behind a trusted reverse proxy, since an untrusted client could otherwise spoof them. `ADDRESS_HEADER` and `XFF_DEPTH` do the same for the client's real IP.
 
-CSRF: `csrf.checkOrigin` (default `true`) rejects a POST, PUT, PATCH, or DELETE whose `Origin` header does not match, with "Cross-site POST form submissions are forbidden."
+CSRF: `csrf.checkOrigin` (default `true`, deprecated in the current reference) checks the `Origin` header for a POST, PUT, PATCH, or DELETE form submission whose `Content-Type` is `application/x-www-form-urlencoded`, `multipart/form-data`, or `text/plain`, rejecting a mismatch with "Cross-site POST form submissions are forbidden." It does not inspect a JSON body or any other content type reaching a `+server.js` endpoint or form action, so those still need their own origin or session check. The docs point to `csrf.trustedOrigins` instead: an allowlist (default empty) of specific origins permitted to submit forms cross site; only `'*'` trusts every origin, and the docs call that generally not recommended.
 
 Public env: only variables prefixed `PUBLIC_` (`env.publicPrefix`) are "statically injected into your bundle at build time" and reachable from `$env/static/public`; anything else throws if imported from client code. Keep secrets in modules SvelteKit treats as server-only, either `$env/static/private` / `$env/dynamic/private`, a `.server.js` filename, or anything under `$lib/server/` ([secrets.md](secrets.md)); SvelteKit statically traces import chains and fails the build if client code imports one, even through a dynamic `import()`.
 
-None of this gates a request for you: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a proxy-layer redirect alone.
+None of this gates a request for you by default: a `+layout.server.js` guard does not protect a sibling `+page.server.js` load function, a form action, or a `+server.js` endpoint reached directly, so each needs its own session check, the same pattern as the Next.js Data Access Layer in [nextjs.md](nextjs.md). The `handle` hook in `hooks.server.js` can enforce access, since it runs on every request and may return a `Response` before `resolve` renders the route, but only when it actually checks the session and blocks; using it just to redirect an unauthenticated page navigation, or just to attach identity onto `event.locals` for other handlers to read, still leaves a directly reached `+server.js` endpoint or form action open. Do not base the authorization decision on `event.url`, `route`, or `params` inside `handle`, since those are client supplied and can be manipulated; check the session instead. Wire real authentication with an identity provider or library per [oidc-integration.md](oidc-integration.md), not a client-side redirect alone.
 
 ## Nuxt (Nitro server routes)
 
-Files under `server/api/`, `server/routes/`, and `server/middleware/` are auto-registered Nitro handlers exported with `defineEventHandler()`. Nuxt ships no built-in authentication: a middleware handler can attach `event.context.auth`, but every handler that reads it still has to check it itself, since middleware alone does not stop the request:
+Files under `server/api/`, `server/routes/`, and `server/middleware/` are auto-registered Nitro handlers exported with `defineEventHandler()`, and a handler in `server/middleware/` runs before every other server route. Nuxt ships no built-in authentication. A middleware handler can enforce access if it throws (for example `createError` with a 401 or 403) or otherwise ends the request there; one that only attaches `event.context.auth` for other handlers to read has not enforced anything, and every handler that reads it still has to check it itself:
 
 ```ts
 // server/api/admin.ts: the route checks for itself; the middleware only sets event.context.auth
@@ -44,15 +44,19 @@ Both are development tooling, not a production server: the `vite preview` docs s
 
 ```bash
 curl -si https://app.example.com/api/private | head -1   # 401 with no session cookie, on all three frameworks
-grep -rl "REPLACE_WITH_LONG_RANDOM_VALUE" build dist .output 2>/dev/null   # no output: no private value in the client build
+ls build dist .output 2>/dev/null                          # confirm which output directory your build actually produced
+grep -rl "REPLACE_WITH_YOUR_ACTUAL_SECRET_VALUE" build dist .output 2>/dev/null
+                                                            # any line here is a leaked value; treat no output as clean only
+                                                            # if the ls above found a real directory, since a missing one
+                                                            # also produces no output from grep
 curl -si https://app.example.com/ -H "Host: evil.example.com" | head -1   # a spoofed Host is not trusted
 ```
 
-Behind a reverse proxy, confirm cookies still carry `Secure` and redirects use an `https://` `Location` once `ORIGIN` (SvelteKit) or `NUXT_PUBLIC_` (Nuxt) values are set; without them, the app often builds an `http://` URL even though the browser connection is TLS.
+Behind a reverse proxy, confirm cookies still carry `Secure` and redirects use an `https://` `Location` once `ORIGIN` (SvelteKit) is set; without it, SvelteKit often builds an `http://` URL even though the browser connection is TLS. `NUXT_PUBLIC_...` is the public runtime-config prefix, exposed straight to the client bundle; it is not a trusted-proxy or secure-cookie setting and does nothing for this check. Nuxt's own trusted-proxy and origin handling come from its deployment preset and hosting platform rather than one documented app-level variable, so verify the equivalent behavior against whichever adapter you deploy with.
 
 ## Common mistakes
 
-- Checking auth only in a SvelteKit `hooks.server.js` redirect or a Nuxt `server/middleware/`, while the `+server.js` endpoint or `server/api/` route trusts that it already happened.
+- Treating a SvelteKit `handle` hook that only redirects an unauthenticated page navigation, or a Nuxt `server/middleware/` that only attaches `event.context.auth`, as if it already enforced access, while the `+server.js` endpoint, form action, or `server/api/` route trusts that it happened and skips its own check.
 - Leaving `server.allowedHosts` at `true`, or `server.host` wide open, past a local demo.
 - Naming a secret `PUBLIC_...` or `NUXT_PUBLIC_...` out of habit from a genuinely public value.
 

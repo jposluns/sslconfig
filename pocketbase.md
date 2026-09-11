@@ -20,9 +20,10 @@ domain automatically, or put it behind your own reverse proxy per [nginx.md](ngi
 
 PocketBase 0.38 and later can restrict superuser sessions by IP: set the allowed list under
 Settings > Application > Superuser IPs, or from the console with
-`./pocketbase superuser ips 127.0.0.1 10.0.0.0 --dir=/path/to/your/pb_data`. The same settings panel
-can require an additional one-time code (email-delivered) when authenticating as a superuser. Both
-are worth enabling for any instance reachable beyond your own machine.
+`./pocketbase superuser ips 127.0.0.1 10.0.0.0 --dir=/path/to/your/pb_data`. Superuser MFA is a
+separate setting: open the `_superusers` collection and enable its MFA and OTP options there, which
+adds an email-delivered one-time code requirement when authenticating as a superuser. Both are worth
+enabling for any instance reachable beyond your own machine.
 
 None of that replaces the actual access control: every collection's API rules (`listRule`,
 `viewRule`, `createRule`, `updateRule`, `deleteRule`) decide what non-superusers can do. A rule left
@@ -39,9 +40,12 @@ prefer HTTPS over HTTP in production environments." Front it per [nginx.md](ngin
 Appwrite itself.
 
 By default only the first user can register through the console; every account after that has to be
-invited. Lock this down further with `_APP_CONSOLE_WHITELIST_ROOT` (only that first user can ever
-self-register), `_APP_CONSOLE_WHITELIST_EMAILS`, or `_APP_CONSOLE_WHITELIST_IPS` to restrict who can
-reach the console dashboard at all.
+invited. `_APP_CONSOLE_WHITELIST_ROOT`, `_APP_CONSOLE_WHITELIST_EMAILS`, and `_APP_CONSOLE_WHITELIST_IPS`
+narrow who can create a console account (the first restricts self-registration to that one first user;
+the other two add an email or IP allowlist to registration), not who can reach or log into the console
+dashboard. If the dashboard itself needs to stay unreachable from the open internet, put a separate
+network or access boundary in front of it, such as a firewall rule, VPN, or the reverse-proxy controls in
+[caddy.md](caddy.md) or [fronting-auth.md](fronting-auth.md).
 
 Project API keys are scoped rather than all-or-nothing; grant only the scopes a given key needs, and
 treat any key with `keys.write` as equivalent to an admin credential, since it can change or delete
@@ -57,9 +61,10 @@ curl -sI https://backend.example.com/console       # Appwrite console: login pag
 
 After bootstrap, confirm the console no longer offers public signup (only invitation), that a
 collection or resource with no rule set denies every request from a non-admin client, and that the
-key or token embedded in your client bundle is a scoped key, never a superuser token or an
-admin/`keys.write` API key. Grep the client bundle for the string used by your admin credentials; it
-should not appear.
+client bundle carries only an end-user session or auth token, never a PocketBase superuser token or
+an Appwrite API key of any scope; Appwrite API keys are a server credential regardless of scope, and
+client code should authenticate with an end-user session from the client SDK instead. Grep the client
+bundle for the string used by your admin credentials or API keys; it should not appear.
 
 ## Sources (checked September 2026)
 

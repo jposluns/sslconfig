@@ -71,19 +71,19 @@ Without `--tlsverify` the daemon does not check client certificates. Firewall 23
 ## Dozzle
 
 - Dozzle reads the Docker socket to show logs, the same host-level access the Docker API section above describes ([docker.md](docker.md)); a Dozzle login is a login to the host.
-- Authentication is off unless configured. Set `DOZZLE_AUTH_PROVIDER=simple` with a generated `users.yml` (`docker run -it --rm amir20/dozzle generate <username> --password <password>`), or `DOZZLE_AUTH_PROVIDER=forward-proxy` to delegate login to a fronting proxy such as Authelia, Authentik, or Cloudflare Access.
+- Authentication is off unless configured. Generate a `users.yml` with `docker run -it --rm amir20/dozzle generate admin > users.yml` (omit `--password` and Dozzle prompts for it on stdin, so it never lands in shell history), mount that file into the container, and set `DOZZLE_AUTH_PROVIDER=simple`; or set `DOZZLE_AUTH_PROVIDER=forward-proxy` to delegate login to a fronting proxy such as Authelia, Authentik, or Cloudflare Access.
 - Container actions (start, stop, recreate) and shell access into a running container can be turned on; leave both off unless a specific workflow needs them, since either turns a log viewer into remote command execution on the host.
 - Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer, like every panel above.
 
 ## Docker Registry (`registry:2`)
 
 - The reference registry image ships with no authentication at all: anyone who reaches the port can push and pull every image, and TLS must be configured before any authentication scheme works, since credentials would otherwise cross the wire in clear text.
-- Put a proxy in front with htpasswd basic authentication (bcrypt only; `htpasswd -B`, since the registry rejects any other hash format) or a token server, or run a registry distribution that has its own authentication built in.
+- Restrict access with htpasswd basic authentication, a token server, or a registry distribution that has its own authentication built in. If using the registry's own native htpasswd auth provider (set directly in the registry's `config.yml`), credentials must be bcrypt-hashed (`htpasswd -B`); the registry rejects any other hash format. If instead a reverse proxy sits in front and does its own basic authentication from its own htpasswd file, that proxy's own hashing rules apply, not the registry's.
 - Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer.
 
 ## Filebrowser
 
-- Ships with a default administrator account created on first run (historically `admin`/`admin`; some current packagings instead default to or auto-generate `admin`/`admin123`, shown once). Change it immediately, before the instance is reachable by anyone else. The project's own repository (archived, unmaintained as of August 2026) says not to expose it directly to the internet.
+- Ships with a default administrator account created on first run (historically `admin`/`admin`). Change it immediately, before the instance is reachable by anyone else. The project's own repository (archived on September 1, 2026) says not to expose it directly to the internet.
 - Bind it to loopback or a private interface and reach it through SSH port forwarding, a tailnet, or Access, with MFA at the fronting layer; never publish a file-serving admin panel.
 
 ## Node-RED
