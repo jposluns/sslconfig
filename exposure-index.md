@@ -35,6 +35,7 @@ one of them is the application's.
 | 1883 | MQTT, plaintext | [mosquitto.md](mosquitto.md) |
 | 2375 | Docker API, plaintext and unauthenticated | [devops-uis.md](devops-uis.md) |
 | 2376 | Docker API over TLS. The port is a convention, not proof of client-certificate authentication: `--tls` and `--tlsverify` are different settings | [devops-uis.md](devops-uis.md), [docker.md](docker.md) |
+| 2379, 2380 | etcd client and peer ports on a Kubernetes control-plane node. Every Secret in the cluster is here, unencrypted unless encryption at rest is configured | [kubernetes.md](kubernetes.md) |
 | 3000 | The most crowded port here: 23 guides in this corpus mention it, and the most likely owners are Metabase, Dagster, Gitea, Dokploy, Next.js, SvelteKit's Node adapter (which defaults to `0.0.0.0`), Rails, Flowise, OpenHands, Langfuse, TGI, and the backend behind most proxy examples. Open WebUI's 3000 is a **published host port** mapping to container 8080 | [nextjs.md](nextjs.md), [frontend-frameworks.md](frontend-frameworks.md), [ruby.md](ruby.md), [bi-dashboards.md](bi-dashboards.md), [workflow-orchestrators.md](workflow-orchestrators.md), [devops-uis.md](devops-uis.md), [open-webui.md](open-webui.md), [llm-observability.md](llm-observability.md), [model-servers.md](model-servers.md), [agent-builders.md](agent-builders.md), [chat-uis.md](chat-uis.md), [mcp-servers.md](mcp-servers.md), [fronting-auth.md](fronting-auth.md) |
 | 3001 | AnythingLLM, or Uptime Kuma | [chat-uis.md](chat-uis.md), [devops-uis.md](devops-uis.md) |
 | 3080 | LibreChat | [agent-builders.md](agent-builders.md) |
@@ -56,6 +57,7 @@ one of them is the application's.
 | 6333, 6334, 6335 | Qdrant REST, gRPC, and internal cluster gRPC | [vector-databases.md](vector-databases.md) |
 | 6362 | Neo4j backup | [neo4j.md](neo4j.md) |
 | 6379 | Redis, Valkey, or the Ray head node | [redis.md](redis.md), [ray.md](ray.md), [cloud-firewalls.md](cloud-firewalls.md) |
+| 6443 | The Kubernetes API server on a self-managed cluster. Managed providers usually serve it on 443 instead, so its absence here proves nothing | [kubernetes.md](kubernetes.md) |
 | 7000 | frp server | [tunnels.md](tunnels.md) |
 | 7233 | Temporal frontend gRPC | [workflow-orchestrators.md](workflow-orchestrators.md) |
 | 7473, 7474, 7687 | Neo4j HTTPS, HTTP, and Bolt | [neo4j.md](neo4j.md) |
@@ -84,6 +86,9 @@ one of them is the application's.
 | 9443 | Portainer HTTPS UI | [devops-uis.md](devops-uis.md) |
 | 10001 | Ray Client server, which executes code | [ray.md](ray.md) |
 | 10002 to 19999 | Ray worker ports, allocated across this whole range by default, plus several randomized ports. Anything in this range on a Ray node may be a worker rather than the service the row below suggests | [ray.md](ray.md) |
+| 10250 | The Kubernetes kubelet API, which runs commands in containers. It also falls inside the Ray worker range above | [kubernetes.md](kubernetes.md) |
+| 10255 | The Kubernetes kubelet read-only port, which serves with no authentication or authorization | [kubernetes.md](kubernetes.md) |
+| 10256, 10257, 10259 | Kubernetes kube-proxy health, the controller manager, and the scheduler | [kubernetes.md](kubernetes.md) |
 | 11211 | Memcached. Check UDP as well as TCP | [memcached.md](memcached.md) |
 | 11434 | Ollama | [ollama.md](ollama.md) |
 | 15672 | RabbitMQ management UI | [rabbitmq.md](rabbitmq.md) |
