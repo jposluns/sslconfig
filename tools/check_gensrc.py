@@ -18,24 +18,17 @@ WHAT IT CHECKS, per entry under "generated":
 
 The third is the one with teeth. The other two only catch a rename.
 
-HOW IT READS THE SCRIPT, and the limit that comes with it: by matching a single
-`files=(...)` array assignment, not by running the script. Running it would be the accurate
-way and it is not worth executing a build to check a manifest.
+HOW IT READS THE SCRIPT: it asks. A build script states its own inputs under
+`--list-inputs`, and this gate takes what the script prints rather than working it out.
+Two earlier versions tried to determine the list from the script's text, first with a
+hand-written parser and then by evaluating the extracted array in bash, and both lost to
+ordinary shell a build script is entitled to use: a variable referenced inside the array,
+a second assignment spelled `typeset -a files+=`. A reviewer's judgement across three
+rounds was that the invariant is worth checking and that this implementation was not worth
+its maintenance cost. Requiring a build script to be able to say what it builds from is a
+smaller thing to ask than reimplementing bash.
 
-So this understands one array in one shape, and anything else must fail the MATCH rather
-than be checked incorrectly. That direction matters more than it sounds. Missing a real
-source is a silent false pass; inventing one is a fabricated drift finding against a
-correct repository, which is worse than no gate, because a maintainer told their manifest
-is wrong when it is right learns to distrust the whole suite. The first version of this
-file did exactly that: a comment line, a line continuation and a quoted filename each
-produced invented sources, while a `files+=` later in the script, a trailing comment, and
-a glob each produced silent passes. All six were demonstrated by a reviewer and are
-recorded in `tools/test_gensrc_gate.py`.
-
-It now refuses, with a reason, when the script assigns to `files` more than once, when a
-token carries shell syntax it would have to expand, or when the array is empty. It reads a
-comment to end of line rather than as one word, and unwraps a quoted filename. The
-manifest side is checked too: `sources` must be a list of non-empty strings, because a
+The manifest side is checked too: `sources` must be a list of non-empty strings, because a
 JSON object passed once when converting it to a set silently took its keys.
 
 WHAT THIS DOES NOT PROVE: that the regenerate command produces the target, that the target
@@ -44,79 +37,44 @@ currency. This one covers the record of how it is made.
 """
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 MANIFEST = Path(".aiqt") / "gensrc.json"
-# The array, opened on its own line and closed by a `)` that has nothing after it.
-FILES_ARRAY = re.compile(r"^files=\(\n(.*?)^\)[ \t]*$", re.S | re.M)
-# Any assignment to the same name, in any of the spellings that change what it holds:
-# `files=`, `files+=`, `files[2]=`, and a `declare -a` in front of any of them.
-FILES_ASSIGN = re.compile(r"^[ \t]*(?:declare[ \t]+-a[ \t]+)?files(?:\[[^]]*\])?\+?=", re.M)
-# Constructs that would RUN something or redirect. The array is handed to bash below, and
-# bash is trusted to split words, strip quotes and drop comments, which is the whole point.
-# It is not trusted to run a command out of a file this gate is only supposed to read.
-ACTIVE = re.compile(r"\$\(|`|\$\{|[;&|<>]")
 
 
 class Unreadable(Exception):
     """The script's list is not in the one shape this gate reads."""
 
 
-def script_inputs(script: Path, root: Path):
-    """The files a build script lists, as bash itself resolves them.
+def script_inputs(command, root: Path):
+    """The files a build script says it builds from, asked rather than worked out.
 
-    The first two versions of this hand-wrote a bash word splitter in Python and lost twice.
-    A reviewer demonstrated eleven ways between them: a comment inside a word, a quoted
-    filename containing a space, mismatched quotes, an empty element, a glob quoted so it is
-    literal, a `files+=` on an indented line, a `files[1]=` index assignment, a `declare -a`
-    respelling, and trailing commands after the closing parenthesis. Each fix grew the
-    parser and each round found more, which is the shape of a losing argument.
+    Two earlier versions tried to determine this from the script's text, first with a
+    hand-written parser and then by evaluating the extracted array in bash. Both lost to
+    ordinary shell that a build script is entitled to use: a variable referenced inside the
+    array, `typeset -a files+=` as a second assignment, a command sitting between the array
+    and a later one. Every fix grew the code and the next round found another word bash
+    already knew how to read.
 
-    So bash does it. The array text is handed to `bash -c`, which applies the real rules for
-    quoting, comments, and globbing, and prints what it actually got. That is not a new
-    risk: `tools/run_all_checks.sh` already runs this very script two checks earlier, to
-    prove the bundle is current, so refusing to let bash read one array out of it was a
-    constraint this gate invented for itself and then lost to.
-
-    What bash is NOT trusted with is running anything. A block carrying a command
-    substitution, a redirection or a control operator is refused, unread.
-
-    Globs expand against the repository root, because that is where the build script runs,
-    so a manifest is compared against the files a glob really produces rather than against
-    the glob.
+    So the script states its own inputs under `--list-inputs`, and this asks for them. The
+    script is the only thing that can answer without guessing, and a build script that
+    cannot say what it builds from is a reasonable thing to require.
     """
-    text = script.read_text(encoding="utf-8")
-    m = FILES_ARRAY.search(text)
-    if not m:
-        raise Unreadable("no files=(...) array opened and closed on their own lines")
-    if len(FILES_ASSIGN.findall(text)) > 1:
-        raise Unreadable("more than one assignment to `files`, so the first is not the whole list")
-    block = m.group(1)
-    if ACTIVE.search(block):
-        raise Unreadable("the array carries a command substitution, a redirection or a "
-                         "control operator, which this gate reads but will not run")
-
     try:
-        done = subprocess.run(
-            ["bash", "-c", 'eval "arr=($1)"; printf "%s\\0" "${arr[@]}"', "_", block],
-            cwd=root, capture_output=True, timeout=30, env={"PATH": os.environ.get("PATH", "")})
+        done = subprocess.run([*command, "--list-inputs"], cwd=root, capture_output=True,
+                              timeout=60, env={"PATH": os.environ.get("PATH", "")})
     except (OSError, subprocess.SubprocessError) as exc:
-        raise Unreadable(f"bash could not read the array: {exc}")
+        raise Unreadable(f"could not run it with --list-inputs: {exc}")
     if done.returncode:
         raise Unreadable(
-            f"bash rejected the array: {done.stderr.decode('utf-8', 'replace').strip()[:160]}")
-
-    out = done.stdout.decode("utf-8").split("\0")
-    if out and out[-1] == "":
-        out.pop()                      # printf writes a separator after the last element
-    if any(not w for w in out):
-        raise Unreadable("the array holds an empty element, which is not a filename and "
-                         "which the build script would fail on")
+            f"--list-inputs exited {done.returncode}. A build script this manifest names has "
+            f"to support it, printing one input per line and doing nothing else: "
+            f"{done.stderr.decode('utf-8', 'replace').strip()[:160]}")
+    out = [w for w in done.stdout.decode("utf-8").splitlines() if w.strip()]
     if not out:
-        raise Unreadable("the files=(...) array is empty")
+        raise Unreadable("--list-inputs printed nothing")
     return out
 
 
@@ -155,12 +113,12 @@ def main() -> int:
             continue
 
         try:
-            listed = script_inputs(script, root)
+            listed = script_inputs(command.split(), root)
         except Unreadable as why:
             findings.append(
-                f"{MANIFEST}: {target}: cannot read the source list out of {named[0]}: {why}. "
-                f"This gate reads one array in one shape; if the script changed how it "
-                f"builds its list, teach this gate the new shape rather than deleting it")
+                f"{MANIFEST}: {target}: cannot get the source list out of {named[0]}: {why}. "
+                f"This gate asks the script rather than reading it, so a script named here "
+                f"has to answer `--list-inputs` with one input per line")
             continue
 
         sources = entry.get("sources")
