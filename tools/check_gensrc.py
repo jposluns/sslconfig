@@ -43,52 +43,78 @@ is current, or that the sources are the right sources. The bundle-freshness gate
 currency. This one covers the record of how it is made.
 """
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 MANIFEST = Path(".aiqt") / "gensrc.json"
-# One array assignment, opened on its own line and closed on its own line.
-FILES_ARRAY = re.compile(r"^files=\(\n(.*?)^\)", re.S | re.M)
-# Any OTHER assignment to the same name. A `files+=(...)` later in the script, or a second
-# `files=(...)`, changes the real list while leaving the first match looking authoritative.
-FILES_AGAIN = re.compile(r"^files\+?=", re.M)
-# Characters the shell would act on. A token carrying one is not a filename, and certifying
-# it literally would bless a manifest that lists a wildcard as though it were a source.
-SHELL_ACTIVE = re.compile(r"[*?\[\]${}~!&|;<>()`\\]")
+# The array, opened on its own line and closed by a `)` that has nothing after it.
+FILES_ARRAY = re.compile(r"^files=\(\n(.*?)^\)[ \t]*$", re.S | re.M)
+# Any assignment to the same name, in any of the spellings that change what it holds:
+# `files=`, `files+=`, `files[2]=`, and a `declare -a` in front of any of them.
+FILES_ASSIGN = re.compile(r"^[ \t]*(?:declare[ \t]+-a[ \t]+)?files(?:\[[^]]*\])?\+?=", re.M)
+# Constructs that would RUN something or redirect. The array is handed to bash below, and
+# bash is trusted to split words, strip quotes and drop comments, which is the whole point.
+# It is not trusted to run a command out of a file this gate is only supposed to read.
+ACTIVE = re.compile(r"\$\(|`|\$\{|[;&|<>]")
 
 
 class Unreadable(Exception):
     """The script's list is not in the one shape this gate reads."""
 
 
-def script_inputs(script: Path):
-    """The files a build script lists.
+def script_inputs(script: Path, root: Path):
+    """The files a build script lists, as bash itself resolves them.
 
-    Raises Unreadable with a reason rather than guessing. Every branch here exists because
-    a reviewer demonstrated the previous version getting it wrong, and the two directions
-    were not equally bad: missing a real source is a silent false pass, while inventing one
-    produces a fabricated drift finding against a correct repository, which is worse than
-    no gate because it teaches a maintainer to distrust the suite.
+    The first two versions of this hand-wrote a bash word splitter in Python and lost twice.
+    A reviewer demonstrated eleven ways between them: a comment inside a word, a quoted
+    filename containing a space, mismatched quotes, an empty element, a glob quoted so it is
+    literal, a `files+=` on an indented line, a `files[1]=` index assignment, a `declare -a`
+    respelling, and trailing commands after the closing parenthesis. Each fix grew the
+    parser and each round found more, which is the shape of a losing argument.
+
+    So bash does it. The array text is handed to `bash -c`, which applies the real rules for
+    quoting, comments, and globbing, and prints what it actually got. That is not a new
+    risk: `tools/run_all_checks.sh` already runs this very script two checks earlier, to
+    prove the bundle is current, so refusing to let bash read one array out of it was a
+    constraint this gate invented for itself and then lost to.
+
+    What bash is NOT trusted with is running anything. A block carrying a command
+    substitution, a redirection or a control operator is refused, unread.
+
+    Globs expand against the repository root, because that is where the build script runs,
+    so a manifest is compared against the files a glob really produces rather than against
+    the glob.
     """
     text = script.read_text(encoding="utf-8")
     m = FILES_ARRAY.search(text)
     if not m:
         raise Unreadable("no files=(...) array opened and closed on their own lines")
-    if len(FILES_AGAIN.findall(text)) > 1:
+    if len(FILES_ASSIGN.findall(text)) > 1:
         raise Unreadable("more than one assignment to `files`, so the first is not the whole list")
+    block = m.group(1)
+    if ACTIVE.search(block):
+        raise Unreadable("the array carries a command substitution, a redirection or a "
+                         "control operator, which this gate reads but will not run")
 
-    out = []
-    for line in m.group(1).splitlines():
-        line = line.split("#", 1)[0]          # a comment runs to end of line, not one word
-        for token in line.split():
-            if token.startswith(("'", '"')) and token.endswith(("'", '"')) and len(token) > 1:
-                token = token[1:-1]           # a quoted filename is that filename
-            if not token:
-                continue
-            if SHELL_ACTIVE.search(token):
-                raise Unreadable(f"{token!r} is shell syntax rather than a plain filename")
-            out.append(token)
+    try:
+        done = subprocess.run(
+            ["bash", "-c", 'eval "arr=($1)"; printf "%s\\0" "${arr[@]}"', "_", block],
+            cwd=root, capture_output=True, timeout=30, env={"PATH": os.environ.get("PATH", "")})
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise Unreadable(f"bash could not read the array: {exc}")
+    if done.returncode:
+        raise Unreadable(
+            f"bash rejected the array: {done.stderr.decode('utf-8', 'replace').strip()[:160]}")
+
+    out = done.stdout.decode("utf-8").split("\0")
+    if out and out[-1] == "":
+        out.pop()                      # printf writes a separator after the last element
+    if any(not w for w in out):
+        raise Unreadable("the array holds an empty element, which is not a filename and "
+                         "which the build script would fail on")
     if not out:
         raise Unreadable("the files=(...) array is empty")
     return out
@@ -129,7 +155,7 @@ def main() -> int:
             continue
 
         try:
-            listed = script_inputs(script)
+            listed = script_inputs(script, root)
         except Unreadable as why:
             findings.append(
                 f"{MANIFEST}: {target}: cannot read the source list out of {named[0]}: {why}. "
