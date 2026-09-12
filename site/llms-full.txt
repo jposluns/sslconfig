@@ -6861,15 +6861,23 @@ import chainlit as cl
 
 # Read the credential from the environment, never from source. Chainlit's own example
 # compares a literal "admin" against a literal "admin", which is a demonstration rather
-# than a deployment.
+# than a deployment. These two names are this application's own, not Chainlit's.
+# Indexing os.environ raises KeyError if either is unset, which stops the process before
+# the callback is ever registered; the explicit test is for a variable that is SET and
+# empty, which indexing accepts and which would otherwise be a usable password.
 EXPECTED_USER = os.environ["CHAINLIT_USER"].encode()
 EXPECTED_PASSWORD = os.environ["CHAINLIT_PASSWORD"].encode()
+if not EXPECTED_USER or not EXPECTED_PASSWORD:
+    raise SystemExit("CHAINLIT_USER and CHAINLIT_PASSWORD must both be set and non-empty")
 
 
 @cl.password_auth_callback
 def auth_callback(username: str, password: str) -> Optional[cl.User]:
-    # Both comparisons run before the `and`, so a short circuit cannot reveal which half
-    # failed, and compare_digest takes the same time whatever the input.
+    # compare_digest avoids content-based short-circuiting, so it does not leak how much of
+    # the password was right; Python notes it can still reveal "the types and lengths of a
+    # and b, but not their values". Both comparisons run before the `and` so that a short
+    # circuit there cannot reveal which half failed. The callback as a whole is not constant
+    # time and does not need to be; the point is that the secret is not compared with ==.
     ok_user = hmac.compare_digest(username.encode(), EXPECTED_USER)
     ok_password = hmac.compare_digest(password.encode(), EXPECTED_PASSWORD)
     if ok_user and ok_password:
@@ -6877,7 +6885,11 @@ def auth_callback(username: str, password: str) -> Optional[cl.User]:
     return None
 ```
 
-That is one shared credential, which is a gate on the deployment rather than user accounts: everyone who gets in is the same `identifier`, and revoking access means changing the value for all of them. Chainlit does not provide a user store, and its documentation says to "hash password before storing them", so real accounts mean verifying against your own store inside this same callback, with a slow password hash such as argon2 or bcrypt rather than the constant-time comparison above. Put the credential in the environment either way ([secrets.md](secrets.md)).
+That is one shared credential, which is a gate on the deployment rather than user accounts: everyone who gets in is the same `identifier`, and there is nobody to revoke individually.
+
+Rotating it is two steps, not one. Changing the environment variable does nothing until the process restarts, because the value above is read once at import. And a new password stops future logins without ending current ones: Chainlit issues a session token signed with `CHAINLIT_AUTH_SECRET`, and that secret, not this password, is what invalidates the sessions already handed out. Change both when you mean to lock everyone out.
+
+For real accounts, this callback is one of the options rather than the only one. Chainlit also supports OAuth and header-based authentication, which move the decision to an identity provider and are usually the better answer ([identity-providers.md](identity-providers.md), [oidc-integration.md](oidc-integration.md)). If you do manage passwords yourself, Chainlit persists user records but provides no password-account management, so the store and the verification are yours: keep a per-user hash from a slow algorithm, Argon2id for anything new, and call it inside this callback in place of the comparison above. The vendor's own advice is the short version of this, "hash password before storing them". A shared service credential still belongs in the environment ([secrets.md](secrets.md)); a per-user password hash belongs in the account store.
 
 ## OpenHands
 
@@ -6912,6 +6924,9 @@ curl -sI https://chat.example.com/                      # via the proxy: TLS, lo
 - LobeHub authentication service environment variables (Better Auth): https://lobehub.com/only-ai/markdown/docs/en/self-hosting/environment-variables/auth
 - Chainlit authentication overview: https://docs.chainlit.io/authentication/overview
 - Chainlit password authentication (`@cl.password_auth_callback` signature and example): https://docs.chainlit.io/authentication/password
+- Python `hmac.compare_digest`, for what it does and does not conceal: https://docs.python.org/3/library/hmac.html
+- Python `os.environ`, for what indexing a missing key does: https://docs.python.org/3/library/os.html
+- OWASP Password Storage Cheat Sheet, for Argon2id over bcrypt in anything new: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
 - OpenHands FAQs (single-user design, no built-in auth, sandboxing, hardened deployment): https://docs.openhands.dev/overview/faqs
 - OpenHands local setup (default docker port mapping): https://docs.openhands.dev/openhands/usage/run-openhands/local-setup
 
