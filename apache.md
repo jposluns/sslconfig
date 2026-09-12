@@ -80,6 +80,16 @@ sudo apachectl configtest && sudo systemctl reload apache2   # httpd on RHEL
 curl -sI http://example.com/            # expect 301 with a https:// Location
 curl -sI https://example.com/           # expect 200 without -k
 curl -s  https://example.com/           # expect 401 when basic auth is on
+ss -tlnp | grep -E ':(80|443)\b'        # only the addresses you meant to serve
+
+# A request whose Host matches no ServerName or ServerAlias does not fail. Apache says it
+# falls through to "the first listed virtual host that matches" the address and port, so
+# authentication configured on one vhost is bypassed entirely if another vhost is listed
+# first and serves the same DocumentRoot.
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https://example.com/
+                                        # must not be 200. Expect the 401 from your own
+                                        # vhost, or whatever the first listed one answers,
+                                        # and read the body if you are not sure which
 ```
 
 ## Common mistakes
@@ -93,4 +103,5 @@ curl -s  https://example.com/           # expect 401 when basic auth is on
 
 - Apache SSL/TLS how-to: https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html
 - Apache authentication how-to: https://httpd.apache.org/docs/2.4/howto/auth.html
+- Apache name-based virtual hosts, for which vhost answers an unmatched Host header: https://httpd.apache.org/docs/2.4/vhosts/name-based.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/

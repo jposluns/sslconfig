@@ -71,6 +71,13 @@ Basic authentication is single-factor, and lighttpd is absent from Authelia's su
 sudo lighttpd -tt -f /etc/lighttpd/lighttpd.conf && sudo systemctl reload lighttpd
 curl -sI http://example.com/        # expect a redirect to https://
 curl -sI https://example.com/       # expect 401 without credentials once auth is on
+ss -tlnp | grep -E ':(80|443)\b'    # only the addresses you meant to serve
+
+# The checks above prove the front door asks for credentials. They do not prove there is
+# only one door: a second server, or this one on another port, can serve the same files
+# with none of this configuration in front of them.
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https://example.com/
+                                    # must not be 200 with the protected content
 ```
 
 ## Common mistakes
