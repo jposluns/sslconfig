@@ -55,10 +55,22 @@ location /admin/ {
     return 404;
 }
 
-# The administrative realm's own login paths are on the same list. Keycloak: "Assuming the
-# administrative realm is called master, restrict /realms/master/ to internal access."
+# The Admin Console AUTHENTICATES against this hostname even when hostname-admin moves its
+# API calls elsewhere: Keycloak builds the console's auth URL from the FRONTEND base URL. So
+# a blanket 404 here locks every administrator out. Restrict by SOURCE instead, which is what
+# Keycloak asks for: "restrict access to the authentication protocol endpoints of the
+# administrative realm from public IP addresses."
 location /realms/master/ {
-    return 404;
+    allow 203.0.113.0/24;          # where your administrators connect from
+    deny  all;
+
+    proxy_pass         http://127.0.0.1:8080;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Forwarded-For   $remote_addr;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_set_header   X-Forwarded-Host  $host;
+    proxy_set_header   X-Forwarded-Port  $server_port;
+    proxy_set_header   X-Forwarded-Prefix "";
 }
 
 location / {
@@ -72,7 +84,9 @@ location / {
 }
 ```
 
-This is a fragment for the public hostname's existing `server` block, not a replacement for it. What it closes has to be open somewhere else, and that somewhere is the admin hostname: a separate `server` block on `id-admin.internal`, reached over a tailnet or an SSH forward per [admin-uis.md](admin-uis.md), which must proxy `/admin/`, `/realms/master/`, `/resources/` and `/.well-known/` through to Keycloak. Miss `/realms/master/` there and no administrator can log in anywhere, because the console authenticates against the master realm and the public hostname now refuses it. Keycloak's own guidance is exactly this shape: "do not expose the path `/realms/master/` to the public internet. Depending on your topology, you can combine this with serving the Admin UI and Admin API on a dedicated hostname and port." If a console login fails after you apply this section, that is the first thing to check, and step 6 of the Verify section is the test.
+This is a fragment for the public hostname's existing `server` block, not a replacement for it. Two different things happen on two different hostnames and it is worth being precise about which. The console's API calls go to the admin hostname, because Keycloak states that the "Administration Console implicitly accesses the API using the URL as specified by the `hostname-admin` option". Its LOGIN does not: Keycloak builds the console's authentication URL from the frontend base URL, so the browser is sent to `id.example.com/realms/master/` to authenticate no matter where the console itself is served. That is why the rule above restricts that path by source address rather than refusing it, and why an earlier version of this guide that refused it outright would have locked out every administrator including the one who applied it. A denied source gets a 403 from nginx rather than a 404, which is what step 5 of the Verify section looks for; if you see a 404 there, the path is being refused outright rather than restricted, and your administrators are locked out along with everyone else.
+
+The admin hostname is a separate `server` block on `id-admin.internal`, reached over a tailnet or an SSH forward per [admin-uis.md](admin-uis.md), and it must proxy `/admin/`, `/resources/` and `/.well-known/`. Add `/js/` as well if you run a version whose console still loads its adapter from there. Step 6 of the Verify section is the test, and it is the only step that checks something still WORKS rather than something is closed.
 
 Overwriting rather than appending matters. Keycloak's reverse proxy guide: "Take extra precautions to ensure that the client address is properly set by your reverse proxy via the `Forwarded` or `X-Forwarded-For` headers. If these headers are incorrectly configured, rogue clients can inject false values and trick Keycloak into thinking the client is connecting from a different IP address than the actual one." An appended header lets a client choose the first value, which is the one most code reads.
 
@@ -127,9 +141,13 @@ probe() { curl -q --noproxy '*' -sS "$@"; }
 # so on authentik substitute its own application and administration URLs; step 2's job is
 # to prove this host reaches that name at all, and any endpoint you expect to answer does it.
 
-# 1. On the host itself: nothing listens on a public address. Keycloak serves 8080 or
-#    8443 and management 9000; authentik serves 9000 and 9443, and metrics on 9300.
-ss -tlnp | grep -E ':(8080|8443|9000|9443|9300)\b'    # 127.0.0.1 or an RFC 1918 address only
+# 1. On the host itself: nothing listens on a public address. Keycloak serves 8080 or 8443
+#    and management 9000; authentik serves 9000 and 9443, and metrics on 9300. Two more are
+#    easy to forget because they are not the product's front door: 6379 is the Redis that
+#    authentik keeps its sessions and task queue in, and 7800 with 57800 are Keycloak's
+#    cache replication and failure detection, which carry the sessions and tokens of a
+#    clustered deployment. Anyone who reaches those reaches what is in them.
+ss -tlnp | grep -E ':(6379|7800|8080|8443|9000|9443|9300|57800)\b'    # 127.0.0.1 or an RFC 1918 address only
 # ss on the HOST does not see a container's own namespace, and a published Docker port
 # bypasses the host firewall besides, so cross-check what Compose actually published:
 docker compose ps --format 'table {{.Service}}\t{{.Ports}}'
@@ -139,8 +157,8 @@ docker compose ps --format 'table {{.Service}}\t{{.Ports}}'
 
 # 2. POSITIVE CONTROL, and the reason every check below means anything: the public
 #    hostname answers from out here. Use the realm your APPLICATIONS use, not master:
-#    section 3 closes the master realm at the proxy, so probing it here would test the
-#    wrong thing and contradict the rule you just wrote.
+#    section 3 restricts the master realm to your administrators' range, so probing it here
+#    would test the wrong thing and tell you nothing about the realm your applications use.
 probe https://id.example.com/realms/apps/.well-known/openid-configuration \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["issuer"])'
 # It must print YOUR issuer URL. A 200 alone proves only that something answered: a wrong
@@ -159,21 +177,29 @@ probe -o /dev/null -w '%{http_code}\n' https://id.example.com/admin/master/conso
 probe -o /dev/null -w '%{http_code}\n' https://id.example.com/admin/realms/master/users
 # 404 is the pass. 401 means the API answered and asked for a token.
 
-# 5. The administrative realm's own login paths are closed.
+# 5. The administrative realm's login paths are RESTRICTED, not refused. Section 3 allows
+#    them from your administrators' range and denies everything else, so from out here:
+#    403 is the pass. nginx answers a denied source with 403, not 404.
+#    200 means the allow rule covers the whole internet, or is not there at all.
+#    404 means you used `return 404` rather than an allow rule, which closes the path for
+#    your administrators too; see section 3 for why the console needs it on this hostname.
 probe -o /dev/null -w '%{http_code}\n' \
   https://id.example.com/realms/master/.well-known/openid-configuration
-# 404 is the pass. A 200 here is the master realm's discovery document, published.
-# Steps 3 to 5 sample three routes. A 404 on each proves those three requests were refused,
+# Steps 3 to 5 sample three routes and expect two different answers: 404 from the two
+# /admin/ paths, which are refused outright, and 403 from the master realm, which is
+# restricted by source. Either way they prove those three requests were handled as intended,
 # not that the whole administration surface is. A more specific `location` elsewhere in the
 # same server block can still serve one, so read the effective configuration too.
 
-# 6. An administrator can still log in. This is the half that the rule in section 3 can
-#    break, and the half nobody tests. From inside the network that reaches the admin
-#    hostname, complete a REAL login to the console, not a page load:
+# 6. An administrator can still log in. This is the half the rule in section 3 can break and
+#    the half nobody tests. From inside the network you allowed in that rule, complete a REAL
+#    login to the console rather than just loading the page:
 #    open https://id-admin.internal:8443/admin/master/console/ and authenticate.
-#    A blank page or a network error in the browser console pointing at id.example.com
-#    means the console tried to authenticate against the public hostname, where section 3
-#    now returns 404, and the admin server block is missing /realms/master/.
+#    Watch where the browser goes. It SHOULD be sent to id.example.com/realms/master/ to
+#    authenticate, because Keycloak builds the console's auth URL from the frontend hostname,
+#    and it should come back. If that request 404s, your allow rule does not cover the address
+#    you are coming from. If you are testing from outside the allowed range it SHOULD fail,
+#    and that is the rule working rather than a fault.
 
 # 7. The management, metrics and application ports are not routable from out here. All of
 #    them: a reader who remapped 9000 and left 9443 published passes every other step.
@@ -195,9 +221,11 @@ done
 # 8. Keycloak's bootstrap admin is gone. It does not expire on its own. Ask for the name
 #    rather than listing users: the users endpoint returns at most 100 by default, and a
 #    bootstrap account on page two looks exactly like a deleted one.
-#    kcadm.sh get users -r master -q username=<the bootstrap name> -q exact=true --fields username,id
+#    kcadm.sh get users -r master -q exact=true -q username=<the bootstrap name> --fields username,id
 #    exact=true matters: without it the filter is a substring match, and the result is capped
 #    at 100 either way, so an unfiltered list proves nothing about what is not in it.
+#    Order the -q flags this way round: an exactness flag placed after the filter it modifies
+#    has been reported not to take effect, and the cost of ordering it defensively is nothing.
 #    Check the master realm's service accounts too: a bootstrap SERVICE account is created
 #    by the client-id form of the same mechanism and is not in the user list at all.
 ```
@@ -215,3 +243,4 @@ One name is not one address, and one address is not one origin. Repeat steps 2 t
 - authentik monitoring, including the separate metrics port 9300 and that the metrics carry no authentication: https://docs.goauthentik.io/sys-mgmt/ops/monitoring
 - Keycloak server administration guide, brute force detection ("Brute force detection is disabled by default") and unspecific redirect URIs: https://www.keycloak.org/docs/latest/server_admin/index.html
 - nginx `location` selection and the `return` directive: https://nginx.org/en/docs/http/ngx_http_core_module.html#location , https://nginx.org/en/docs/http/ngx_http_rewrite_module.html#return
+- Keycloak configuring distributed caches, including the default cache ports 7800 (`cache-embedded-network-bind-port`, unicast data transmission) and 57800 (`jgroups.fd.port-offset`, failure detection): https://www.keycloak.org/server/caching
