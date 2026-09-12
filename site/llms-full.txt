@@ -4307,7 +4307,7 @@ openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
   -verify_hostname mq.example.com -verify_return_error </dev/null
 
 # Negative, and this half is what discriminates: drop -cert and -key, and the broker must
-# close the connection, because ssl_options.fail_if_no_peer_cert = true requires one.
+# refuse the connection, because ssl_options.fail_if_no_peer_cert = true requires one.
 openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
   -verify_hostname mq.example.com -verify_return_error </dev/null
 
