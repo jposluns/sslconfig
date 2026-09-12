@@ -420,84 +420,50 @@ else
   ok "no private keys or provider tokens found"
 fi
 
-echo "== site CSP script hash =="
-# The CSP in site/_headers pins the inline script by sha256. Recompute it from site/index.html so an
-# edited script cannot ship with a stale hash (the browser would then refuse to run it). Only the
-# script-src directive of the header block that applies to / (or /*) counts, and only a real inline
-# <script> (no src= attribute) is hashed.
-csp_ok=1
-while IFS= read -r line; do
-  case "$line" in
-    NO_SCRIPT) bad "no inline <script> found in site/index.html"; csp_ok=0 ;;
-    NO_BLOCK) bad "site/_headers has no path block for / or /*"; csp_ok=0 ;;
-    NO_CSP) bad "the applicable site/_headers block has no Content-Security-Policy header line"; csp_ok=0 ;;
-    NO_SCRIPT_SRC) bad "the Content-Security-Policy in site/_headers has no script-src directive"; csp_ok=0 ;;
-    MISSING:*) bad "the script-src directive in site/_headers lacks the hash of an inline script in site/index.html (sha256-${line#MISSING:})"; csp_ok=0 ;;
-  esac
-done < <(python3 - <<'PY'
-import re, base64, hashlib
+echo "== site CSP pins every inline block by hash =="
+# The CSP in site/_headers names the sha256 of each inline <script> and <style> in
+# site/index.html, so an edited block cannot ship with a stale hash: the browser would then
+# refuse to run the script, or refuse to apply the stylesheet and render the page unstyled.
+# Both are silent in a diff and obvious to a visitor. This check used to live here as an
+# embedded Python heredoc and covered only script-src, while style-src carried
+# 'unsafe-inline', which permits any inline style including an injected one.
+if csp=$(python3 tools/check_csp_hashes.py 2>&1); then
+  printf '%s\n' "$csp"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$csp"; then
+    bad "check_csp_hashes.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$csp"; then
+  bad "check_csp_hashes.py crashed; the CSP hashes are unverified"
+  printf '%s\n' "$csp" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$csp"; then
+  printf '%s\n' "$csp"
+  fail=1
+else
+  bad "check_csp_hashes.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$csp" | sed 's/^/          /'
+fi
 
-html = open("site/index.html", encoding="utf-8").read()
-html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
-
-hashes = []
-for attrs, body in re.findall(r"<script(\s[^>]*)?>(.*?)</script>", html, re.S):
-    if attrs and re.search(r"\bsrc\s*=", attrs):
-        continue
-    hashes.append(base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode())
-
-if not hashes:
-    print("NO_SCRIPT")
-else:
-    headers_text = open("site/_headers", encoding="utf-8").read()
-    blocks = {}
-    path = None
-    lines = []
-    for raw in headers_text.splitlines():
-        if not raw.strip():
-            continue
-        if not raw[0].isspace():
-            if path is not None:
-                blocks[path] = lines
-            path = raw.strip()
-            lines = []
-        else:
-            lines.append(raw.strip())
-    if path is not None:
-        blocks[path] = lines
-
-    block = blocks.get("/*")
-    if block is None:
-        block = blocks.get("/")
-
-    if block is None:
-        print("NO_BLOCK")
-    else:
-        csp_value = None
-        for line in block:
-            m = re.match(r"content-security-policy:\s*(.*)$", line, re.I)
-            if m:
-                csp_value = m.group(1)
-                break
-        if csp_value is None:
-            print("NO_CSP")
-        else:
-            script_src = None
-            for directive in csp_value.split(";"):
-                directive = directive.strip()
-                if re.match(r"script-src\b", directive, re.I):
-                    script_src = directive
-                    break
-            if script_src is None:
-                print("NO_SCRIPT_SRC")
-            else:
-                tokens = script_src.split()[1:]
-                for h in hashes:
-                    if "'sha256-" + h + "'" not in tokens:
-                        print("MISSING:" + h)
-PY
-)
-[ "$csp_ok" = 1 ] && ok "every inline script hash in site/index.html is pinned in the site/_headers script-src directive"
+echo "== the CSP hash gate still catches what review found =="
+# The gate's first version read the page with regular expressions and a reviewer demonstrated
+# six ways that was wrong. It reads the page with html.parser now. One case is a FALSE ALARM
+# the old version raised rather than a miss it had, and the file checks that the old approach
+# really would have failed it, so the case cannot quietly stop meaning anything.
+if csp_tests=$(python3 tools/test_csp_hashes.py 2>&1); then
+  printf '%s\n' "$csp_tests"
+  if grep -q '^  FAIL  ' <<< "$csp_tests"; then
+    bad "test_csp_hashes.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$csp_tests"; then
+  bad "test_csp_hashes.py crashed; the CSP hash gate is unverified"
+  printf '%s\n' "$csp_tests" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$csp_tests"; then
+  printf '%s\n' "$csp_tests"
+  fail=1
+else
+  bad "test_csp_hashes.py exited non-zero without reporting a result"
+  printf '%s\n' "$csp_tests" | sed 's/^/          /'
+fi
 
 echo "== AIQT baseline =="
 # The vendored gates derive the repo root from their own location, so they operate on this tree.

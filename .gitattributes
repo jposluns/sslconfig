@@ -1,0 +1,6 @@
+# These two files are the CSP hash gate's input and a browser's input, so keep them boring:
+# LF in the index and LF in every checkout. The gate normalizes newlines itself, the way HTML's
+# input-stream preprocessing does, so this pin is not what makes it correct. It just stops the
+# two files drifting between platforms for no reason.
+site/index.html text eol=lf
+site/_headers text eol=lf
