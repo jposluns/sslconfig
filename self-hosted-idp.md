@@ -197,9 +197,11 @@ probe -o /dev/null -w '%{http_code}\n' \
 #    open https://id-admin.internal:8443/admin/master/console/ and authenticate.
 #    Watch where the browser goes. It SHOULD be sent to id.example.com/realms/master/ to
 #    authenticate, because Keycloak builds the console's auth URL from the frontend hostname,
-#    and it should come back. If that request 404s, your allow rule does not cover the address
-#    you are coming from. If you are testing from outside the allowed range it SHOULD fail,
-#    and that is the rule working rather than a fault.
+#    and it should come back. If that request 403s, your allow rule does not cover the address
+#    you are coming from. If it 404s instead, `return 404` is still in place on that path,
+#    which is the state step 5 warns about and it locks out every administrator. If you are
+#    testing from outside the allowed range it SHOULD fail, and that is the rule working
+#    rather than a fault.
 
 # 7. The management, metrics and application ports are not routable from out here. All of
 #    them: a reader who remapped 9000 and left 9443 published passes every other step.
