@@ -8,7 +8,7 @@ Exposed HTTP ports (the "Expose HTTP Ports" pod setting) go through RunPod's pro
 
 Exposed TCP ports get "direct TCP forwarding with a public IP address" instead, and TLS is not automatic there: RunPod's own docs say to "implement TLS in your application when handling sensitive data over TCP." Secure every template listener, including notebooks, before exposing its port; a notebook exposed as raw TCP with no application-level password is fully open.
 
-A "symmetrical port mapping" option lets a template request a specific external port above 70000 so the internal and external port numbers match, with the assignment readable from the pod's environment (for example `$RUNPOD_TCP_PORT_70000`); that is a convenience for the pod's own scripts, not a security boundary, and the port is still public once mapped.
+A "symmetrical port mapping" option lets a template ask for matching internal and external port numbers by specifying a value above 70000 in its TCP configuration. That value is not a port: RunPod's documentation says such numbers are not valid ports and serve only to signal the request, and the real assignment arrives in the pod's environment (for example `$RUNPOD_TCP_PORT_70000`). It is a convenience for the pod's own scripts, not a security boundary, and the port is still public once mapped.
 
 ## Vast.ai
 
