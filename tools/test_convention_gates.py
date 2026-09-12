@@ -16,6 +16,13 @@ named branch: a longer adverbial suffix is reached only because a shorter one ma
 fails its word boundary, and the engine retries. It is recorded precisely because nothing else
 would notice if a future reordering broke it.
 
+Not every case here records a change. One is labelled a coverage guard: `minimise` is caught both
+before and after the round that moved its stem from one pattern to the other, because only the route
+changed. It fails only if the stem is dropped from BOTH patterns, which is how an incomplete move
+would go wrong, so it guards something real without being a regression case. It is labelled that way
+because seven of the eight cases added beside it DO fail against the previous code, and describing
+all eight the same way would be the overclaim this file exists to prevent.
+
 This is not a proof of correctness. It is a record of what has already gone wrong.
 
 Some cases here record a KNOWN LIMIT rather than a fix. Their description begins "known limit:", they
@@ -225,7 +232,7 @@ PROSE_CASES = (
      "The endpoint is recognisably the same one.", True, 15),
     ("a longer adverbial suffix, which the alternation reaches by backtracking",
      "They are organisationally separate.", True, 15),
-    ("minimise still needs catching after its stem moved",
+    ("coverage guard: minimise, whose stem moved between two patterns",
      "They minimise the risk.", True, 15),
 
     # FALSE ALARMS.
