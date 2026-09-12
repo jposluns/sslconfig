@@ -39,6 +39,9 @@ NOT_A_GUIDE = {
     "CLAUDE.md",
     "AGENTS.md",
     "CHANGELOG.md",
+    # The backlog. It carries no configuration, so a Verify section and dated Sources would be
+    # ceremony rather than the contract they are for every guide.
+    "TODO.md",
 }
 
 # README.md is a guide for this gate's purposes: it carries a substantive

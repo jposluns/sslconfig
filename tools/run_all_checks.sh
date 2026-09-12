@@ -23,7 +23,7 @@ bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
 # checklist without its sources.
 not_a_guide() {
   case "$1" in
-    CONTRIBUTING.md|CLAUDE.md|AGENTS.md|CHANGELOG.md|README.sources.md) return 0 ;;
+    CONTRIBUTING.md|CLAUDE.md|AGENTS.md|CHANGELOG.md|README.sources.md|TODO.md) return 0 ;;
     *) return 1 ;;
   esac
 }
