@@ -41,7 +41,54 @@ if bash scripts/build-llms-full.sh >/dev/null 2>&1; then
 else
   bad "scripts/build-llms-full.sh exited non-zero"
 fi
-cp "$orig" site/llms-full.txt
+# An unchecked restore could leave a half-written bundle for every later gate to read.
+cp "$orig" site/llms-full.txt || { bad "could not restore site/llms-full.txt from $orig"; exit 1; }
+
+echo "== the generated-file record matches how they are generated =="
+# CLAUDE.md names .aiqt/gensrc.json as the record of which sources produce site/llms-full.txt.
+# Adding a guide touches five wiring surfaces and four of them were gated; this was the fifth,
+# so a guide added to the build script and forgotten in the manifest left the record wrong and
+# nothing said so. The check above proves the bundle is current. This one proves the manifest
+# still agrees with what the build script reports as its inputs.
+if gensrc=$(python3 tools/check_gensrc.py 2>&1); then
+  printf '%s\n' "$gensrc"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$gensrc"; then
+    bad "check_gensrc.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$gensrc"; then
+  bad "check_gensrc.py crashed; the generated-file record is unverified"
+  printf '%s\n' "$gensrc" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$gensrc"; then
+  printf '%s\n' "$gensrc"
+  fail=1
+else
+  bad "check_gensrc.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$gensrc" | sed 's/^/          /'
+fi
+
+echo "== the generated-file record gate still catches what review found =="
+# The first version of the gate above was naive in both directions, and the two are not
+# equally bad: missing a source is a silent pass, while inventing one is a fabricated
+# finding against a correct repository, which teaches a maintainer to distrust the suite.
+# Each case here is a fixture a reviewer ran against it. They build throwaway repositories
+# and invoke the real gate, so what is under test is the shipped entry point.
+if gensrc_tests=$(python3 tools/test_gensrc_gate.py 2>&1); then
+  printf '%s\n' "$gensrc_tests"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$gensrc_tests"; then
+    bad "test_gensrc_gate.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$gensrc_tests"; then
+  bad "test_gensrc_gate.py crashed; the record gate is unverified"
+  printf '%s\n' "$gensrc_tests" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$gensrc_tests"; then
+  printf '%s\n' "$gensrc_tests"
+  fail=1
+else
+  bad "test_gensrc_gate.py exited non-zero without reporting a result"
+  printf '%s\n' "$gensrc_tests" | sed 's/^/          /'
+fi
 
 echo "== every guide is wired into the site =="
 wired=1
