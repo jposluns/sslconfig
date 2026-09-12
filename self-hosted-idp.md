@@ -234,7 +234,7 @@ done
 # 8. Keycloak's bootstrap admin is gone. It does not expire on its own. Ask for the name
 #    rather than listing users: the users endpoint returns at most 100 by default, and a
 #    bootstrap account on page two looks exactly like a deleted one.
-#    kcadm.sh get users -r master -q exact=true -q username=<the bootstrap name> --fields username,id
+#    kcadm.sh get users -r master -q exact=true -q username=REPLACE_WITH_BOOTSTRAP_NAME --fields username,id
 #    exact=true matters: without it the filter is a substring match, and the result is capped
 #    at 100 either way, so an unfiltered list proves nothing about what is not in it.
 #    Order the -q flags this way round: an exactness flag placed after the filter it modifies

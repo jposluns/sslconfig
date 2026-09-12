@@ -26,12 +26,15 @@ suite to promise more than it delivers.
 THE SECOND CHECK is here because shellcheck has a specific blind spot this corpus walks
 into. An angle-bracket placeholder inside a bash block is not a placeholder to the shell,
 it is a redirection: `chown <service-user> server.key` reads from a file called
-`service-user`. shellcheck catches that only when two redirections compete for the same
-stream, so `https://<machine>.<tailnet>.ts.net/` is caught with four errors while
-`http://<public-ip>:11434/api/tags` produces none at all, silently truncating a pasted
-command to `curl -s http://`. The corpus had three of these and shellcheck saw two, so the
-third is found here instead. Inside double quotes an angle bracket is literal and is left
-alone, which is why `-H "Authorization: Bearer <key>"` is fine.
+`service-user`. shellcheck catches one only when two redirections compete for one stream,
+so `https://<a>.<b>/` is caught with four errors while `http://<c>:8080/x` produces none at
+all. This check therefore reports an angle-bracket placeholder anywhere in a bash block,
+quoted or not. Quoting made no difference to whether a placeholder belongs in this corpus,
+and tracking quotes to exempt the quoted ones cost three demonstrated defects. Heredoc
+bodies are skipped, because they are data rather than shell; that is the only shell
+construct this gate tracks, and it is tracked because a configuration block inside a
+heredoc is exactly the text a fronting-layer guide carries. The corpus now carries none of
+these placeholders, the five that existed having been replaced with house placeholders.
 
 WHEN SHELLCHECK IS NOT INSTALLED this prints a SKIP and the suite stays green. That is a
 GAP, not a pass, and the message says so. The angle-bracket check does not depend on it and
@@ -55,41 +58,15 @@ from _walk import walk_files  # noqa: E402  fail-closed tree walk
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", "site", "tools", "scripts", ".github", ".aiqt"}
 BASH_BLOCK = re.compile(r"^```bash\n(.*?)^```", re.S | re.M)
-# A placeholder the shell would read as a redirection. Bounded to a word so that a comparison
-# or a here-doc marker is not mistaken for one.
-ANGLE = re.compile(r"<[A-Za-z][A-Za-z0-9_.-]*>")
-
-
-def unquoted_spans(line):
-    """The parts of a line outside double and single quotes, with their offsets.
-
-    An angle bracket inside quotes is literal, so `-H "Bearer <key>"` is not a redirection
-    and must not be reported. Comments are dropped first, on the same rule the other gates
-    use: a `#` starts one at the beginning of a line or after whitespace.
-    """
-    out, buf, start, quote = [], [], 0, None
-    for i, ch in enumerate(line):
-        if quote:
-            if ch == quote:
-                quote = None
-        elif ch in "'\"":
-            quote = ch
-            if buf:
-                out.append((start, "".join(buf)))
-            buf, start = [], i + 1
-            continue
-        elif ch == "#" and (i == 0 or line[i - 1].isspace()):
-            break
-        else:
-            if not buf:
-                start = i
-            buf.append(ch)
-            continue
-        if quote is None and not buf:
-            start = i + 1
-    if buf:
-        out.append((start, "".join(buf)))
-    return out
+# Any angle-bracket placeholder, anywhere in a bash block. The class is deliberately wide:
+# an earlier version excluded `:`, `@` and space, so `<IP:PORT>` and `<user@host>` passed
+# while silently truncating a pasted command.
+ANGLE = re.compile(r"<[A-Za-z][^<>\n]*>")
+# A heredoc body is data, not shell. `<<EOF`, `<<-EOF` and `<<'EOF'` open one; a line equal
+# to the marker closes it, allowing leading tabs for the dash form. This is the only shell
+# construct this gate tracks, because an Apache or XML configuration block inside a heredoc
+# is exactly the text a fronting-layer guide carries, and reading it as shell rejected it.
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 
 
 def blocks_of(path):
@@ -124,15 +101,23 @@ def main() -> int:  # noqa: C901
             for first, body in found:
                 n_blocks += 1
                 # The angle-bracket check, which does not need shellcheck.
+                marker = None
                 for offset, line in enumerate(body.splitlines()):
-                    for _at, span in unquoted_spans(line):
-                        hit = ANGLE.search(span)
-                        if hit:
-                            findings.append(
-                                f"{path.name}:{first + offset}: {hit.group(0)} outside quotes is a "
-                                f"redirection, not a placeholder; use a house placeholder such as "
-                                f"203.0.113.10 or quote it")
-                            break
+                    if marker is not None:
+                        if line.strip() == marker:
+                            marker = None
+                        continue
+                    opened = HEREDOC.search(line)
+                    # The opener supplies a `<` of its own, so `cat <<EOF > /tmp/x` would
+                    # otherwise report `<EOF >` as a placeholder. Blank the openers first.
+                    hit = ANGLE.search(HEREDOC.sub(" ", line))
+                    if hit:
+                        findings.append(
+                            f"{path.name}:{first + offset}: {hit.group(0)} is a redirection to the "
+                            f"shell, not a placeholder; use a house placeholder such as "
+                            f"203.0.113.10, or REPLACE_WITH_A_NAME for a value the reader supplies")
+                    if opened:
+                        marker = opened.group(2)
                 if have_shellcheck:
                     name = tmp / f"{n_blocks:04d}.sh"
                     name.write_text("#!/usr/bin/env bash\n" + body, encoding="utf-8")

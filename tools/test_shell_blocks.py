@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cases for check_shell_blocks.py, including the ones it cannot catch.
 
-Two of these matter more than the rest, and neither is a pass. The gate was written because
+The rule these test changed once: an angle-bracket placeholder is now reported anywhere in a\nbash block, quoted or not, because tracking quotes to exempt the quoted ones cost three\ndemonstrated defects and the corpus had no quoted ones left to exempt.\n\nTwo of these matter more than the rest, and neither is a pass. The gate was written because
 this corpus produced two shell defects that every other gate missed, and it catches neither
 of them. Both are recorded here as known limits, asserting that the gate stays green, so
 that the file cannot quietly start claiming coverage it does not have.
@@ -50,6 +50,10 @@ CASES = (
      "curl -s http://<public-ip>:11434/api/tags", True, "is a redirection"),
     ("an angle-bracket placeholder as a command argument",
      "chown <service-user> server.key", True, "is a redirection"),
+    ("a placeholder containing a colon, which the old class excluded",
+     "curl -s http://<IP:PORT>/api/tags", True, "is a redirection"),
+    ("a placeholder containing an at sign, which the old class excluded",
+     "ssh <user@host> 'ss -tlnp'", True, "is a redirection"),
     ("an unquoted expansion that breaks on a path with a space",
      "cp a.pem ${HOME}/certs/b.pem", True, "SC2086"),
     ("an unquoted command substitution",
@@ -58,14 +62,19 @@ CASES = (
      'if [ "$n" -lt 5 ]; then echo low; fi', True, "SC2154"),
 
     # NOT CAUGHT, and correctly so.
-    ("an angle bracket inside double quotes is literal",
-     'curl -s https://x.example.com/ -H "Authorization: Bearer <key>"', False, None),
+    ("a placeholder inside double quotes, which the rule no longer exempts",
+     'curl -s https://x.example.com/ -H "Authorization: Bearer <key>"', True, "is a redirection"),
     ("a house placeholder address",
      "curl -s http://203.0.113.10:11434/api/tags", False, None),
     ("a quoted expansion",
      'cp a.pem "${HOME}/certs/b.pem"', False, None),
     ("a heredoc carrying plain text",
      "cat > /tmp/x <<'EOF'\nplain text\nEOF", False, None),
+    ("a heredoc body holding configuration that looks like shell",
+     "cat > /etc/apache2/auth.conf <<'EOF'\n<Location />\n  Require valid-user\n</Location>\nEOF",
+     False, None),
+    ("a heredoc opener carrying its own redirect",
+     "cat <<EOF > /tmp/x\nplain text\nEOF", False, None),
     ("an ordinary correct Verify block",
      "ss -tlnp | grep 8080\ncurl -sS -o /dev/null -w '%{http_code}\\n' https://app.example.com/",
      False, None),

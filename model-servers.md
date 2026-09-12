@@ -65,7 +65,7 @@ LM Studio's developer server is a desktop feature. The documentation addresses i
 ```bash
 ss -tlnp | grep -E ':(8080|8000|8001|8002|3000|9000|30000|1234) '   # loopback only
 curl -s https://models.example.com/v1/models            # 401 without a key
-curl -s https://models.example.com/v1/models -H "Authorization: Bearer <key>"   # succeeds
+curl -s https://models.example.com/v1/models -H "Authorization: Bearer REPLACE_WITH_API_KEY"   # succeeds
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://models.example.com/invocations -d '{}'
                                                         # vLLM: 404 or 403 from the PROXY. vLLM does not require the
                                                         # API key on this route, so a 200 here is an unauthenticated
