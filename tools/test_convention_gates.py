@@ -25,6 +25,10 @@ a comment stripper with its position guard removed, so the case it was protectin
 regressed with a green suite. It now has a twin that fails under that mutation. And these
 helpers re-implement `main()`'s per-line glue rather than calling it, so `main()`'s own
 wiring, the file filters and the double comment strip, has no coverage here.
+That happened a second time in the very round that fixed it: a case added to cover a Markdown
+container bug asserted the right answer for the wrong reason, because the fixture's second fence
+carried an info string and the broken scanner reached the flag by a different route. A case earns its
+place by failing when its bug is restored, and nothing else.
 """
 import sys
 from pathlib import Path
@@ -96,7 +100,7 @@ TLS_CASES = (
     ("a flag after a quoted query string, which a quote-blind splitter would sever",
      "curl 'https://example.com/?a=1&b=2' -k", True, 6),
     ("a block quotation that ends before its fence does",
-     "PLACEHOLDER_BQ_ENDS", True, 6),
+     "PLACEHOLDER_BQ_ENDS", True, 8),
     ("a fenced block inside nested block quotations",
      "PLACEHOLDER_BQ_NESTED", True, 6),
 
@@ -130,6 +134,8 @@ TLS_CASES = (
     ("a fully verified s_client inside a quoted remote command",
      "ssh probe@host 'openssl s_client -connect mq.example.com:5671 -CAfile ca.pem "
      "-verify_hostname mq.example.com -verify_return_error'", False, 5),
+    ("prose after a block quotation that ended mid-fence",
+     "PLACEHOLDER_BQ_PROSE", False, 8),
 )
 
 
@@ -226,9 +232,18 @@ def main() -> int:
             "PLACEHOLDER_BLOCKQUOTE":
                 "## Verify\n\n> ```bash\n> curl -k https://example.com/\n> ```\n",
             # The quotation ends while its fence is still open, and an ordinary fenced block
-            # follows. The scanner used to read the second fence as the first one's close.
+            # follows. Without the container fix the scanner reads the BARE opening fence of
+            # the second block as the first one's close, so the flag inside it falls outside
+            # any fence and is never scanned. The second fence must carry no info string, or
+            # the broken scanner keeps reading the tail as content and finds the flag anyway,
+            # which is how the first version of this case came to assert nothing.
             "PLACEHOLDER_BQ_ENDS":
-                "## Verify\n\n> ```bash\n> echo ok\n\n```bash\ncurl -k https://example.com/\n```\n",
+                "## Verify\n\n> ```bash\n> echo ok\n\n```\ncurl -k https://example.com/\n```\n",
+            # The mirror image: with the quotation closed, an ordinary paragraph after it is
+            # prose and must not be scanned. Without the fix it is read as fence content and
+            # reported, which is a false alarm on a guide warning readers against the flag.
+            "PLACEHOLDER_BQ_PROSE":
+                "## Verify\n\n> ```bash\n> echo ok\n\nNever run curl -k against production.\n",
             # Two levels of quotation marker with a space between them.
             "PLACEHOLDER_BQ_NESTED":
                 "## Verify\n\n>  > ```bash\n>  > curl -k https://example.com/\n>  > ```\n",
