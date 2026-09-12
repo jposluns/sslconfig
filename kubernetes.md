@@ -81,9 +81,28 @@ spec:
 Gateway API defines no authentication filter; each implementation adds its own. Envoy Gateway's `SecurityPolicy` attaches basic auth to a Gateway, HTTPRoute, or GRPCRoute from a Secret holding an htpasswd file. Its docs state that only SHA hashes are supported, which falls short of the bcrypt rule in [authentication.md](authentication.md): treat it as a gate over TLS with long random passwords, and keep the application's own login in place.
 
 ```bash
-htpasswd -cbs .htpasswd admin REPLACE_WITH_LONG_RANDOM_VALUE
+# -b would take the password from the command line, where `ps` and your shell history can
+# read it. Apache's own page says of it: "This option should be used with extreme care,
+# since the password is clearly visible on the command line. For script use see the -i
+# option." -i reads it from stdin instead. Envoy Gateway's example uses -b; this does not.
+read -rs -p 'basic auth password: ' PASSWORD
+echo
+printf '%s' "$PASSWORD" | htpasswd -cis .htpasswd admin
+# -i does no verification, so a mistyped or mis-consumed value is written silently. Check it
+# before the secret is created: `read` takes the NEXT LINE of input, so pasting this whole
+# block into a shell without bracketed paste feeds it the following line instead of your
+# password, and every command after that still succeeds.
+printf '%s' "$PASSWORD" | htpasswd -vi .htpasswd admin
+unset PASSWORD
 kubectl create secret generic app-basic-auth --from-file=.htpasswd
 ```
+
+`-s` is SHA-1, which Apache describes as "insecure by today's standards", and it is not a
+choice here: Envoy Gateway's basic auth documentation says "only SHA hash algorithm is
+supported for now", so `-B` for bcrypt produces a file it cannot read. Treat this credential
+accordingly. It is a single shared secret protecting an entry point, it is only as strong as
+its own length, and a long random value is doing all of the work. Where that is not enough,
+the `oidc` block below moves the decision to an identity provider instead.
 
 ```yaml
 apiVersion: gateway.envoyproxy.io/v1alpha1
@@ -301,6 +320,7 @@ allowed ranges out of the provider's own configuration rather than inferring the
 - Gateway API getting started (CRD install): https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/ ; TLS: https://gateway-api.sigs.k8s.io/guides/user-guides/tls/ ; HTTP routing: https://gateway-api.sigs.k8s.io/guides/user-guides/http-routing/ ; redirects: https://gateway-api.sigs.k8s.io/guides/user-guides/http-redirect-rewrite/
 - Envoy Gateway: https://gateway.envoyproxy.io/ ; Helm install: https://gateway.envoyproxy.io/docs/install/install-helm/ ; quickstart and its manifest (GatewayClass `controllerName`): https://gateway.envoyproxy.io/docs/tasks/quickstart/ , https://github.com/envoyproxy/gateway/releases/download/v1.9.1/quickstart.yaml
 - Envoy Gateway tasks, secure gateways (TLS listener): https://gateway.envoyproxy.io/docs/tasks/security/secure-gateways/ ; basic auth: https://gateway.envoyproxy.io/docs/tasks/security/basic-auth/ ; OIDC: https://gateway.envoyproxy.io/docs/tasks/security/oidc/ ; external authorization (`extAuth`): https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/ ; HTTP redirect: https://gateway.envoyproxy.io/docs/tasks/traffic/http-redirect/
+- htpasswd, for `-i` rather than `-b` and what SHA-1 costs: https://httpd.apache.org/docs/2.4/programs/htpasswd.html
 - Authelia: proxy integration (the proxy calls the authorization endpoint): https://www.authelia.com/integration/proxies/introduction/ ; Envoy Gateway `SecurityPolicy` example: https://www.authelia.com/integration/kubernetes/envoy/gateway/
 - kubectl JSONPath filter syntax: https://kubernetes.io/docs/reference/kubectl/jsonpath/
 - curl exit codes, used to read the API server probe (6 could not resolve, 7 failed to connect, 28 timed out, 60 peer certificate not trusted): https://curl.se/libcurl/c/libcurl-errors.html

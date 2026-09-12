@@ -12,7 +12,15 @@ Leaked API keys and credentials in public repositories are the most common secur
    gitleaks git .          # scans the repository history
    gitleaks dir .          # scans the working tree
    ```
-5. **CI/CD secrets live in the platform's secret store** (for example GitHub Actions secrets), scoped to the jobs that need them, never echoed into logs or artefacts.
+5. **Secrets never enter a command line.** A process's arguments are readable through `/proc/<pid>/cmdline`, which is what `ps` prints; on a default Linux that means every other user on the host, for as long as the process runs, and the command is then written to your shell history. A `hidepid` proc mount or a separate PID namespace narrows who can see it, neither is the default, and neither covers the history. Prefer a flag that reads from stdin (`htpasswd -i`, `docker login --password-stdin`, `gh auth login --with-token`), a file the tool reads itself (`~/.pgpass`, `curl --netrc`), or an environment variable where the tool offers nothing better. Where a value has to be typed, `read -rs` keeps it off the screen, and what `read` consumes is input rather than a command, so no shell records it.
+
+   ```bash
+   printf '%s' "$TOKEN" | docker login ghcr.io -u "$USER" --password-stdin
+   ```
+
+   There is no probe for this rule, and the obvious one is worse than none. `ps -eo args | grep -i 'password\|token\|secret'` finds only commands that spell the word out, such as `docker login --password hunter2`. It does not match `htpasswd -cbs .htpasswd admin Xk29fQ7LmVt3w9Zr`, or `mysql -pHunter2`, or `curl -u admin:hunter2`, because a real secret is a random string and `.htpasswd` does not contain the word "password". A snapshot also misses every short-lived process, which is most of them. A check that reads clean while the exposure is running is worse than no check, so this rule is enforced by review and by reaching for the stdin flag, not by grep.
+
+6. **CI/CD secrets live in the platform's secret store** (for example GitHub Actions secrets), scoped to the jobs that need them, never echoed into logs or artefacts.
 
 ## When a secret leaks
 
@@ -42,3 +50,7 @@ On every push, gitleaks must exit 0 with no findings (the `&& echo clean` then p
 - trufflehog: https://github.com/trufflesecurity/trufflehog
 - sops: https://github.com/getsops/sops and age: https://github.com/FiloSottile/age
 - git-filter-repo: https://github.com/newren/git-filter-repo
+- proc_pid_cmdline(5), for why a command line is readable by other users: https://man7.org/linux/man-pages/man5/proc_pid_cmdline.5.html
+- docker login, for `--password-stdin`: https://docs.docker.com/reference/cli/docker/login/
+- gh auth login, for `--with-token`: https://cli.github.com/manual/gh_auth_login
+- htpasswd, for `-i` and what Apache says about `-b`: https://httpd.apache.org/docs/2.4/programs/htpasswd.html
