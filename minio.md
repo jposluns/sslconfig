@@ -18,8 +18,8 @@ Never run with the historic `minioadmin`/`minioadmin` pair; scanners try it cons
 MinIO serves HTTPS automatically when it finds a PEM key pair named `public.crt` and `private.key` in `${HOME}/.minio/certs` (or the directory given with `--certs-dir`):
 
 ```bash
-cp fullchain.pem ${HOME}/.minio/certs/public.crt
-cp privkey.pem   ${HOME}/.minio/certs/private.key
+cp fullchain.pem "${HOME}/.minio/certs/public.crt"
+cp privkey.pem   "${HOME}/.minio/certs/private.key"
 ```
 
 Certificates per [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md); clients then use `https://` endpoints and, for self-signed, trust the CA rather than disabling verification.

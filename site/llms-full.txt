@@ -375,7 +375,7 @@ Rules that make the certificate actually work:
 
 ```bash
 chmod 600 server.key
-chown <service-user> server.key
+chown app:app server.key      # whichever user your service runs as
 ```
 
 Never commit a private key to version control. Add `*.key` and `*.pem` to `.gitignore` before generating anything inside a repository, and treat any key that has ever been committed or pasted into a chat as compromised: regenerate it.
@@ -490,8 +490,8 @@ MFA: the emailed one-time PIN proves control of a mailbox only. For anything sen
 For APIs and machine clients, create a **service token** in the Zero Trust dashboard (Access service authentication section), add a **Service Auth** policy to the application, and send the token with each request:
 
 ```bash
-curl -H "CF-Access-Client-Id: <id>" \
-     -H "CF-Access-Client-Secret: <secret>" \
+curl -H "CF-Access-Client-Id: REPLACE_WITH_CLIENT_ID" \
+     -H "CF-Access-Client-Secret: REPLACE_WITH_CLIENT_SECRET" \
      https://app.example.com/api
 ```
 
@@ -553,7 +553,7 @@ Serve for anything private (most things). Funnel or [cloudflare.md](cloudflare.m
 
 ```bash
 tailscale serve status
-curl -sI https://<machine>.<tailnet>.ts.net/     # from a tailnet device: works
+curl -sI https://host.tailnet.ts.net/            # from a tailnet device: works
 # From a non-tailnet network: serve URL unreachable; funnel URL reachable, so its app login must gate it.
 ```
 
@@ -1141,7 +1141,7 @@ done
 # 8. Keycloak's bootstrap admin is gone. It does not expire on its own. Ask for the name
 #    rather than listing users: the users endpoint returns at most 100 by default, and a
 #    bootstrap account on page two looks exactly like a deleted one.
-#    kcadm.sh get users -r master -q exact=true -q username=<the bootstrap name> --fields username,id
+#    kcadm.sh get users -r master -q exact=true -q "username=REPLACE_WITH_BOOTSTRAP_NAME" --fields username,id
 #    exact=true matters: without it the filter is a substring match, and the result is capped
 #    at 100 either way, so an unfiltered list proves nothing about what is not in it.
 #    Order the -q flags this way round: an exactness flag placed after the filter it modifies
@@ -4685,8 +4685,8 @@ Never run with the historic `minioadmin`/`minioadmin` pair; scanners try it cons
 MinIO serves HTTPS automatically when it finds a PEM key pair named `public.crt` and `private.key` in `${HOME}/.minio/certs` (or the directory given with `--certs-dir`):
 
 ```bash
-cp fullchain.pem ${HOME}/.minio/certs/public.crt
-cp privkey.pem   ${HOME}/.minio/certs/private.key
+cp fullchain.pem "${HOME}/.minio/certs/public.crt"
+cp privkey.pem   "${HOME}/.minio/certs/private.key"
 ```
 
 Certificates per [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md); clients then use `https://` endpoints and, for self-signed, trust the CA rather than disabling verification.
@@ -4900,7 +4900,7 @@ listener.name.sasl_ssl.ssl.client.auth=none
 The documentation says SCRAM should be used only with TLS, hence `SASL_SSL` rather than `SASL_PLAINTEXT`. In KRaft the inter-broker credential must exist before the brokers first start, so create it while formatting storage. Once the cluster is up, give each application its own credential ([authentication.md](authentication.md)) with `kafka-configs.sh`, authenticating as the admin through a properties file like the one in step 5.
 
 ```bash
-bin/kafka-storage.sh format -t $(bin/kafka-storage.sh random-uuid) -c config/server.properties \
+bin/kafka-storage.sh format -t "$(bin/kafka-storage.sh random-uuid)" -c config/server.properties \
   --add-scram 'SCRAM-SHA-512=[name="admin",password="REPLACE_WITH_LONG_RANDOM_VALUE"]'
 # after the brokers are running:
 bin/kafka-configs.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties \
@@ -5773,7 +5773,7 @@ MFA: Ollama has no login of its own, so a second factor can only come from the f
 
 ```bash
 ss -tlnp | grep 11434                                  # 127.0.0.1 only
-curl -s http://<public-ip>:11434/api/tags              # from another machine: connection refused
+curl -s http://203.0.113.10:11434/api/tags             # from another machine: connection refused
 curl -s https://ollama.example.com/api/tags            # 401 without credentials
 curl -su admin https://ollama.example.com/api/tags     # model list with credentials
 ```
@@ -5869,7 +5869,7 @@ Run the proxy on loopback (or a private container network) and publish it only t
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' https://llm.example.com/v1/models   # 401 without a key
-curl -s https://llm.example.com/v1/models -H "Authorization: Bearer <virtual-key>"   # model list
+curl -s https://llm.example.com/v1/models -H "Authorization: Bearer REPLACE_WITH_VIRTUAL_KEY"   # model list
 ss -tlnp | grep 4000                                            # loopback only
 ```
 
@@ -5948,7 +5948,7 @@ LM Studio's developer server is a desktop feature. The documentation addresses i
 ```bash
 ss -tlnp | grep -E ':(8080|8000|8001|8002|3000|9000|30000|1234) '   # loopback only
 curl -s https://models.example.com/v1/models            # 401 without a key
-curl -s https://models.example.com/v1/models -H "Authorization: Bearer <key>"   # succeeds
+curl -s https://models.example.com/v1/models -H "Authorization: Bearer REPLACE_WITH_API_KEY"   # succeeds
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://models.example.com/invocations -d '{}'
                                                         # vLLM: 404 or 403 from the PROXY. vLLM does not require the
                                                         # API key on this route, so a 200 here is an unauthenticated
