@@ -59,7 +59,7 @@ backwards. `s_client -verify_return_error` takes no argument, so a pattern match
 bare `s_client -connect host:port` completes a handshake against any certificate, which
 is the defect. It is flagged unless the invocation carries BOTH a flag that makes
 verification errors fatal (`-verify_return_error`) and a flag that binds the certificate
-to the endpoint (`-verify_hostname`, `-verify_ip` or `-verify_email`). A trust anchor
+to the endpoint (`-verify_hostname` or `-verify_ip`). A trust anchor
 alone is not enough, because verification continues after errors. Fatal errors alone are
 not enough either, because a chain that verifies still binds no name: it accepts any
 unexpired certificate that CA signed, for any host.
@@ -226,7 +226,10 @@ SCLIENT_VERIFIES = re.compile(r"""(?:^|\s)-verify_return_error(?:[\s<>|)`'";&]|$
 SCLIENT_HELP = re.compile(r"\s-(?:help|h)\b")
 # Chain verification without an identity check binds nothing to the endpoint: it accepts
 # any unexpired certificate that CA signed, for any hostname. self-signed.md says so.
-SCLIENT_BINDS = re.compile(r"""(?:^|\s)-verify_(?:hostname|ip|email)(?:[\s<>|)=`'";&]|$)""")
+# `-verify_email` is deliberately NOT here. It matches an email SAN, which says nothing about
+# the host you connected to: a certificate for wrong.example.com carrying the right email
+# address passes it and fails -verify_hostname, demonstrated against OpenSSL.
+SCLIENT_BINDS = re.compile(r"""(?:^|\s)-verify_(?:hostname|ip)(?:[\s<>|)=`'";&]|$)""")
 
 
 def logical_lines(text):

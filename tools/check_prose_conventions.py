@@ -118,7 +118,9 @@ HOSTNAME_TAIL = re.compile(r"[A-Za-z0-9.-]*")
 # A code span may be fenced by any RUN of backticks, and it closes only on a run of the same
 # length. The single-backtick form read the opening ``  of ``serialise(`value`)`` as an empty
 # span and then flagged the identifier inside it.
-QUOTED_RE = re.compile(r"(`+)(?:(?!\1)[\s\S])*?\1|\"[^\"]*\"")
+# Typographic double quotes count too. A vendor quotation written with them is still a
+# quotation, and CONTRIBUTING rule 2 says quoted vendor text is never respelled.
+QUOTED_RE = re.compile("(`+)(?:(?!\\1)[\\s\\S])*?\\1|\"[^\"]*\"|“[^”]*”")
 # A cited URL may contain a British spelling in its path, and respelling it breaks the
 # link. UK government and vendor documentation routinely does this. The URL stops at a
 # quotation mark, a backtick or an angle bracket rather than running to whitespace: a
@@ -126,7 +128,9 @@ QUOTED_RE = re.compile(r"(`+)(?:(?!\1)[\s\S])*?\1|\"[^\"]*\"")
 # followed then hid real prose after the quotation ended. An apostrophe is not in that set:
 # single quotes are not a quotation delimiter here, so excluding one only truncated a valid
 # URL path.
-URL_RE = re.compile(r"""https?://[^\s"`<>]+""")
+# Case-insensitive, because a URI scheme is: `HTTPS://host/authorisation` is a valid URL and
+# respelling its path breaks the link just the same.
+URL_RE = re.compile(r"""https?://[^\s"`<>]+""", re.I)
 
 
 def unquoted(line):
@@ -166,6 +170,26 @@ def _fence_comment(line):
     return line[out_start:] if out_start is not None else ""
 
 
+def _url_tail_spans(line):
+    """Spans covering each URL from its first path slash to its end.
+
+    A hostname-shaped string in a URL PATH is not a hostname. `yourdomain.com` in
+    `https://example.com/migration/yourdomain.com` is path data, and the host is the
+    permitted one. Blanking whole URLs is not the answer, because a bad placeholder AS the
+    host is a real defect this check exists to catch.
+    """
+    spans = []
+    for m in URL_RE.finditer(line):
+        url = m.group(0)
+        scheme_end = url.find("://")
+        if scheme_end == -1:
+            continue
+        slash = url.find("/", scheme_end + 3)
+        if slash != -1:
+            spans.append((m.start() + slash, m.end()))
+    return spans
+
+
 def bad_placeholder(line):
     """The first placeholder on the line that is outside the house set, or None.
 
@@ -176,6 +200,8 @@ def bad_placeholder(line):
     Every match is therefore extended to the end of its hostname and judged whole.
     """
     for m in BAD_PLACEHOLDERS.finditer(line):
+        if any(start <= m.start() < end for start, end in _url_tail_spans(line)):
+            continue    # path data, not a hostname
         host = m.group(0) + HOSTNAME_TAIL.match(line, m.end()).group(0).rstrip(".")
         if host.lower().endswith(HOUSE_SUFFIXES):
             continue

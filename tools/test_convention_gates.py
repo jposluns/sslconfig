@@ -107,6 +107,9 @@ TLS_CASES = (
      'curl -k4 https://example.com/health', True, 9),
     ("curl short flags combined with the progress-bar flag",
      'curl -k# https://example.com/health', True, 9),
+    ("s_client binding an email SAN rather than the endpoint",
+     'openssl s_client -connect mq.example.com:5671 -CAfile ca.pem '
+     '-verify_return_error -verify_email ops@example.com', True, 9),
 
     # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
     ("sort -k inside a quoted command substitution",
@@ -230,6 +233,12 @@ PROSE_CASES = (
      "Use `a``; randomised ports ``` here.", False, 6),
     ("known limit: unequal backtick runs inside a valid span expose an identifier",
      "Use `printf '%s' '`` ``` serialise'` to print the vendor identifier.", True, 6),
+    ("an uppercase URI scheme is still a URL",
+     "See HTTPS://example.com/authorisation for vendor documentation.", False, 9),
+    ("a placeholder in a URL path is not the hostname",
+     "```bash\ncurl -f https://example.com/migration/yourdomain.com\n```", False, 9),
+    ("a vendor quotation in typographic double quotes",
+     "The vendor says “requests are randomised per connection”.", False, 9),
 )
 
 
