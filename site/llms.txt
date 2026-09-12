@@ -64,6 +64,7 @@
 ## Databases, storage, and messaging
 
 - [postgresql](https://raw.githubusercontent.com/jposluns/secureconfig/main/postgresql.md)
+- [connection-poolers](https://raw.githubusercontent.com/jposluns/secureconfig/main/connection-poolers.md)
 - [mysql](https://raw.githubusercontent.com/jposluns/secureconfig/main/mysql.md)
 - [mongodb](https://raw.githubusercontent.com/jposluns/secureconfig/main/mongodb.md)
 - [redis](https://raw.githubusercontent.com/jposluns/secureconfig/main/redis.md)
