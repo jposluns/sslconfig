@@ -103,6 +103,10 @@ TLS_CASES = (
      "PLACEHOLDER_BQ_ENDS", True, 8),
     ("a fenced block inside nested block quotations",
      "PLACEHOLDER_BQ_NESTED", True, 6),
+    ("curl short flags combined with a digit flag",
+     'curl -k4 https://example.com/health', True, 9),
+    ("curl short flags combined with the progress-bar flag",
+     'curl -k# https://example.com/health', True, 9),
 
     # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
     ("sort -k inside a quoted command substitution",
@@ -136,6 +140,12 @@ TLS_CASES = (
      "-verify_hostname mq.example.com -verify_return_error'", False, 5),
     ("prose after a block quotation that ended mid-fence",
      "PLACEHOLDER_BQ_PROSE", False, 8),
+    # NOT a bypass, and recorded so it is not "fixed" into a false positive later. A reviewer
+    # reported that a blank line after a continuation hides the flag. Tested in bash: `curl \`
+    # then a blank line then `-k https://host/` runs curl with NO arguments and then tries to
+    # run `-k` as a command. Two commands, which is exactly what the scanner sees.
+    ("a blank line after a continuation really is two commands",
+     'curl \\\n\n  -k https://example.com/', False, 9),
 )
 
 

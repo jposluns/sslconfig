@@ -196,8 +196,11 @@ INSECURE_CURL = re.compile(r"(?:^|[\s'\"/=`(])curl\b")
 # demonstrated `ssh host 'curl https://h/ -k'` and `curl https://h/ -k>/dev/null` both
 # passing, because the PREFIX class accepted quotes and this one did not. The same
 # asymmetry was fixed for the s_client flags in an earlier round and never mirrored here.
+# The combined-flag class takes digits and `#` as well as letters, because curl combines
+# short flags and `-4`, `-6` and `-#` are all real ones, so `curl -k4` was passing.
 CURL_FLAG = re.compile(
-    r"""(?:\s|^)(?:-[a-zA-Z]*k[a-zA-Z]*|--insecure|--proxy-insecure)(?:[\s=)`'"<>|;&]|$)""")
+    r"""(?:\s|^)(?:-[a-zA-Z0-9#]*k[a-zA-Z0-9#]*|--insecure|--proxy-insecure)"""
+    r"""(?:[\s=)`'"<>|;&]|$)""")
 
 CHECKS = (
     ("wget --no-check-certificate (prefix abbreviations included)",

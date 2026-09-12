@@ -47,9 +47,10 @@ ss -tlnp | grep -E '5671|5672|15672'      # 5672 gone once listeners.tcp = none;
 # ssl_options.cacertfile, with TLS Web Client Authentication in its extended key usage.
 # A server certificate will not do: verify_peer checks the chain, and the broker must
 # trust the issuer.
-openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
+sleep 2 | openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
   -cert client.pem -key client.key \
-  -verify_hostname mq.example.com -verify_return_error </dev/null
+  -verify_hostname mq.example.com -verify_return_error
+echo "positive run exit $?"
 
 # Negative, and this half is what discriminates: drop -cert and -key, and the broker must
 # refuse the connection, because ssl_options.fail_if_no_peer_cert = true requires one.
@@ -62,12 +63,14 @@ echo "negative run exit $?"
 # not match on a particular message. The broker rejects an empty client certificate list
 # with a fatal alert. On TLS 1.3 the client can consider its own side finished before that
 # alert arrives, and the exact wording comes from whichever TLS stack is reporting it.
-# What you are looking for is a non-zero exit from the second run. Note the `sleep 2` on it:
-# with `</dev/null` s_client reaches end of input and exits before the rejection arrives,
-# because on TLS 1.3 the server can only refuse the empty client certificate after the
-# client's flight. Measured, that negative run exits 0 and prints a full session block four
-# times in five, which is indistinguishable from the positive one. Holding stdin open for a
-# couple of seconds is what makes the refusal observable. Reading
+# What you are looking for is a non-zero exit from the second run. Note the `sleep 2` on
+# BOTH runs: with `</dev/null` s_client reaches end of input and exits before the rejection
+# arrives, because on TLS 1.3 the server can only refuse the empty client certificate after
+# the client's flight. Measured, that negative run exits 0 and prints a full session block
+# four times in five, which is indistinguishable from the positive one. Holding stdin open
+# for a couple of seconds is what makes the refusal observable. The positive run needs it
+# for the same reason in reverse: with `</dev/null` it exits 0 before a rejection of a WRONG
+# client certificate can arrive, so a broken deployment reads as a working one. Reading
 # "Verification: OK" from the second run as a success is the mistake this pair exists to
 # catch. Without -verify_return_error the handshake completes even when the server
 # certificate fails to verify, so -CAfile alone proves only that TLS is on. If you set
