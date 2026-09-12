@@ -192,7 +192,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/   # 401 where
 # The API server endpoint, taken WHOLE. Do not rebuild it with :6443. Managed providers
 # serve the API on 443, and a probe of 6443 times out against a cluster that is answering
 # the internet on 443, which reads as a pass.
-API=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}') && echo "$API"
+API=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+# Whether a schemeless server means HTTP or HTTPS is decided by the TLS settings beside it,
+# so read those too rather than guessing.
+TLS=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.certificate-authority}{.clusters[0].cluster.certificate-authority-data}{.clusters[0].cluster.insecure-skip-tls-verify}{.users[0].user.client-certificate}{.users[0].user.client-certificate-data}')
 
 # From a machine OUTSIDE any allowed range, against a cluster you are authorized to test.
 # Neutralize the proxy settings, all of them. curl reads ALL_PROXY and all_proxy as well as
@@ -201,25 +204,31 @@ unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY
 
 # First at the TCP layer, because this is the only part with a clean answer. Did anything
 # accept a connection?
-read -r HOST PORT URL <<<"$(python3 - "$API" <<'PY'
+PARSED=$(python3 - "$API" "$TLS" <<'PY'
 import sys, urllib.parse
-raw = sys.argv[1].strip()
-if "://" not in raw:                      # kubectl accepts a bare host; curl would guess http
-    raw = "https://" + raw
+raw, tls = sys.argv[1].strip(), sys.argv[2].strip()
+if "://" not in raw:
+    # Kubernetes starts at http:// and moves to https:// only when the cluster entry
+    # carries a CA, a client certificate, or insecure-skip-tls-verify. Guessing https
+    # here sent the probe to 443 against a cluster the client would reach on 80.
+    raw = ("https://" if tls else "http://") + raw
 p = urllib.parse.urlsplit(raw)
 if not p.hostname:
     sys.exit("cannot parse an API server out of: " + sys.argv[1])
 print(p.hostname, p.port or (80 if p.scheme == "http" else 443),
       p.scheme + "://" + p.netloc)
 PY
-)" || exit 1
+) || exit 1
+read -r HOST PORT URL <<<"$PARSED"
+echo "$URL"
 nc -vz -w 3 "$HOST" "$PORT"
 # Parsed with python3 rather than cut with sed. A bracketed IPv6 address breaks on the
-# colons, and the failure looks exactly like the clean drop you were hoping for. A bare
-# host with no scheme is also legal in a kubeconfig, and curl would read that as HTTP on
-# port 80 and probe the wrong thing entirely, so the scheme is filled in here and the URL
-# the probe uses is the normalized one. This step needs python3, nc and nmap on the machine
-# you run it from, none of which the cluster provides for you.
+# colons, and the failure looks exactly like the clean drop you were hoping for.
+# A bare host with no scheme is also legal in a kubeconfig, and the scheme it implies depends
+# on the TLS settings beside it rather than on a convention, so those are read and the URL the
+# probe uses is the normalized one. Getting that wrong sends both layers of this check at a
+# port the cluster was never using, where a refusal proves nothing. This step needs python3,
+# nc and nmap on the machine you run it from, none of which the cluster provides for you.
 # "succeeded" means something is listening and reachable from here, whatever it does next.
 
 # Then at the HTTP layer, with verification left ON.
@@ -288,7 +297,7 @@ allowed ranges out of the provider's own configuration rather than inferring the
 - Authelia: proxy integration (the proxy calls the authorization endpoint): https://www.authelia.com/integration/proxies/introduction/ ; Envoy Gateway `SecurityPolicy` example: https://www.authelia.com/integration/kubernetes/envoy/gateway/
 - kubectl JSONPath filter syntax: https://kubernetes.io/docs/reference/kubectl/jsonpath/
 - curl exit codes, used to read the API server probe (6 could not resolve, 7 failed to connect, 28 timed out, 60 peer certificate not trusted): https://curl.se/libcurl/c/libcurl-errors.html
-- Nmap host discovery and port specification, for the node scan (`-Pn`, `-p`, `-6`): https://nmap.org/book/man-host-discovery.html , https://nmap.org/book/man-port-scanning-basics.html
+- Nmap host discovery (`-Pn`): https://nmap.org/book/man-host-discovery.html ; port specification (`-p`): https://nmap.org/book/man-port-specification.html ; IPv6 scanning (`-6`): https://nmap.org/book/man-misc-options.html
 - Kubernetes ports and protocols (6443 API server, 2379 and 2380 etcd, 10250 kubelet, 10259 scheduler, 10257 controller manager): https://kubernetes.io/docs/reference/networking/ports-and-protocols/
 - Kubernetes kubelet authentication and authorization (unrejected requests treated as anonymous, `--anonymous-auth`, `--authorization-mode=Webhook`): https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
 - Kubernetes kubelet command-line reference (`--anonymous-auth` "Default: true", `--read-only-port` "Default: 10255" serving "with no authentication/authorization"): https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
