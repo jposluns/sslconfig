@@ -51,6 +51,11 @@ openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_ip 10.0.0.5 \
                                                           # name instead where the certificate carries
                                                           # a DNS SAN. Chain checks alone accept any
                                                           # certificate that CA signed
+                                                          # This matches the default, which does not require
+                                                          # client certificates. With -o ssl_verify_mode=2, add
+                                                          # -cert and -key: without them memcached closes the
+                                                          # connection after the handshake and "Verification: OK"
+                                                          # still prints.
 ```
 
 With `-S`, a plain `stats` over the text protocol is rejected, because the binary protocol is enforced.

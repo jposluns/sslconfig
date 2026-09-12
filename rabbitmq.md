@@ -41,14 +41,25 @@ The management plugin's web UI is an admin panel: keep it off public interfaces 
 
 ```bash
 ss -tlnp | grep -E '5671|5672|15672'      # 5672 gone once listeners.tcp = none; UI private
+
+# Positive: a client holding a certificate connects.
+openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
+  -cert client.pem -key client.key \
+  -verify_hostname mq.example.com -verify_return_error </dev/null
+
+# Negative, and this half is what discriminates: drop -cert and -key, and the broker must
+# close the connection, because ssl_options.fail_if_no_peer_cert = true requires one.
 openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
   -verify_hostname mq.example.com -verify_return_error </dev/null
-                                                                         # prints Verification: OK.
-                                                                         # Without -verify_return_error
-                                                                         # the handshake completes even
-                                                                         # when the certificate fails to
-                                                                         # verify, so -CAfile alone
-                                                                         # proves only that TLS is on
+
+# "Verification: OK" reports the SERVER certificate only, and it prints in BOTH runs. The
+# pass condition is the pair: the first run reaches a session, the second ends in "peer did
+# not return a certificate" on TLS 1.2 or a "certificate required" alert on TLS 1.3. Reading
+# "Verification: OK" from the second run as a success is the mistake this pair exists to
+# catch. Without -verify_return_error the handshake completes even when the server
+# certificate fails to verify, so -CAfile alone proves only that TLS is on. If you set
+# fail_if_no_peer_cert = false, the second run succeeds as well and the pair proves nothing,
+# because a password is then the client's only identity.
 # Remote login attempt as guest fails: "user 'guest' can only connect via localhost"
 ```
 

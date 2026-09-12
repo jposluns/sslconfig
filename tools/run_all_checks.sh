@@ -120,6 +120,11 @@ echo "== every guide has a Verify section and dated Sources =="
 # appears on the page it cites; both stay authoring obligations enforced by review.
 if guide_shape=$(python3 tools/check_guide_shape.py 2>&1); then
   printf '%s\n' "$guide_shape"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  # Aligned with the two gates below; not new behaviour for this gate.
+  if grep -q '^  FAIL  ' <<< "$guide_shape"; then
+    bad "check_guide_shape.py printed findings but exited 0"
+  fi
 elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$guide_shape"; then
   # A crash, INCLUDING one that printed some FAIL lines before dying. The gate did not
   # finish, so its findings are incomplete and must never read as a complete verdict.
@@ -178,6 +183,28 @@ elif grep -q '^  FAIL  ' <<< "$prose_conv"; then
 else
   bad "check_prose_conventions.py exited non-zero without reporting a gate result"
   printf '%s\n' "$prose_conv" | sed 's/^/          /'
+fi
+
+echo "== the convention gates still catch what review found =="
+# The two gates above were broken more than thirty times across four rounds of cross-family
+# review, and three of those rounds broke something an earlier round had fixed. Each case in
+# this file is an input a reviewer actually ran, recorded so that a future change lands on a
+# named prior finding instead of silently reopening it. It checks the gates, not the corpus.
+if gate_tests=$(python3 tools/test_convention_gates.py 2>&1); then
+  printf '%s\n' "$gate_tests"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$gate_tests"; then
+    bad "test_convention_gates.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$gate_tests"; then
+  bad "test_convention_gates.py crashed; the gates are unverified"
+  printf '%s\n' "$gate_tests" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$gate_tests"; then
+  printf '%s\n' "$gate_tests"
+  fail=1
+else
+  bad "test_convention_gates.py exited non-zero without reporting a result"
+  printf '%s\n' "$gate_tests" | sed 's/^/          /'
 fi
 
 echo "== local links resolve =="

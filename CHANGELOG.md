@@ -158,9 +158,11 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   These surfaced only because the first version of the new gate got the openssl case backwards: it
   matched `-verify_return_error 0`, a syntax OpenSSL does not have, for a flag whose presence is the
   safe state. Cross-family review found the dead pattern, and fixing it exposed the guides behind it.
-  Two further uses are deliberately not flagged: `deployment-lifecycle.md` and `free-certificates.md`
-  pipe `s_client` into `openssl x509` to read an expiry or issuer, which inspects a certificate rather
-  than trusting it, and in both the real verification check sits on the line above.
+  The exemption for certificate inspection was removed after review showed it was a laundering pipe,
+  since appending `| openssl x509` to an unverified handshake made the line pass, and the two guides
+  that inspect a publicly trusted certificate, `deployment-lifecycle.md` and `free-certificates.md`,
+  now pass because their commands carry `-verify_hostname` and `-verify_return_error`, not because an
+  exemption covers them.
 - A "Bound the expensive endpoints" section in each of the four proxy guides (#20).
   `realtime-webhooks.md` and `authentication.md` both require request-size, concurrency and timeout
   limits on inference, upload and job-submission endpoints, naming denial of wallet as the failure

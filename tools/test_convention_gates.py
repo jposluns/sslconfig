@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""Regression cases for the two convention gates, one per demonstrated review finding.
+
+Four rounds of cross-family review broke these gates more than thirty times, and three of
+those rounds broke something an earlier round had fixed. A word list in a gate is checked
+by the gate; the gate itself was not checked by anything. This file is that check.
+
+Every case below is an input a reviewer actually constructed and ran, not a case imagined
+while writing the gate. MISSES are inputs that are real defects and must be caught. FALSE
+ALARMS are legitimate text that must not be. The comment on each says which round found it,
+so a future change that reintroduces one lands on a named prior finding rather than a
+nameless assertion.
+
+This is not a proof of correctness. It is a record of what has already gone wrong.
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import check_prose_conventions as prose  # noqa: E402
+import check_verify_safety as tls  # noqa: E402
+
+
+def fenced(body, marker="```bash"):
+    """Wrap a command body in a Verify section, the way a guide holds one."""
+    close = marker.split("bash")[0].split("python")[0] or "```"
+    return f"## Verify\n\n{marker}\n{body}\n{close}\n"
+
+
+def tls_hits(body, marker="```bash"):
+    """Every label the TLS gate reports for a fenced body."""
+    hits = []
+    for _lineno, line in tls.logical_lines(fenced(body, marker)):
+        hits.extend(tls.findings_for(tls.strip_comment(line)))
+    return hits
+
+
+# (description, body, must_be_caught, round_found)
+TLS_CASES = (
+    # MISSES. Each of these passed a shipped version of the gate.
+    ("command substitution holding the insecure command",
+     'status=$(curl -k https://example.com/health)', True, 4),
+    ("redirection & read as a command separator",
+     'curl https://example.com/ 2>&1 -k', True, 4),
+    ("escaped quote swallowing the rest of the line",
+     'curl -H "X-Note: \\" #note" https://example.com/ -k', True, 4),
+    ("three-backtick line inside a four-backtick fence",
+     "cat <<'TEXT'\n```\nTEXT\ncurl -k https://example.com/", True, 4),
+    ("plain curl -k, the flagship case",
+     'curl -k https://example.com/health', True, 1),
+    ("flag abutting a closing paren",
+     '(curl https://example.com/health --insecure)', True, 3),
+    ("line continuation between command and flag",
+     'curl https://example.com/health \\\n  --insecure', True, 2),
+    ("bare s_client, no trust source at all",
+     'openssl s_client -connect example.com:443 </dev/null', True, 2),
+    ("s_client with a trust source but errors not fatal",
+     'openssl s_client -connect example.com:443 -CAfile ca.pem </dev/null', True, 2),
+    ("s_client verifying the chain but binding no name",
+     'openssl s_client -connect example.com:443 -CAfile ca.pem '
+     '-verify_return_error </dev/null', True, 3),
+    ("inspection pipe no longer launders an unverified handshake",
+     'openssl s_client -connect example.com:443 </dev/null | openssl x509 -noout -text',
+     True, 3),
+    ("redirect glued to the verifying flag",
+     'openssl s_client -connect example.com:443 -CAfile ca.pem -verify_hostname '
+     'example.com -verify_return_error</dev/null', False, 3),
+
+    # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
+    ("sort -k inside a quoted command substitution",
+     'curl https://example.com/ -o "$(sort -k 2 paths.txt)"', False, 4),
+    ("sort -k inside an unquoted command substitution",
+     'curl -sf -o $(sort -k 2) https://example.com/health', False, 3),
+    ("backslash inside single quotes is not an escape",
+     "curl -H 'X-Path: \\' https://example.com/; sort -k 2 paths.txt", False, 4),
+    ("a comment ends the continuation it terminates",
+     'curl https://example.com/ \\\n# no additional arguments\nsort -k 2 paths.txt',
+     False, 4),
+    ("query-string ampersand does not sever the flag",
+     "curl 'https://example.com/?a=1&b=2' -sf", False, 3),
+    ("URL fragment survives comment stripping",
+     'curl -sf https://example.com/#health', False, 2),
+    ("a fully specified s_client is the good state",
+     'openssl s_client -connect example.com:443 -CAfile ca.pem '
+     '-verify_hostname example.com -verify_return_error </dev/null', False, 3),
+    ("s_client -help is not a handshake",
+     'openssl s_client -help', False, 2),
+)
+
+
+def prose_hits(text):
+    """Every finding the prose gate reports for a whole file body."""
+    found = []
+    fences = prose.Fences()
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if fences.feed(line):
+            continue
+        quoted = line.lstrip().startswith(">")
+        is_prose = not (fences.inside or quoted)
+        target = line if is_prose else ("" if quoted else prose._fence_comment(line))
+        if prose.ISE_RE.search(prose.unquoted(target)):
+            found.append((lineno, "spelling"))
+        if prose.bad_placeholder(line):
+            found.append((lineno, "placeholder"))
+    return found
+
+
+# (description, file body, must_be_caught, round_found)
+PROSE_CASES = (
+    # MISSES.
+    ("column-one comment inside a fence",
+     "```bash\n# ports are randomised at startup\n```", True, 4),
+    ("second placeholder on a line whose first is exempt",
+     "curl https://foo.com.example.com/ https://yourdomain.com/", True, 4),
+    ("listed stem mid-word",
+     "The endpoint is unauthorised by default.", True, 3),
+    ("the -ability suffix of a listed stem",
+     "Kafka offers serialisability across partitions.", True, 3),
+    ("placeholder inside a fenced command, the defect the gate exists for",
+     "```bash\n./pocketbase serve yourdomain.com\n```", True, 2),
+    ("trailing comment inside a fence",
+     "```bash\ncurl https://example.com/  # tokens are randomised\n```", True, 3),
+
+    # FALSE ALARMS.
+    ("a .internal host whose left label looks like a placeholder",
+     "./pocketbase serve yourdomain.com.internal", False, 4),
+    ("a host under example.com",
+     "curl https://yourdomain.com.example.com/", False, 3),
+    ("a quoted Markdown heading in a block quotation",
+     "> ## Authorisation", False, 4),
+    ("an escaped quote in fenced string data",
+     '```bash\nprintf "%s\\n" "a \\" #randomised"\n```', False, 4),
+    ("an identifier inside a four-backtick fence",
+     "````python\nmarker = '''\n```\n'''\ndef serialise(value):\n    return value\n````",
+     False, 4),
+    ("an identifier inside an ordinary fence",
+     "```python\ndef serialise(value):\n    return value\n```", False, 2),
+    ("a British spelling inside a URL",
+     "See https://vendor.example/tls#minimise-exposure for the vendor's wording.",
+     False, 3),
+    ("a full URL with a British-spelled fragment inside a fenced comment",
+     "```bash\ncurl -s https://vendor.example/tls  "
+     "# see https://vendor.example/tls#minimise-exposure\n```",
+     False, 3),
+    # A KNOWN LIMIT, recorded rather than fixed: the URL exemption keys on a scheme, so a
+    # bare path fragment is read as prose. Exempting bare paths would blank any comment
+    # containing a slash, which is most of them. The gate's docstring says so.
+    ("a bare path fragment is NOT exempt, and the docstring says so",
+     "```bash\ncurl -s https://vendor.example/tls  # see /tls#minimise-exposure\n```",
+     True, 5),
+    ("a vendor quotation in double quotes",
+     'The vendor writes "requests are randomised per connection" on that page.',
+     False, 2),
+    ("Oxford English keeps analyse",
+     "Analyse the output before changing anything.", False, 2),
+)
+
+
+def main() -> int:
+    failures = []
+
+    for desc, body, should_catch, rnd in TLS_CASES:
+        marker = "````bash" if "```\nTEXT" in body else "```bash"
+        caught = bool(tls_hits(body, marker))
+        if caught != should_catch:
+            want = "caught" if should_catch else "clean"
+            failures.append(f"TLS (round {rnd}) {desc}: expected {want}, was not")
+
+    for desc, body, should_catch, rnd in PROSE_CASES:
+        caught = bool(prose_hits(body))
+        if caught != should_catch:
+            want = "caught" if should_catch else "clean"
+            failures.append(f"prose (round {rnd}) {desc}: expected {want}, was not")
+
+    if failures:
+        for f in failures:
+            print(f"  FAIL  {f}")
+        return 1
+    total = len(TLS_CASES) + len(PROSE_CASES)
+    print(f"  ok    {total} recorded review findings stay closed")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
