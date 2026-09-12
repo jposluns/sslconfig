@@ -57,6 +57,7 @@ one of them is the application's.
 | 6333, 6334, 6335 | Qdrant REST, gRPC, and internal cluster gRPC | [vector-databases.md](vector-databases.md) |
 | 6362 | Neo4j backup | [neo4j.md](neo4j.md) |
 | 6379 | Redis, Valkey, or the Ray head node | [redis.md](redis.md), [ray.md](ray.md), [cloud-firewalls.md](cloud-firewalls.md) |
+| 6432 | PgBouncer, whose client-side TLS is disabled by default | [connection-poolers.md](connection-poolers.md), [postgresql.md](postgresql.md) |
 | 6443 | The Kubernetes API server on a self-managed cluster. Managed providers usually serve it on 443 instead, so its absence here proves nothing | [kubernetes.md](kubernetes.md) |
 | 7000 | frp server | [tunnels.md](tunnels.md) |
 | 7233 | Temporal frontend gRPC | [workflow-orchestrators.md](workflow-orchestrators.md) |
@@ -85,6 +86,8 @@ one of them is the application's.
 | 9300 | authentik's Prometheus metrics, which carry no authentication | [self-hosted-idp.md](self-hosted-idp.md) |
 | 9440 | ClickHouse native TCP over TLS | [clickhouse.md](clickhouse.md) |
 | 9443 | Portainer HTTPS UI, authentik's HTTPS port | [devops-uis.md](devops-uis.md), [self-hosted-idp.md](self-hosted-idp.md) |
+| 9898 | Pgpool-II's PCP administration channel, which has its own credential file | [connection-poolers.md](connection-poolers.md) |
+| 9999 | Pgpool-II | [connection-poolers.md](connection-poolers.md), [postgresql.md](postgresql.md) |
 | 10001 | Ray Client server, which executes code | [ray.md](ray.md) |
 | 10002 to 19999 | Ray worker ports, allocated across this whole range by default, plus several randomized ports. Anything in this range on a Ray node may be a worker rather than the service the row below suggests | [ray.md](ray.md) |
 | 10250 | The Kubernetes kubelet API, which runs commands in containers. It also falls inside the Ray worker range above | [kubernetes.md](kubernetes.md) |

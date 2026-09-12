@@ -13,7 +13,7 @@ files=(
   nodejs.md python.md docker.md kubernetes.md frontend-frameworks.md container-hardening.md
   nextjs.md go.md dotnet.md java.md php.md ruby.md
   host.md cloud-firewalls.md paas.md egress-metadata.md gpu-clouds.md deployment-lifecycle.md
-  postgresql.md mysql.md mongodb.md redis.md elasticsearch.md minio.md
+  postgresql.md connection-poolers.md mysql.md mongodb.md redis.md elasticsearch.md minio.md
   rabbitmq.md mosquitto.md
   kafka.md clickhouse.md neo4j.md memcached.md object-storage.md nats.md search-engines.md sqlite.md surrealdb.md
   jupyter.md ollama.md open-webui.md litellm.md model-servers.md

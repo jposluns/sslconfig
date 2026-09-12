@@ -45,6 +45,7 @@
         "gpu-clouds.md",
         "deployment-lifecycle.md",
         "postgresql.md",
+        "connection-poolers.md",
         "mysql.md",
         "mongodb.md",
         "redis.md",
