@@ -1049,11 +1049,14 @@ probe() { curl -q --noproxy '*' -sS "$@"; }
 # to prove this host reaches that name at all, and any endpoint you expect to answer does it.
 
 # 1. On the host itself: nothing listens on a public address. Keycloak serves 8080 or 8443
-#    and management 9000; authentik serves 9000 and 9443, and metrics on 9300. Two more are
-#    easy to forget because they are not the product's front door: 6379 is the Redis that
-#    authentik keeps its sessions and task queue in, and 7800 with 57800 are Keycloak's
-#    cache replication and failure detection, which carry the sessions and tokens of a
-#    clustered deployment. Anyone who reaches those reaches what is in them.
+#    and management 9000; authentik serves 9000 and 9443, and metrics on 9300. Three more
+#    are easy to forget because they are not the product's front door. 7800 and 57800 are
+#    Keycloak's cache transport and failure detection, which carry the sessions and tokens
+#    of a clustered deployment; TLS is on by default there for TCP stacks, so this is about
+#    reachability rather than plaintext, and a reachable cluster port is still a cluster you
+#    did not mean to offer. 6379 is Redis, which authentik used for sessions and its task
+#    queue UP TO 2025.10; from that release it "no longer uses Redis at all" and keeps both
+#    in PostgreSQL, so check which you are running rather than which the internet says.
 ss -tlnp | grep -E ':(6379|7800|8080|8443|9000|9443|9300|57800)\b'    # 127.0.0.1 or an RFC 1918 address only
 # ss on the HOST does not see a container's own namespace, and a published Docker port
 # bypasses the host firewall besides, so cross-check what Compose actually published:
@@ -1112,20 +1115,27 @@ probe -o /dev/null -w '%{http_code}\n' \
 
 # 7. The management, metrics and application ports are not routable from out here. All of
 #    them: a reader who remapped 9000 and left 9443 published passes every other step.
-#    --connect-timeout is separate from -m on purpose: without it, a port that accepts
-#    the connection and then stalls produces the same exit 28 as a port that was never
-#    reachable, and the two are not the same finding.
+#    --connect-timeout is separate from -m so the two deadlines are distinguishable in the
+#    output, not because it changes the exit code: a port that accepts the connection and
+#    then stalls, and a port that was never reachable, both still end in exit 28. The
+#    diagnostic below is what tells them apart, which is why it is printed whole.
 for p in 8080 8443 9000 9300 9443; do
   err=$(probe --connect-timeout 3 -m 8 -o /dev/null -v "http://id.example.com:$p/" 2>&1 >/dev/null)
-  echo "$p: curl exit $? $(printf %s "$err" | grep -iE 'connected to|refused|timed out' | tail -1)"
+  rc=$?
+  echo "=== $p: curl exit $rc"
+  printf '%s\n' "$err"
 done
-# Pass is exit 7, connection refused or otherwise not established, or exit 28 with a
-# connect timeout. Exit 0 means it answered. Exit 28 AFTER the connection was accepted
-# means something is listening and slow, which is also an answer.
-# Exit 28 is ambiguous on its own, so the line above keeps curl's own account of what
-# happened. "Connected to" before a timeout means something accepted you and then went
-# quiet, which is an answer. No connection line means it never got that far. If neither is
-# present, the result is inconclusive and has to be chased, not accepted.
+# Exit 0 means it answered and exit 7 means nothing accepted the connection, which is the
+# outcome you want. Exit 28 is a timeout and does NOT settle it on its own: a port that
+# accepted you and then went quiet, and a port that was never reachable, both end there.
+# The whole diagnostic is printed rather than filtered for that reason.
+# Read it yourself. A line saying the connection was established, before a timeout, means
+# something accepted you and then went quiet, which is an answer. Do not reduce this to a
+# grep for a fixed phrase: curl has changed that wording more than once, and an earlier
+# version of this guide matched a phrase current curl no longer prints and then read its
+# absence as proof that nothing was listening. Absence of a line you were looking for is not
+# evidence. If the output does not settle it, the result is inconclusive and has to be
+# chased rather than accepted.
 
 # 8. Keycloak's bootstrap admin is gone. It does not expire on its own. Ask for the name
 #    rather than listing users: the users endpoint returns at most 100 by default, and a
@@ -1152,7 +1162,8 @@ One name is not one address, and one address is not one origin. Repeat steps 2 t
 - authentik monitoring, including the separate metrics port 9300 and that the metrics carry no authentication: https://docs.goauthentik.io/sys-mgmt/ops/monitoring
 - Keycloak server administration guide, brute force detection ("Brute force detection is disabled by default") and unspecific redirect URIs: https://www.keycloak.org/docs/latest/server_admin/index.html
 - nginx `location` selection and the `return` directive: https://nginx.org/en/docs/http/ngx_http_core_module.html#location , https://nginx.org/en/docs/http/ngx_http_rewrite_module.html#return
-- Keycloak configuring distributed caches, including the default cache ports 7800 (`cache-embedded-network-bind-port`, unicast data transmission) and 57800 (`jgroups.fd.port-offset`, failure detection): https://www.keycloak.org/server/caching
+- Keycloak configuring distributed caches, including the default cache ports 7800 (`cache-embedded-network-bind-port`, unicast data transmission) and 57800 (`jgroups.fd.port-offset`, failure detection), and that "Encryption using TLS is enabled by default for TCP-based transport stacks": https://www.keycloak.org/server/caching
+- authentik 2025.10 release notes, removing the Redis dependency ("authentik no longer uses Redis at all"): https://docs.goauthentik.io/releases/2025.10/
 
 ======================================================================
 ==> oidc-integration.md
