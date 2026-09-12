@@ -2562,16 +2562,18 @@ serve on, so read the port out of your own kubeconfig rather than assuming 6443.
 any business being reachable beyond the cluster, and only from addresses you list. Kubernetes states that
 "By default, the API server stores plain-text representations of resources into etcd, with no at-rest
 encryption", so what is on that disk is every Secret in the cluster in the clear. Reaching 2379 is not
-the same as reading it, because the same page says "Once etcd is configured correctly, only clients with
-valid certificates can access it"; the point is that the certificate is the entire boundary, and there is
-no second one behind it. Kubernetes puts the consequence plainly: "Access to etcd is equivalent to root
-permission in the cluster so ideally only the API server should have access to it." Require client
-certificates on both the client and peer ports, and keep the client listener off any public interface. Do
-not simply move it to the private address: kubeadm points the API server at `127.0.0.1:2379` and
-configures etcd to listen on loopback as well as the advertised address, so dropping loopback breaks the
-API server on that node. Keep issuance narrow rather than absolute, because kubeadm issues an
-`etcd-healthcheck-client` certificate of its own and backups need one too; the rule is that you should be
-able to name every holder. A firewall rule in front of an etcd still listening on `0.0.0.0` is one
+the same as reading it, because Kubernetes' operating-etcd guide says "Once etcd is configured
+correctly, only clients with valid certificates can access it"; the point is that the certificate is
+the entire boundary, and there is no second one behind it. Kubernetes puts the consequence plainly:
+"Access to etcd is equivalent to root permission in the cluster so ideally only the API server should
+have access to it." Require client certificates on both the client and peer ports, and keep the client
+listener off any public interface. Do not simply move it to the private address: kubeadm points the
+API server at loopback, `127.0.0.1:2379` or `::1` depending on the address family it advertises, and
+configures etcd to listen there as well as on the advertised address, so dropping the loopback
+listener breaks the API server on that node. Keep whichever one your cluster configured rather than
+the literal written here. Keep issuance narrow rather than absolute, because kubeadm issues an
+`etcd-healthcheck-client` certificate of its own and backups need one too; the rule is that you should
+be able to name every holder. A firewall rule in front of an etcd still listening on `0.0.0.0` is one
 misconfiguration away from the same outcome.
 
 **The kubelet's default depends on how it is configured, and the two answers are opposites.**
@@ -2619,33 +2621,45 @@ unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY
 
 # First at the TCP layer, because this is the only part with a clean answer. Did anything
 # accept a connection?
-read -r HOST PORT <<<"$(python3 - "$API" <<'PY'
+read -r HOST PORT URL <<<"$(python3 - "$API" <<'PY'
 import sys, urllib.parse
-p = urllib.parse.urlsplit(sys.argv[1])
-print(p.hostname, p.port or 443)
+raw = sys.argv[1].strip()
+if "://" not in raw:                      # kubectl accepts a bare host; curl would guess http
+    raw = "https://" + raw
+p = urllib.parse.urlsplit(raw)
+if not p.hostname:
+    sys.exit("cannot parse an API server out of: " + sys.argv[1])
+print(p.hostname, p.port or (80 if p.scheme == "http" else 443),
+      p.scheme + "://" + p.netloc)
 PY
-)"
+)" || exit 1
 nc -vz -w 3 "$HOST" "$PORT"
-# Parsed with python3 rather than cut with sed, because a bracketed IPv6 address breaks on
-# the colons and the failure looks exactly like the clean drop you were hoping for. This
-# step needs python3, nc and nmap on the machine you run it from, none of which the cluster
-# provides for you.
+# Parsed with python3 rather than cut with sed. A bracketed IPv6 address breaks on the
+# colons, and the failure looks exactly like the clean drop you were hoping for. A bare
+# host with no scheme is also legal in a kubeconfig, and curl would read that as HTTP on
+# port 80 and probe the wrong thing entirely, so the scheme is filled in here and the URL
+# the probe uses is the normalized one. This step needs python3, nc and nmap on the machine
+# you run it from, none of which the cluster provides for you.
 # "succeeded" means something is listening and reachable from here, whatever it does next.
 
 # Then at the HTTP layer, with verification left ON.
 curl -q --noproxy '*' -sS -o /dev/null --connect-timeout 3 -m 10 \
-  -w '%{http_code}\n' "$API/version"; echo "curl exit $?"
-# Exit 0 with ANY status, 200, 401, 403 and 404 alike, means it answered. So does exit 60:
-# curl completed a TLS handshake and then declined the cluster's own CA, and the 000 printed
-# beside it is not a pass.
+  -w '%{http_code}\n' "$URL/version"; echo "curl exit $?"
+# Exit 0 with ANY status, 200, 401, 403 and 404 alike, means it answered.
+# So does exit 60: curl reached a TLS peer, received a certificate and refused to trust it.
+# That is not necessarily a completed handshake, and it does not need to be: something on
+# that address answered in TLS, and the 000 printed beside it is not a pass.
 # Exit 7 is "failed to connect", which is the outcome you want. Exit 28 is a TIMEOUT and it
 # is NOT clean evidence either way: a dropped packet and an endpoint that accepted the
 # connection and then stalled both produce it. If you get 28, the nc line above is what
 # tells you which one you had.
-# Any other exit is neither, and two are worth naming. Exit 6 is a name that did not
-# resolve, which is what a private cluster with its public endpoint disabled looks like
-# from outside, so it is a pass in that configuration and an error in any other. And
-# a TLS-intercepting middlebox on your own network answers every outbound 443 with its own
+# Any other exit is neither, and two are worth naming.
+# Exit 6 is a name that did not resolve. Do not read that as proof of a private cluster:
+# EKS documents that a private-only endpoint is still "resolved by public DNS servers to a
+# private IP address from the VPC", so a correctly private cluster usually resolves fine
+# and simply refuses the connection. Exit 6 means your resolver had no answer, which is
+# worth understanding before you call it anything.
+# And a TLS-intercepting middlebox on your own network answers every outbound 443 with its own
 # certificate, so it prints exit 60 whether or not the cluster is reachable. Exit 60 means
 # SOMETHING answered, and on a network like that it may not be the thing you aimed at; the
 # unset above defeats a configured proxy and nothing defeats a transparent one except
@@ -2659,7 +2673,9 @@ curl -q --noproxy '*' -sS -o /dev/null --connect-timeout 3 -m 10 \
 # address. A managed cluster hides the control-plane nodes from you, but not its workers,
 # and the kubectl line below tells you which nodes have a public address. Scan the ones
 # that do.
-kubectl get nodes -o wide          # every address, control-plane nodes and workers alike
+kubectl get nodes -o wide          # control-plane nodes and workers alike, but see below
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.addresses[*].address}{"\n"}{end}'
+                                   # -o wide prints only the FIRST external address per node
 nmap -Pn -p 6443,2379,2380,10250,10255,10256,10257,10259 REPLACE_WITH_ONE_NODE_ADDRESS
 nmap -6 -Pn -p 6443,2379,2380,10250,10255,10256,10257,10259 REPLACE_WITH_ITS_IPV6_ADDRESS
                                                                      # every one closed or filtered from
@@ -2672,7 +2688,9 @@ public address, worker nodes included, and every address each one answers on, in
 filtered on IPv4 while it answers on IPv6 passes every check above and is still reachable. The
 `kubectl get svc` line catches NodePort Services that exist, but nothing here probes the 30000 to 32767
 NodePort range itself, over TCP or UDP, so scan that too if you run self-managed nodes with
-public addresses.
+public addresses. And a cluster whose etcd runs on its own machines has hosts that `kubectl get nodes`
+never lists, because they carry no kubelet; take their client and peer addresses from wherever you
+configured them and scan those too.
 
 Be clear about what a pass here is worth. It says that this host, at this moment, over this address
 family, could not reach that endpoint. It does not say the cluster is restricted, because your own
@@ -2689,6 +2707,8 @@ allowed ranges out of the provider's own configuration rather than inferring the
 - Envoy Gateway tasks, secure gateways (TLS listener): https://gateway.envoyproxy.io/docs/tasks/security/secure-gateways/ ; basic auth: https://gateway.envoyproxy.io/docs/tasks/security/basic-auth/ ; OIDC: https://gateway.envoyproxy.io/docs/tasks/security/oidc/ ; external authorization (`extAuth`): https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/ ; HTTP redirect: https://gateway.envoyproxy.io/docs/tasks/traffic/http-redirect/
 - Authelia: proxy integration (the proxy calls the authorization endpoint): https://www.authelia.com/integration/proxies/introduction/ ; Envoy Gateway `SecurityPolicy` example: https://www.authelia.com/integration/kubernetes/envoy/gateway/
 - kubectl JSONPath filter syntax: https://kubernetes.io/docs/reference/kubectl/jsonpath/
+- curl exit codes, used to read the API server probe (6 could not resolve, 7 failed to connect, 28 timed out, 60 peer certificate not trusted): https://curl.se/libcurl/c/libcurl-errors.html
+- Nmap host discovery and port specification, for the node scan (`-Pn`, `-p`, `-6`): https://nmap.org/book/man-host-discovery.html , https://nmap.org/book/man-port-scanning-basics.html
 - Kubernetes ports and protocols (6443 API server, 2379 and 2380 etcd, 10250 kubelet, 10259 scheduler, 10257 controller manager): https://kubernetes.io/docs/reference/networking/ports-and-protocols/
 - Kubernetes kubelet authentication and authorization (unrejected requests treated as anonymous, `--anonymous-auth`, `--authorization-mode=Webhook`): https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
 - Kubernetes kubelet command-line reference (`--anonymous-auth` "Default: true", `--read-only-port` "Default: 10255" serving "with no authentication/authorization"): https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
@@ -2698,7 +2718,7 @@ allowed ranges out of the provider's own configuration rather than inferring the
 - Kubernetes encrypting confidential data at rest ("By default, the API server stores plain-text representations of resources into etcd, with no at-rest encryption"): https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
 - Kubernetes, operating etcd clusters, including securing communication and limiting access ("Access to etcd is equivalent to root permission in the cluster"): https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/
 - GKE, disable the kubelet read-only port (disabled by default only in new clusters running 1.32 or later): https://docs.cloud.google.com/kubernetes-engine/docs/how-to/disable-kubelet-readonly-port
-- Amazon EKS cluster endpoint access ("[b]y default, this API server endpoint is public to the internet"): https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html
+- Amazon EKS cluster endpoint access ("[b]y default, this API server endpoint is public to the internet"; private endpoint DNS, "resolved by public DNS servers to a private IP address from the VPC"): https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html
 - GKE control plane network isolation, including how authorized networks work: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/network-isolation#how_authorized_networks_work
 - AKS API server authorized IP ranges: https://learn.microsoft.com/en-us/azure/aks/api-server-authorized-ip-ranges
 - cert-manager Gateway API usage (enabling support, annotations): https://cert-manager.io/docs/usage/gateway/ ; ACME HTTP-01 `gatewayHTTPRoute` solver: https://cert-manager.io/docs/configuration/acme/http01/
