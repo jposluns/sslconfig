@@ -22,6 +22,9 @@ changed. It fails only if the stem is dropped from BOTH patterns, which is how a
 would go wrong, so it guards something real without being a regression case. It is labelled that way
 because seven of the eight cases added beside it DO fail against the previous code, and describing
 all eight the same way would be the overclaim this file exists to prevent.
+The summary line counts the three kinds separately, because a coverage guard closed nothing and a
+disclosed limit is still open, and folding either into the closed-findings total would overstate what
+this file has actually established.
 
 This is not a proof of correctness. It is a record of what has already gone wrong.
 
@@ -342,10 +345,13 @@ def main() -> int:
         for f in failures:
             print(f"  FAIL  {f}")
         return 1
-    total = len(TLS_CASES) + len(PROSE_CASES)
-    limits = sum(1 for c in TLS_CASES + PROSE_CASES if c[0].startswith("known limit:"))
+    cases = TLS_CASES + PROSE_CASES
+    total = len(cases)
+    limits = sum(1 for c in cases if c[0].startswith("known limit:"))
+    guards = sum(1 for c in cases if c[0].startswith("coverage guard:"))
     print(f"  ok    {total} recorded review cases behave as recorded: "
-          f"{total - limits} findings closed, {limits} disclosed limits still open")
+          f"{total - limits - guards} findings closed, {guards} coverage "
+          f"guard{'' if guards == 1 else 's'}, {limits} disclosed limits still open")
     return 0
 
 
