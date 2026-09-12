@@ -147,9 +147,10 @@ probe() { curl -q --noproxy '*' -sS "$@"; }
 #    Keycloak's cache transport and failure detection, which carry the sessions and tokens
 #    of a clustered deployment; TLS is on by default there for TCP stacks, so this is about
 #    reachability rather than plaintext, and a reachable cluster port is still a cluster you
-#    did not mean to offer. 6379 is Redis, which authentik used for sessions and its task
-#    queue UP TO 2025.10; from that release it "no longer uses Redis at all" and keeps both
-#    in PostgreSQL, so check which you are running rather than which the internet says.
+#    did not mean to offer. 6379 is Redis, which authentik used for caching, tasks, the
+#    embedded outpost's session store and WebSocket connections. It moved tasks to
+#    Postgres in 2025.8 and the rest in 2025.10, which "no longer uses Redis at all", so
+#    whether this port matters depends on your version. Check it rather than assume.
 ss -tlnp | grep -E ':(6379|7800|8080|8443|9000|9443|9300|57800)\b'    # 127.0.0.1 or an RFC 1918 address only
 # ss on the HOST does not see a container's own namespace, and a published Docker port
 # bypasses the host firewall besides, so cross-check what Compose actually published:
