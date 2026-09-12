@@ -11,10 +11,13 @@ Every case below is an input a reviewer actually constructed and ran, not a case
 while writing the gate. MISSES are inputs that are real defects and must be caught. FALSE
 ALARMS are legitimate text that must not be. The comment on each says which round found it,
 so a future change that reintroduces one lands on a named prior finding rather than a
-nameless assertion. One case here depends on the ORDER of an alternation rather than on a
-named branch: a longer adverbial suffix is reached only because a shorter one matches first,
-fails its word boundary, and the engine retries. It is recorded precisely because nothing else
-would notice if a future reordering broke it.
+nameless assertion. One case covers a longer adverbial suffix that the engine reaches by backtracking, a shorter
+alternative having matched first and failed its word boundary. An earlier version of this paragraph
+claimed the case therefore guarded the alternation's ORDER. A reviewer reordered the alternatives
+longest first and all cases still passed, so that claim was wrong: what the case actually guards is
+that the suffix is NAMED at all, and it fails when the alternative is removed. The correction is
+recorded here rather than quietly made, because a file whose subject is overclaiming should show its
+own.
 
 Not every case here records a change. One is labelled a coverage guard: `minimise` is caught both
 before and after the round that moved its stem from one pattern to the other, because only the route
