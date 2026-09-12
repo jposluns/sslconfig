@@ -112,7 +112,14 @@ internet.
 to the internet" for EKS. Restrict it: EKS supports private endpoint access and CIDR restrictions on the
 public one, GKE calls the same control "authorized networks", and AKS calls it authorized IP ranges.
 Whichever you run, the question to answer is which addresses can reach the API server, and the default
-answer is everyone.
+answer is everyone. GKE needs a second look, because it has two control-plane endpoints and authorized
+networks only govern one. The vendor says authorized networks "provide an IP-based firewall that
+controls access to the GKE control plane", and that reaching the DNS-based endpoint is a different
+question entirely: "To access the control plane endpoint, you need to configure IAM roles and policies,
+and authentication tokens." So a GKE reader who restricts authorized networks exactly as this section
+says, and then probes the address in their kubeconfig, can still have a DNS-based endpoint answering
+from anywhere, gated by IAM alone. Check both, and if you do not use the DNS-based endpoint, disable it
+rather than leaving it to IAM.
 
 **A kubeconfig may be a credential, or only a pointer to one.** A file with an embedded token, or with
 a client certificate and its key, is the credential: anyone holding it has whatever it is bound to, with
@@ -157,11 +164,15 @@ effective configuration on a node, and where the flags are in use set `--anonymo
 `--authorization-mode=Webhook`. Port 10250 runs commands in containers, so it should never be reachable
 from outside the cluster either way.
 
-**The read-only port asks nobody for anything.** `--read-only-port` carries "Default: 10255" and serves,
-in Kubernetes' own words, "with no authentication/authorization (set to 0 to disable)". It is a separate
-listener, so fixing 10250 does not touch it, and it hands pod and node state to anyone who can reach it.
-GKE states that "The kubelet read-only port is disabled by default in new clusters that run version 1.32
-or later", which is to say an older cluster did not inherit that and needs the change made.
+**The read-only port has the same split, and the same answer.** The `--read-only-port` FLAG carries
+"Default: 10255", and Kubernetes describes that listener as serving "with no
+authentication/authorization (set to 0 to disable)". The `KubeletConfiguration` v1beta1 field carries
+"Default: 0 (disabled)". So a flag-configured node serves an unauthenticated listener nobody asked for,
+and a file-configured node does not unless something turned it on. GKE is the case where something did:
+it states that "The kubelet read-only port is disabled by default in new clusters that run version 1.32
+or later", which is only worth saying because older clusters have it on. Read the effective
+configuration here too, and remember that 10255 is a separate listener, so securing 10250 does not
+touch it.
 
 ## Verify
 
@@ -198,23 +209,37 @@ curl -q --noproxy '*' -sS -o /dev/null --connect-timeout 3 -m 10 \
 # is NOT clean evidence either way: a dropped packet and an endpoint that accepted the
 # connection and then stalled both produce it. If you get 28, the nc line above is what
 # tells you which one you had.
+# Any other exit is neither, and two are worth naming. Exit 6 is a name that did not
+# resolve, which is what a private cluster with its public endpoint disabled looks like
+# from outside, so it is a pass in that configuration and an error in any other. And
+# a TLS-intercepting middlebox on your own network answers every outbound 443 with its own
+# certificate, so it prints exit 60 whether or not the cluster is reachable. Exit 60 means
+# SOMETHING answered, and on a network like that it may not be the thing you aimed at; the
+# unset above defeats a configured proxy and nothing defeats a transparent one except
+# testing from somewhere else.
 
-# Scan the CONTROL-PLANE nodes, not a worker. A worker shows 6443 and 2379 closed while
-# the control-plane host serves both. A managed cluster has no control-plane node you can
-# scan, so there the curl above is the whole of this check.
-kubectl get nodes -l node-role.kubernetes.io/control-plane -o wide
+# Scan the control-plane nodes FIRST, because a worker shows 6443 and 2379 closed while
+# the control-plane host serves both, and a scan of a worker alone therefore passes on an
+# exposed control plane. Then scan every node that has a public address, worker nodes
+# included: 10250 and 10256 are worker ports, 10250 runs commands in containers, and a
+# kubeadm or k3s cluster built on cloud instances commonly gives every node a public
+# address. A managed cluster hides the control-plane nodes from you, but not its workers,
+# and the kubectl line below tells you which nodes have a public address. Scan the ones
+# that do.
+kubectl get nodes -o wide          # every address, control-plane nodes and workers alike
 nmap -Pn -p 6443,2379,2380,10250,10255,10256,10257,10259 REPLACE_WITH_ONE_NODE_ADDRESS
 nmap -6 -Pn -p 6443,2379,2380,10250,10255,10256,10257,10259 REPLACE_WITH_ITS_IPV6_ADDRESS
                                                                      # every one closed or filtered from
                                                                      # outside. 10250 runs commands in
-                                                                     # containers; 2379 holds every Secret
+                                                                     # containers; 2379 is the whole of etcd
 ```
 
-One name is not one address and one node is not the cluster. Repeat the scan for every control-plane
-node and every address each one answers on, in both families: a host filtered on IPv4 while it answers
-on IPv6 passes every check above and is still reachable. The `kubectl get svc` line catches NodePort
-Services that exist, but nothing here probes the 30000 to 32767 NodePort range itself, over TCP or UDP,
-so scan that too if you run self-managed nodes with public addresses.
+One name is not one address and one node is not the cluster. Repeat the scan for every node that has a
+public address, worker nodes included, and every address each one answers on, in both families: a host
+filtered on IPv4 while it answers on IPv6 passes every check above and is still reachable. The
+`kubectl get svc` line catches NodePort Services that exist, but nothing here probes the 30000 to 32767
+NodePort range itself, over TCP or UDP, so scan that too if you run self-managed nodes with
+public addresses.
 
 Be clear about what a pass here is worth. It says that this host, at this moment, over this address
 family, could not reach that endpoint. It does not say the cluster is restricted, because your own
@@ -226,7 +251,7 @@ allowed ranges out of the provider's own configuration rather than inferring the
 ## Sources (checked September 2026)
 
 - Ingress NGINX: Statement from the Kubernetes Steering and Security Response Committees (retirement, detection command): https://kubernetes.io/blog/2026/01/29/ingress-nginx-statement/ ; Kubernetes docs, Gateway API (successor to Ingress, migration guide): https://kubernetes.io/docs/concepts/services-networking/gateway/
-- Gateway API getting started (CRD install): https://gateway-api.sigs.k8s.io/guides/getting-started/ ; TLS: https://gateway-api.sigs.k8s.io/guides/user-guides/tls/ ; HTTP routing: https://gateway-api.sigs.k8s.io/guides/user-guides/http-routing/ ; redirects: https://gateway-api.sigs.k8s.io/guides/user-guides/http-redirect-rewrite/
+- Gateway API getting started (CRD install): https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/ ; TLS: https://gateway-api.sigs.k8s.io/guides/user-guides/tls/ ; HTTP routing: https://gateway-api.sigs.k8s.io/guides/user-guides/http-routing/ ; redirects: https://gateway-api.sigs.k8s.io/guides/user-guides/http-redirect-rewrite/
 - Envoy Gateway: https://gateway.envoyproxy.io/ ; Helm install: https://gateway.envoyproxy.io/docs/install/install-helm/ ; quickstart and its manifest (GatewayClass `controllerName`): https://gateway.envoyproxy.io/docs/tasks/quickstart/ , https://github.com/envoyproxy/gateway/releases/download/v1.9.1/quickstart.yaml
 - Envoy Gateway tasks, secure gateways (TLS listener): https://gateway.envoyproxy.io/docs/tasks/security/secure-gateways/ ; basic auth: https://gateway.envoyproxy.io/docs/tasks/security/basic-auth/ ; OIDC: https://gateway.envoyproxy.io/docs/tasks/security/oidc/ ; external authorization (`extAuth`): https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/ ; HTTP redirect: https://gateway.envoyproxy.io/docs/tasks/traffic/http-redirect/
 - Authelia: proxy integration (the proxy calls the authorization endpoint): https://www.authelia.com/integration/proxies/introduction/ ; Envoy Gateway `SecurityPolicy` example: https://www.authelia.com/integration/kubernetes/envoy/gateway/
@@ -234,7 +259,7 @@ allowed ranges out of the provider's own configuration rather than inferring the
 - Kubernetes ports and protocols (6443 API server, 2379 and 2380 etcd, 10250 kubelet, 10259 scheduler, 10257 controller manager): https://kubernetes.io/docs/reference/networking/ports-and-protocols/
 - Kubernetes kubelet authentication and authorization (unrejected requests treated as anonymous, `--anonymous-auth`, `--authorization-mode=Webhook`): https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
 - Kubernetes kubelet command-line reference (`--anonymous-auth` "Default: true", `--read-only-port` "Default: 10255" serving "with no authentication/authorization"): https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
-- Kubernetes `KubeletConfiguration` v1beta1 reference (the file defaults: `anonymous: enabled: false`, `webhook: enabled: true`, `mode: Webhook`): https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/
+- Kubernetes `KubeletConfiguration` v1beta1 reference (the file defaults: `anonymous: enabled: false`, `webhook: enabled: true`, `mode: Webhook`, `readOnlyPort` "Default: 0 (disabled)"): https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/
 - Kubernetes kubeconfig API reference (`ExecConfig`, whose `env` "defines additional environment variables to expose to the process"): https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/
 - Kubernetes encrypting confidential data at rest ("By default, the API server stores plain-text representations of resources into etcd, with no at-rest encryption"): https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
 - Kubernetes, operating etcd clusters, including securing communication and limiting access ("Access to etcd is equivalent to root permission in the cluster"): https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/
