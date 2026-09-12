@@ -187,10 +187,11 @@ fi
 
 echo "== every fenced bash block is shell =="
 # Nothing in this suite checked whether the shell in a Verify block parses, and a reader
-# pastes these into a terminal. The gate is honest about the two defects that motivated it,
-# which it does not catch; what it does catch is five real defects this corpus was carrying,
-# plus a class shellcheck structurally cannot see, where an angle-bracket placeholder is a
-# redirection rather than a placeholder.
+# pastes these into a terminal. What it catches is five real defects this corpus was
+# carrying. What it does NOT catch is stated in its own docstring and in CONTRIBUTING rule 6:
+# `head -c 11m`, and an angle-bracket placeholder, whose check was deleted after five rules
+# for it were each beaten by legal shell. It now also proves shellcheck actually ran, rather
+# than trusting an exit code that a silenced binary also returns.
 if shellblocks=$(python3 tools/check_shell_blocks.py 2>&1); then
   printf '%s\n' "$shellblocks"
   # A gate that exits 0 while printing findings would otherwise read as a pass. A SKIP line

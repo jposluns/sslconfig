@@ -22,6 +22,7 @@ The cases that need shellcheck SKIP when shellcheck is absent rather than failin
 gate skips too and its docstring promises the suite stays green.
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -42,7 +43,7 @@ def run_against(block, fence="```bash", env=None, path_prefix=None, raw=None, ho
         if raw is not None:
             body = raw
         else:
-            marker = fence.split("bash")[0].rstrip()
+            marker = re.match(r"[`~]+", fence).group(0)
             body = "# T\n\n## Verify\n\n" + fence + "\n" + block + "\n" + marker + "\n"
         (d / "guide.md").write_text(body, encoding="utf-8")
         run_env = dict(os.environ)
@@ -54,6 +55,30 @@ def run_against(block, fence="```bash", env=None, path_prefix=None, raw=None, ho
             run_env["PATH"] = f"{path_prefix}{os.pathsep}{run_env.get('PATH', '')}"
         r = subprocess.run([sys.executable, "tools/check_shell_blocks.py"], cwd=d,
                            capture_output=True, text=True, env=run_env)
+        return r.returncode, r.stdout.strip()
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def run_multi(guides, path_prefix=None):
+    """Run the gate over several guides at once. (exit, output).
+
+    Every other case here uses one guide with one block, so nothing noticed a gate that read
+    only the first guide, only the first block, or reused one temporary filename for all of
+    them. A reviewer found four mutants living in that gap.
+    """
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "tools").mkdir()
+        for f in ("check_shell_blocks.py", "_walk.py", "_markdown.py"):
+            shutil.copy(TOOLS / f, d / "tools" / f)
+        for name, body in guides.items():
+            (d / name).write_text(body, encoding="utf-8")
+        env = dict(os.environ)
+        if path_prefix:
+            env["PATH"] = f"{path_prefix}{os.pathsep}{env.get('PATH', '')}"
+        r = subprocess.run([sys.executable, "tools/check_shell_blocks.py"], cwd=d,
+                           capture_output=True, text=True, env=env)
         return r.returncode, r.stdout.strip()
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -77,6 +102,12 @@ CASES = (
      'cert=/etc/ssl/a.pem\nopenssl x509 -in "$cret" -noout', True, "SC2154", True),
     ("a sourced file that cannot be followed",
      "source ./deployment.env\ncurl -sS https://app.example.com/", True, "SC1091", True),
+    ("a variable assigned and never used, which a typo in the reader looks like",
+     "cert=/etc/ssl/a.pem\necho done", True, "SC2034", True),
+    ("a dynamically sourced path",
+     'source "$CONFIG_FILE"\ncurl -sS https://app.example.com/', True, "SC1090", True),
+    ("local used outside a function",
+     "local cert=/etc/ssl/a.pem\necho \"$cert\"", True, "SC2168", True),
     # The escape a guide should use when a fragment genuinely needs a rule off, in view of the
     # reader rather than buried in a suite-wide exclusion.
     ("a fragment that disables one rule in view of the reader",
@@ -170,6 +201,28 @@ def main() -> int:
                 f"Expected it to contain {expected!r}. It said: {out!r}")
 
     if HAVE_SHELLCHECK:
+        # Every guide and every block, not just the first of each. Four mutants lived here.
+        rc, out = run_multi({
+            "a.md": "# A\n\n## Verify\n\n```bash\necho ok\n```\n\n```bash\n"
+                    "cp a.pem ${HOME}/b.pem\n```\n",
+            "b.md": "# B\n\n## Verify\n\n```bash\ncp c.pem ${HOME}/d.pem\n```\n"})
+        if not rc or "a.md:10:" not in out or "b.md:6:" not in out:
+            failures.append(
+                f"the gate did not report the second block of the first guide AND the first "
+                f"block of the second guide: {out!r}")
+        rc, out = run_multi({
+            "a.md": "# A\n\n## Verify\n\n```bash\necho ok\n```\n",
+            "b.md": "# B\n\n## Verify\n\n```bash\necho ok\n```\n"})
+        if rc or "2 bash blocks in 2 guides" not in out:
+            failures.append(f"the pass line does not count every block and guide: {out!r}")
+
+        # A line separator splitlines() treats as a break and a reader does not.
+        rc, out = run_multi({"a.md": "# A\n\n## Verify\n\n```bash\n"
+                                     "printf '%s' 'x\u2028y'\ncp a.pem ${HOME}/b.pem\n```\n"})
+        if not rc or "a.md:7:" not in out:
+            failures.append(
+                f"a U+2028 in a block shifted the reported line number: {out!r}")
+
         # Every fence form must actually be read. The previous expression matched none of
         # these, so a block behind one left "every fenced bash block" silently.
         for desc, fence in FENCES:
@@ -181,6 +234,13 @@ def main() -> int:
         rc, out = run_against("cp a.pem ${HOME}/b.pem", fence="```text")
         if rc:
             failures.append(f"a ```text fence was linted as bash: {out!r}")
+
+        # The first word of the info string, case-insensitively. Comparing the whole string
+        # missed two forms that render as bash and that a reader copies from.
+        for fence in ("```Bash", "```bash {.numberLines}"):
+            rc, out = run_against("cp a.pem ${HOME}/b.pem", fence=fence)
+            if not rc or "SC2086" not in out:
+                failures.append(f"a {fence} fence was not linted: {out!r}")
 
         # An indented fence has its own indentation removed, per CommonMark. Leaving it on
         # handed shellcheck an indented script and produced a parse error against a block that
@@ -230,6 +290,27 @@ def main() -> int:
         finally:
             shutil.rmtree(rc_home, ignore_errors=True)
 
+        # The canary has to be matched on its own path field and a bracketed code. A reviewer
+        # got past a prefix test with a forged `<canary>.forged` row and past a substring test
+        # with SC20860.
+        for label, line in (
+                ("a forged path suffix", '%s.forged:2:4: note: x [SC2086]'),
+                ("a longer code", '%s:2:4: note: x [SC20860]')):
+            stub = Path(tempfile.mkdtemp())
+            try:
+                (stub / "shellcheck").write_text(
+                    '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "version: 9.9.9"; exit 0; fi\n'
+                    'for a in "$@"; do case "$a" in */canary.sh) printf "' + line + '\\n" "$a";; esac; done\n'
+                    'exit 1\n', encoding="utf-8")
+                (stub / "shellcheck").chmod(0o755)
+                rc, out = run_against("echo ok", path_prefix=str(stub))
+                if not rc or "did not lint" not in out:
+                    failures.append(
+                        f"the canary accepted {label}, so it does not identify its own "
+                        f"diagnostic: {out!r}")
+            finally:
+                shutil.rmtree(stub, ignore_errors=True)
+
         # The canary: a shellcheck that answers without linting must not read as a pass,
         # whatever exit code it chooses. This stub is the GHCRTS shape through a channel the
         # gate does not strip.
@@ -269,7 +350,8 @@ def main() -> int:
         for f in failures:
             print(f"  FAIL  {f}")
         return 1
-    limits = sum(1 for c in CASES if c[0].startswith("known limit:"))
+    limits = sum(1 for c in CASES
+                 if c[0].startswith("known limit:") and (HAVE_SHELLCHECK or not c[4]))
     ran = len(CASES) - skipped
     note = f", {skipped} skipped because shellcheck is not installed" if skipped else ""
     print(f"  ok    {ran} recorded cases for the shell-block gate: "

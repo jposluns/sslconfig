@@ -37,13 +37,21 @@ obligation now, named in CONTRIBUTING, and NOTHING in this suite catches an angl
 placeholder in a bash block. That gap is stated here so nobody rediscovers it as a surprise.
 
 THE CANARY, which is the most important thing left in this file. Every batch is linted with one
-extra block KNOWN to produce SC2086, and its finding must come back. If it does not, shellcheck
-did not lint and the gate fails, whatever exit code it gave. A reviewer set `GHCRTS=-M1m` in the
-environment: the real shellcheck then exits 1, writes to stderr and prints NOTHING on stdout,
-and this gate read that as a clean run over all 156 blocks. Blacklisting that one variable would
-have fixed that one input; the canary fixes the class, because a lint that cannot find a defect
-it was handed did not happen, whatever went wrong. `SHELLCHECK_OPTS` and `GHCRTS` are stripped
-and `--norc` is passed as well, but those are hygiene and the canary is the guarantee.
+extra block KNOWN to produce SC2086, and that exact finding must come back, matched on the
+canary's own path field and a bracketed `[SC2086]`. If it does not, shellcheck did not lint and
+the gate fails, whatever exit code it gave. A reviewer set `GHCRTS=-M1m` in the environment: the
+real shellcheck then exits 1, writes to stderr and prints NOTHING on stdout, and this gate read
+that as a clean run over all 156 blocks. Blacklisting that one variable would have fixed that one
+input; the canary covers the class, because a lint that cannot find a defect it was handed did
+not happen, whatever went wrong. `SHELLCHECK_OPTS` and `GHCRTS` are stripped and `--norc` is
+passed as well, but those are hygiene and the canary is the guarantee.
+
+WHAT THE CANARY DOES NOT GUARANTEE, because a reviewer got past the first version of it eight
+ways. It proves an expected diagnostic came back. It does not authenticate the executable, and
+it cannot: a stub on PATH that lints only the canary, or that fabricates its line and drops a
+real finding, passes. Anything that controls PATH controls the answer, and no check inside this
+file changes that. What the canary is for is the accident, which is the case that actually
+happened: an environment variable, a broken install, a rule set that no longer fires.
 
 NO RULES ARE EXCLUDED. An earlier version excluded SC2154 and SC1091 on the theory that these
 blocks are deliberately incomplete fragments. A reviewer showed the cost: SC2154 is what catches
@@ -74,6 +82,7 @@ WHAT THIS DOES NOT PROVE: that a Verify step is correct, that its commands do wh
 claim, or that a valid command carries valid arguments.
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -91,6 +100,9 @@ AMBIENT = ("SHELLCHECK_OPTS", "GHCRTS")
 # A block shellcheck must find a defect in. If this finding does not come back, it did not lint.
 CANARY = "cp $HOME/a /tmp/b\n"
 CANARY_CODE = "SC2086"
+# shellcheck -f gcc: `file:line:col: severity: message`. Anchored on a numeric line and column
+# so a row this gate cannot read is skipped rather than raising out of it.
+ROW = re.compile(r"^(?P<file>.+?):(?P<line>\d+):(?P<col>\d+):\s*(?P<msg>.*)$")
 
 
 def blocks_of(path):
@@ -103,8 +115,11 @@ def blocks_of(path):
     for n, line in enumerate(lines, 1):
         if fences.feed(line):
             if fences.inside:
-                info = FENCE_RE.match(line).group(2).strip()
-                if info == "bash":
+                info = FENCE_RE.match(line).group(2).strip().split()
+                # The first word of the info string, case-insensitively, which is the usual
+                # convention. Comparing the whole string missed ```bash {.numberLines} and
+                # ```Bash, both of which render as bash and both of which a reader copies.
+                if info and info[0].lower() == "bash":
                     start, body = n + 1, []
                     indent = len(line) - len(line.lstrip(" "))
                 else:
@@ -130,9 +145,11 @@ def shellcheck_version():
                               env={k: v for k, v in os.environ.items() if k not in AMBIENT})
     except (OSError, subprocess.SubprocessError):
         return "unknown"
+    if done.returncode:
+        return "unknown"
     for row in done.stdout.splitlines():
         if row.lower().startswith("version:"):
-            return row.split(":", 1)[1].strip()
+            return row.split(":", 1)[1].strip() or "unknown"
     return "unknown"
 
 
@@ -179,7 +196,12 @@ def main() -> int:  # noqa: C901
                 print(f"  FAIL  shellcheck could not be run: {exc}")
                 return 1
             rows = done.stdout.splitlines()
-            if not any(r.startswith(str(canary)) and CANARY_CODE in r for r in rows):
+            # Exact path field and bracketed code. A reviewer got past the earlier prefix test
+            # with a row naming `<canary path>.forged`, and past the substring test with
+            # SC20860. Neither is a defence against a hostile executable on PATH, which owns
+            # the answer either way; both were ways for an accident to read as a pass.
+            if not any(r.split(":", 1)[0] == str(canary) and f"[{CANARY_CODE}]" in r
+                       for r in rows):
                 # See THE CANARY. Whatever the exit code says, a lint that did not report a
                 # defect it was handed did not happen.
                 print(f"  FAIL  shellcheck did not report {CANARY_CODE} against the canary "
@@ -192,13 +214,16 @@ def main() -> int:  # noqa: C901
                       f"the whole answer: {done.stderr.strip()[:160]}")
                 return 1
             for row in rows:
-                parts = row.split(":", 4)
-                if len(parts) < 5 or Path(parts[0]).name == canary.name:
+                # Split off the known path first: a colon inside TMPDIR made a left-to-right
+                # split misread the filename, and a row whose line number is not a number used
+                # to raise an uncaught ValueError out of the gate.
+                m = ROW.match(row)
+                if not m or Path(m.group("file")).name == canary.name:
                     continue
-                fname, lineno, _col, _sev, message = parts
-                guide, first = index.get(Path(fname).name, ("?", 0))
+                guide, first = index.get(Path(m.group("file")).name, ("?", 0))
                 # The block gains a shebang, so extracted line 2 is the block's first line.
-                findings.append(f"{guide}:{first + int(lineno) - 2}:{message.strip()}")
+                findings.append(
+                    f"{guide}:{first + int(m.group('line')) - 2}:{m.group('msg').strip()}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
