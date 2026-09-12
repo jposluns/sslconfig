@@ -2613,8 +2613,9 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://app.example.com/   # 401 where
 # serve the API on 443, and a probe of 6443 times out against a cluster that is answering
 # the internet on 443, which reads as a pass.
 API=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-# Whether a schemeless server means HTTP or HTTPS is decided by the TLS settings beside it,
-# so read those too rather than guessing.
+# Whether a schemeless server means HTTP or HTTPS is decided by the TLS settings in the
+# same kubeconfig, on the cluster entry and the user entry both, so read those rather
+# than guessing.
 TLS=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.certificate-authority}{.clusters[0].cluster.certificate-authority-data}{.clusters[0].cluster.insecure-skip-tls-verify}{.users[0].user.client-certificate}{.users[0].user.client-certificate-data}')
 
 # From a machine OUTSIDE any allowed range, against a cluster you are authorized to test.
@@ -2628,9 +2629,10 @@ PARSED=$(python3 - "$API" "$TLS" <<'PY'
 import sys, urllib.parse
 raw, tls = sys.argv[1].strip(), sys.argv[2].strip()
 if "://" not in raw:
-    # Kubernetes starts at http:// and moves to https:// only when the cluster entry
-    # carries a CA, a client certificate, or insecure-skip-tls-verify. Guessing https
-    # here sent the probe to 443 against a cluster the client would reach on 80.
+    # Kubernetes starts at http:// and moves to https:// only when the config carries a
+    # CA or insecure-skip-tls-verify on the cluster entry, or a client certificate on the
+    # user entry. Guessing https here sent the probe to 443 against a cluster the client
+    # would reach on 80.
     raw = ("https://" if tls else "http://") + raw
 p = urllib.parse.urlsplit(raw)
 if not p.hostname:
