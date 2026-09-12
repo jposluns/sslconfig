@@ -88,7 +88,8 @@ one of them is the application's.
 | 10002 to 19999 | Ray worker ports, allocated across this whole range by default, plus several randomized ports. Anything in this range on a Ray node may be a worker rather than the service the row below suggests | [ray.md](ray.md) |
 | 10250 | The Kubernetes kubelet API, which runs commands in containers. It also falls inside the Ray worker range above | [kubernetes.md](kubernetes.md) |
 | 10255 | The Kubernetes kubelet read-only port, which serves with no authentication or authorization | [kubernetes.md](kubernetes.md) |
-| 10256, 10257, 10259 | Kubernetes kube-proxy health, the controller manager, and the scheduler | [kubernetes.md](kubernetes.md) |
+| 10256 | Kubernetes kube-proxy health, on worker nodes | [kubernetes.md](kubernetes.md) |
+| 10257, 10259 | The Kubernetes controller manager and scheduler, on control-plane nodes | [kubernetes.md](kubernetes.md) |
 | 11211 | Memcached. Check UDP as well as TCP | [memcached.md](memcached.md) |
 | 11434 | Ollama | [ollama.md](ollama.md) |
 | 15672 | RabbitMQ management UI | [rabbitmq.md](rabbitmq.md) |

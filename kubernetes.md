@@ -134,7 +134,9 @@ kubeconfig with RBAC rather than handing out cluster-admin, and prefer the plugi
 
 **Self-managed clusters expose more ports.** Kubernetes documents the control plane's inbound ports as
 6443 for the API server, 2379 and 2380 for etcd, 10250 for the kubelet API, 10259 for the scheduler and
-10257 for the controller manager. These are defaults, not fixtures. The same page notes that "One common
+10257 for the controller manager. Worker nodes have their own inbound list on the same page: 10250
+again for the kubelet API, 10256 for kube-proxy health, and the NodePort range 30000 to 32767 over
+TCP and UDP. These are defaults, not fixtures. The same page notes that "One common
 example is API server port that is sometimes switched to 443", which is the port the managed providers
 serve on, so read the port out of your own kubeconfig rather than assuming 6443. Only the API server has
 any business being reachable beyond the cluster, and only from addresses you list. Kubernetes states that
@@ -159,7 +161,9 @@ methods are treated as anonymous requests", given the username `system:anonymous
 the same settings default the other way: the `KubeletConfiguration` v1beta1 reference gives
 `authentication` the defaults "anonymous: enabled: false" and "webhook: enabled: true", and gives
 `authorization` the default "mode: Webhook". kubeadm and the managed distributions configure by file, so
-those nodes are not anonymous by default and a flag-configured node is. Assume neither. Read the
+those nodes are not anonymous by default and a flag-configured node is. The EKS AMI's own node
+bootstrap writes a `KubeletConfiguration` carrying `Anonymous.Enabled: false`, `Mode: "Webhook"` and
+`ReadOnlyPort: 0`, which is the file path rather than the flag path. Assume neither. Read the
 effective configuration on a node, and where the flags are in use set `--anonymous-auth=false` and
 `--authorization-mode=Webhook`. Port 10250 runs commands in containers, so it should never be reachable
 from outside the cluster either way.
@@ -195,8 +199,17 @@ unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY
 
 # First at the TCP layer, because this is the only part with a clean answer. Did anything
 # accept a connection?
-nc -vz -w 3 "$(printf %s "$API" | sed -E 's#^https?://##; s#/.*##; s#:.*##')" \
-  "$(printf %s "$API" | sed -E 's#.*:([0-9]+).*#\1#; s#^https?.*#443#')"
+read -r HOST PORT <<<"$(python3 - "$API" <<'PY'
+import sys, urllib.parse
+p = urllib.parse.urlsplit(sys.argv[1])
+print(p.hostname, p.port or 443)
+PY
+)"
+nc -vz -w 3 "$HOST" "$PORT"
+# Parsed with python3 rather than cut with sed, because a bracketed IPv6 address breaks on
+# the colons and the failure looks exactly like the clean drop you were hoping for. This
+# step needs python3, nc and nmap on the machine you run it from, none of which the cluster
+# provides for you.
 # "succeeded" means something is listening and reachable from here, whatever it does next.
 
 # Then at the HTTP layer, with verification left ON.
@@ -260,6 +273,7 @@ allowed ranges out of the provider's own configuration rather than inferring the
 - Kubernetes kubelet authentication and authorization (unrejected requests treated as anonymous, `--anonymous-auth`, `--authorization-mode=Webhook`): https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
 - Kubernetes kubelet command-line reference (`--anonymous-auth` "Default: true", `--read-only-port` "Default: 10255" serving "with no authentication/authorization"): https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
 - Kubernetes `KubeletConfiguration` v1beta1 reference (the file defaults: `anonymous: enabled: false`, `webhook: enabled: true`, `mode: Webhook`, `readOnlyPort` "Default: 0 (disabled)"): https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/
+- Amazon EKS AMI node bootstrap, the default `KubeletConfiguration` it writes (`Anonymous.Enabled: false`, `Mode: "Webhook"`, `ReadOnlyPort: 0`): https://github.com/awslabs/amazon-eks-ami/blob/main/nodeadm/internal/kubelet/config.go
 - Kubernetes kubeconfig API reference (`ExecConfig`, whose `env` "defines additional environment variables to expose to the process"): https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/
 - Kubernetes encrypting confidential data at rest ("By default, the API server stores plain-text representations of resources into etcd, with no at-rest encryption"): https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
 - Kubernetes, operating etcd clusters, including securing communication and limiting access ("Access to etcd is equivalent to root permission in the cluster"): https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/
