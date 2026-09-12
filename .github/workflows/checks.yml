@@ -13,5 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The gate suite parses HTML with html.parser, whose rawtext edge behaviour has shifted
+      # across Python releases, while `ubuntu-latest` floats its system Python. Pin it so a
+      # runner image update cannot change what a gate computes.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
       - name: Run the gate suite
         run: tools/run_all_checks.sh

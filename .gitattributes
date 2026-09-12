@@ -1,0 +1,5 @@
+# The CSP hash gate hashes the bytes of these two files, and a browser hashes the bytes it is
+# served. A CRLF checkout makes those differ: unstyled page, dead script, green gate. The gate
+# reads bytes so it is right either way; this keeps the bytes right in the first place.
+site/index.html text eol=lf
+site/_headers text eol=lf

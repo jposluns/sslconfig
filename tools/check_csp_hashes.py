@@ -12,17 +12,32 @@ WHY STYLE AS WELL AS SCRIPT: the script side was pinned and the style side was
 page. The page has exactly one `<style>` block and no `style=` attributes, so the hash
 costs nothing to pin. `'unsafe-inline'` was the easy default rather than a considered one.
 
-WHAT IT DOES NOT PROVE: that the CSP is otherwise sound, that the hashed content is safe,
-or that any header outside the block matching `/` or `/*` is correct. It compares two
-files and says whether they agree.
+A NOTE ON WHAT COUNTS. Only a real inline block is hashed. A `<script src=...>` loads from
+elsewhere and is governed by a source expression rather than a hash, and that exemption
+belongs to `script` alone: `src` means nothing on `<style>`, which a browser treats as an
+ordinary inline element and still requires a hash for. A reviewer demonstrated that skipping
+it shipped a block the browser refuses, with a green gate. The page is read with
+`html.parser` rather than regular expressions, because an earlier reviewer demonstrated five
+ways the expressions were wrong and every one was a question about HTML that the standard
+library already answers.
 
-A NOTE ON WHAT COUNTS. Only a real inline block is hashed: a `<script src=...>` loads from
-elsewhere and is governed by a source expression rather than a hash. HTML comments are
-stripped first, because a commented-out block is not served. This reads HTML with a regular
-expression, which is not a parser; the site is one hand-written page and the expression is
-anchored on the tags it actually uses. If that stops being true, this should read the page
-with a real parser rather than grow more expressions, which is a lesson this repository
-learned expensively elsewhere.
+WHAT IT HASHES, AND WHY THE BYTES MATTER. The raw bytes of the file, decoded once, with no
+newline translation. `read_text` would quietly turn a CRLF file into LF before hashing, so a
+page committed from a Windows checkout hashed one way here and another way in the browser:
+unstyled page, dead script, green gate. A reviewer demonstrated exactly that. `.gitattributes`
+pins these two files to LF as the underlying guardrail, and this reads bytes so the gate stays
+right even if that pin is removed.
+
+WHERE IT IS NOT COMPETENT: `<style>` inside `<svg>`. That is foreign content, where a browser
+parses comments and entities into nodes rather than stylesheet text, while `html.parser`
+treats every `<style>` as CDATA wherever it sits. The two disagree about what the hash covers,
+so a maintainer obeying a hash this gate computed there would pin one the browser never uses.
+The gate refuses to guess: it reports the element and says it cannot hash it.
+
+WHAT IT DOES NOT PROVE: that the CSP is otherwise sound, that the hashed content is safe, or
+that any header outside the block matching `/` or `/*` is correct. `script-src` is hash-only
+with no `'self'`, so the first external script or stylesheet anyone adds is blocked by the
+browser and no gate here says so.
 """
 import base64
 import hashlib
@@ -33,7 +48,8 @@ from pathlib import Path
 
 PAGE = Path("site") / "index.html"
 HEADERS = Path("site") / "_headers"
-# (tag, CSP directive). A tag carrying src= is not inline and is skipped.
+# (tag, CSP directive). Only a <script src=...> is skipped; see the docstring on why <style>
+# with a src is not.
 KINDS = (("script", "script-src"), ("style", "style-src"))
 
 
@@ -41,7 +57,7 @@ class Inline(HTMLParser):
     """Collect the text of inline <script> and <style>, and any style= attribute.
 
     An earlier version read the page with regular expressions and a reviewer demonstrated
-    six ways that was wrong: a quoted `>` inside an attribute swallowed attribute text into
+    five ways that was wrong: a quoted `>` inside an attribute swallowed attribute text into
     the hash, `data-src` matched a test for `src` so a real block was skipped, an uppercase
     `<STYLE>` passed unpinned, a `<style>` written inside a JavaScript string was hashed as
     if it were an element, and stripping HTML comments with a regex changed what was hashed
@@ -57,19 +73,33 @@ class Inline(HTMLParser):
         super().__init__(convert_charrefs=False)
         self.blocks = {"script": [], "style": []}
         self.style_attrs = []
+        self.foreign = []
         self._open = None
+        self._svg = 0
 
     def handle_starttag(self, tag, attrs):
         names = {k.lower() for k, _ in attrs}
         if "style" in names:
-            self.style_attrs.append(tag)
-        if tag in ("script", "style") and "src" not in names:
-            self._open = tag
-            self.blocks[tag].append([])
-        elif tag in ("script", "style"):
+            self.style_attrs.append((tag, self.getpos()[0]))
+        if tag == "svg":
+            self._svg += 1
+        if tag not in ("script", "style"):
+            return
+        if tag == "script" and "src" in names:
+            # Loaded from elsewhere, so a source expression governs it rather than a hash.
+            # This exemption is for `script` only: `src` means nothing on `<style>`.
             self._open = None
+            return
+        if self._svg:
+            self.foreign.append((tag, self.getpos()[0]))
+            self._open = None
+            return
+        self._open = tag
+        self.blocks[tag].append([])
 
     def handle_endtag(self, tag):
+        if tag == "svg" and self._svg:
+            self._svg -= 1
         if tag == self._open:
             self._open = None
 
@@ -86,7 +116,13 @@ class Inline(HTMLParser):
 
 
 def parse_page(html):
-    """Parsed inline blocks and style attributes, or raises on malformed markup."""
+    """Parsed inline blocks, style attributes, and any block this gate cannot hash.
+
+    It does NOT raise on malformed markup, whatever an earlier version of this line claimed.
+    `html.parser` is lenient by design, and a reviewer fed it five malformed inputs without
+    raising one of them. Bad markup produces whatever the parser makes of it, and the hash
+    comparison downstream is what fails.
+    """
     p = Inline()
     p.feed(html)
     p.close()
@@ -114,7 +150,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     findings = []
     try:
-        page = parse_page((root / PAGE).read_text(encoding="utf-8"))
+        page = parse_page((root / PAGE).read_bytes().decode("utf-8"))
         headers_text = (root / HEADERS).read_text(encoding="utf-8")
     except Exception as exc:
         print(f"  FAIL  could not read the site files: {exc}")
@@ -124,15 +160,19 @@ def main() -> int:
     if block is None:
         print(f"  FAIL  {HEADERS} has no path block for / or /*")
         return 1
-    csp = None
-    for line in block:
-        m = re.match(r"content-security-policy:\s*(.*)$", line, re.I)
-        if m:
-            csp = m.group(1)
-            break
-    if csp is None:
+    csps = [m.group(1) for m in
+            (re.match(r"content-security-policy:\s*(.*)$", line, re.I) for line in block) if m]
+    if not csps:
         print(f"  FAIL  the applicable {HEADERS} block has no Content-Security-Policy header")
         return 1
+    if len(csps) > 1:
+        # A browser enforces every policy it is sent, so the strictest wins. Reading the first
+        # and stopping meant a second header could forbid everything while this gate passed.
+        print(f"  FAIL  the applicable {HEADERS} block has {len(csps)} Content-Security-Policy "
+              f"headers; a browser enforces all of them, so this gate would only have checked "
+              f"the first")
+        return 1
+    csp = csps[0]
 
     pinned = 0
     for tag, directive in KINDS:
@@ -162,11 +202,18 @@ def main() -> int:
             else:
                 pinned += 1
 
-    for tag in sorted(set(page.style_attrs)):
+    for tag, line in sorted(set(page.foreign)):
         findings.append(
-            f"<{tag}> in {PAGE} carries a style= attribute. A CSP hash covers an element's "
-            f"text, never an attribute, so this needs 'unsafe-hashes' or the rule moved into "
-            f"the stylesheet; pinning the block by hash does not cover it")
+            f"<{tag}> at {PAGE}:{line} sits inside <svg>, which is foreign content. A browser "
+            f"parses comments and entities there into nodes rather than text, so this gate "
+            f"cannot compute the hash it would use and will not guess one; move the rule into "
+            f"the stylesheet")
+
+    for tag, line in sorted(set(page.style_attrs)):
+        findings.append(
+            f"<{tag}> at {PAGE}:{line} carries a style= attribute. A CSP hash covers an "
+            f"element's text, never an attribute, so this needs 'unsafe-hashes' or the rule "
+            f"moved into the stylesheet; pinning the block by hash does not cover it")
 
     if findings:
         for f in findings:
