@@ -28,6 +28,14 @@ rounds was that the invariant is worth checking and that this implementation was
 its maintenance cost. Requiring a build script to be able to say what it builds from is a
 smaller thing to ask than reimplementing bash.
 
+WHAT `--list-inputs` PROVES, AND WHAT IT DOES NOT. It proves what the script SAYS it builds
+from. A script can report one list and build from another, and a reviewer demonstrated that
+with an append placed after the listing exits. The mitigation is placement rather than
+detection: the listing block sits immediately before the work, so anything changing the list
+has to happen above it. That is a convention this gate cannot enforce, and it is the honest
+cost of asking the script instead of reading it. The alternative was reimplementing bash,
+which lost three rounds running.
+
 The manifest side is checked too: `sources` must be a list of non-empty strings, because a
 JSON object passed once when converting it to a set silently took its keys.
 
@@ -37,6 +45,7 @@ currency. This one covers the record of how it is made.
 """
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -103,7 +112,14 @@ def main() -> int:
             findings.append(f"{MANIFEST}: target {target} does not exist")
 
         command = entry.get("regenerate", "")
-        named = [w for w in command.split() if w.endswith(".sh") or w.endswith(".py")]
+        try:
+            words = shlex.split(command)
+        except ValueError as exc:
+            findings.append(
+                f"{MANIFEST}: {target}: regenerate command does not parse as a shell "
+                f"command line ({exc}): {command!r}")
+            continue
+        named = [w for w in words if w.endswith(".sh") or w.endswith(".py")]
         if not named:
             findings.append(f"{MANIFEST}: {target}: regenerate command names no script: {command!r}")
             continue
@@ -113,7 +129,7 @@ def main() -> int:
             continue
 
         try:
-            listed = script_inputs(command.split(), root)
+            listed = script_inputs(words, root)
         except Unreadable as why:
             findings.append(
                 f"{MANIFEST}: {target}: cannot get the source list out of {named[0]}: {why}. "

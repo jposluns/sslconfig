@@ -7,9 +7,17 @@ comment inside a word, a quoted filename with a space, a glob, mismatched quotes
 resolves all of those now, because bash runs the script, so those cases had nothing left to
 assert and keeping them would have meant asserting things about deleted code.
 
-Three survive in a different form, as the last three cases. They are inputs that beat both
-earlier implementations, and they are here to show the current one handles them by
+Three survive in a different form: a variable referenced inside the array, a quoted filename
+containing a space, and the `typeset -a files+=` append, which now sits among the placement
+cases because placement is what decides whether the listing reports it. They are inputs that
+beat both earlier implementations, and they are here to show the current one handles them by
 construction rather than by another special case.
+
+One case here records a KNOWN LIMIT rather than a closed finding. Its description begins
+"known limit:", it asserts the gate's CURRENT answer rather than the right one, and the gate's
+own docstring discloses the same thing in prose. The success line counts those separately,
+because reporting an open limit as a closed finding is the kind of quiet overclaim this file
+exists to prevent.
 
 A case earns its place by failing when its bug is restored, and most assert on the gate's
 MESSAGE as well as its exit status, because an exit code cannot tell a diagnosis from a
@@ -26,14 +34,17 @@ from pathlib import Path
 
 GATE = Path(__file__).resolve().parent / "check_gensrc.py"
 BASE = ["scripts/build-llms-full.sh", "README.md"]
+REGENERATE = "bash scripts/build-llms-full.sh"
 
-# Shaped like the real build script: it states its inputs, then would do work.
+# Shaped like the real build script: it states its inputs LAST, immediately before the work, so
+# anything changing `files` has to sit above the listing to be reported. `middle` is that
+# above-the-listing slot; `tail` is below it, where a change cannot reach the listing.
 SCRIPT = """#!/usr/bin/env bash
 set -euo pipefail
 {preamble}files=(
 {body}
 )
-if [ "${{1:-}}" = "--list-inputs" ]; then
+{middle}if [ "${{1:-}}" = "--list-inputs" ]; then
   printf '%s\\n' "${{files[@]}}"
   exit 0
 fi
@@ -41,11 +52,11 @@ fi
 """
 
 
-def script(body, preamble="", tail=""):
-    return SCRIPT.format(body=body, preamble=preamble, tail=tail)
+def script(body, preamble="", middle="", tail=""):
+    return SCRIPT.format(body=body, preamble=preamble, middle=middle, tail=tail)
 
 
-def fixture(script_body, sources, extra_files=(), write_script=True):
+def fixture(script_body, sources, extra_files=(), write_script=True, regenerate=REGENERATE):
     """Build a throwaway repository and run the real gate in it. Returns (exit, output)."""
     d = Path(tempfile.mkdtemp())
     try:
@@ -61,7 +72,7 @@ def fixture(script_body, sources, extra_files=(), write_script=True):
             (d / f).write_text("x", encoding="utf-8")
         (d / ".aiqt" / "gensrc.json").write_text(json.dumps({"generated": [{
             "kind": "file", "target": "site/llms-full.txt",
-            "regenerate": "bash scripts/build-llms-full.sh", "sources": sources}]}),
+            "regenerate": regenerate, "sources": sources}]}),
             encoding="utf-8")
         r = subprocess.run([sys.executable, f"tools/{GATE.name}"], cwd=d,
                            capture_output=True, text=True)
@@ -75,6 +86,7 @@ LIST_FAILS = ("#!/usr/bin/env bash\nif [ \"${1:-}\" = \"--list-inputs\" ]; then\
               "  echo 'no list here' >&2\n  exit 3\nfi\n")
 
 # (description, script, sources, must_fail, extra files, expected substring, write_script)
+# An optional eighth field replaces the manifest's regenerate command.
 CASES = (
     # THE DRIFT THIS GATE EXISTS FOR.
     ("a source built in and not recorded",
@@ -93,6 +105,14 @@ CASES = (
      LIST_FAILS, BASE, True, (), "--list-inputs exited 3", True),
     ("a regenerate command naming a script that is not there",
      "", BASE, True, (), "does not exist", False),
+    # The regenerate value is a shell command line, so `str.split` kept the quotes and the
+    # suffix match rejected a script path that was plainly named.
+    ("a quoted script path in the regenerate command",
+     script("  README.md"), BASE, False, (), None, True,
+     'bash "scripts/build-llms-full.sh"'),
+    ("an unbalanced quote in the regenerate command is reported, not raised",
+     script("  README.md"), BASE, True, (), "regenerate command", True,
+     'bash "scripts/build-llms-full.sh'),
 
     # THE MANIFEST HAS TO BE WELL FORMED.
     ("sources given as a JSON object, whose keys a set conversion took",
@@ -111,18 +131,37 @@ CASES = (
     ("a variable referenced inside the array",
      script("  README.md $guide", preamble="guide=nginx.md\n"),
      BASE + ["nginx.md"], False, (), None, True),
-    ("a second assignment spelled typeset -a",
-     script("  README.md", tail="typeset -a files+=(nginx.md)\n"), BASE, False, (), None, True),
     ("a quoted filename containing a space",
      script('  "guide name.md"'), ["scripts/build-llms-full.sh", "guide name.md"], False,
      ("guide name.md",), None, True),
+
+    # WHERE THE LISTING SITS. The gate believes what the script reports, so the listing has to
+    # be the last thing before the work: an append above it is reported, an append below it is
+    # not. A second assignment spelled `typeset -a files+=` beat both earlier implementations,
+    # and it is the append used here.
+    ("an append before the listing is reported",
+     script("  README.md", middle="typeset -a files+=(nginx.md)\n"),
+     BASE + ["nginx.md"], False, (), None, True),
+    # This case asserts the gate's CURRENT answer, not the right one: an append below the
+    # listing changes what the script builds from, the listing never mentions it, and the gate
+    # believes the listing. Placement is the mitigation and it is a convention this gate cannot
+    # enforce. A change that closes this should make this case fail loudly rather than be
+    # quietly deleted.
+    ("known limit: an append AFTER the listing is a disagreement this gate cannot see",
+     script("  README.md", tail="typeset -a files+=(nginx.md)\n"), BASE, False, (),
+     None, True),
+    ("an append above the listing is included in what it reports",
+     script("  README.md", middle="typeset -a files+=(nginx.md)\n"), BASE, True, (),
+     "nginx.md is built in but not recorded here", True),
 )
 
 
 def main() -> int:
     failures = []
-    for desc, body, sources, must_fail, extra, expected, write in CASES:
-        rc, out = fixture(body, sources, extra, write)
+    for case in CASES:
+        desc, body, sources, must_fail, extra, expected, write = case[:7]
+        regenerate = case[7] if len(case) > 7 else REGENERATE
+        rc, out = fixture(body, sources, extra, write, regenerate)
         if bool(rc) != must_fail:
             want = "fail" if must_fail else "pass"
             failures.append(f"{desc}: expected the gate to {want}, it did not ({out})")
@@ -135,7 +174,11 @@ def main() -> int:
         for f in failures:
             print(f"  FAIL  {f}")
         return 1
-    print(f"  ok    {len(CASES)} recorded cases for the generated-file record gate")
+    total = len(CASES)
+    limits = sum(1 for c in CASES if c[0].startswith("known limit:"))
+    print(f"  ok    {total} recorded cases for the generated-file record gate: "
+          f"{total - limits} findings closed, {limits} disclosed "
+          f"limit{'' if limits == 1 else 's'} still open")
     return 0
 
 

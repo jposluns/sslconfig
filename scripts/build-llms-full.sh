@@ -22,8 +22,11 @@ files=(
   admin-uis.md devops-uis.md cors.md headers.md firebase-supabase.md web-exposure.md realtime-webhooks.md bi-dashboards.md pocketbase.md exposure-index.md common-mistakes.md
 )
 
-# Say what we build from, so the gate that records it does not have to work it out. This has
-# to sit after the array and before any work, and it must be the ONLY thing this mode does.
+# Say what we build from, so the gate that records it does not have to work it out. This
+# block sits immediately before the work on purpose: anything that changes `files` has to
+# happen ABOVE it, or the list reported here would not be the list built from below. A
+# reviewer demonstrated exactly that drift with an append placed after an earlier position
+# of this block.
 if [ "${1:-}" = "--list-inputs" ]; then
   printf '%s\n' "${files[@]}"
   exit 0
