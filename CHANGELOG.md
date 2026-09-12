@@ -9,7 +9,153 @@ can check `VERSION` against GitHub: the suite is deliberately offline so that no
 turn the build red, and a pull request number is only knowable from outside. Keeping `VERSION` in step
 with the merged pull request is therefore an authoring obligation, not an enforced one.
 
+## 2026-09-12
+
+### Added
+
+- A control-plane section in `kubernetes.md` (#23). A managed cluster's API server is reachable from
+  the internet the moment the cluster is created, so a control plane nobody exposed on purpose is
+  exposed; a kubeconfig may be a credential in itself or only a pointer to one, which decides what
+  its disclosure costs; a self-managed control plane answers on 6443, 2379, 2380, 10250, 10255,
+  10256, 10257 and 10259; the kubelet's flag and file defaults are opposites, so a reader who checks
+  one learns nothing about the other; and GKE's DNS-based endpoint is not governed by authorized
+  networks, so an allowlist that looks complete does not cover it. `exposure-index.md` gained rows
+  for those ports.
+- `self-hosted-idp.md`, covering Keycloak and authentik (#24). `hostname-admin` does not restrict
+  the Administration REST API, so an operator who sets it can believe the administrative surface is
+  closed while it answers; the administrative realm's login paths have to be restricted by source
+  rather than refused; authentik's Compose install has a first-boot window in which whoever loads
+  the page first becomes the administrator; and the management and metrics ports answer without
+  asking who you are.
+- `tools/check_gensrc.py` and `tools/test_gensrc_gate.py`, which gate `.aiqt/gensrc.json` against
+  the build script it describes (#25). A new guide touches five wiring surfaces, and this was the
+  fifth and the only one nothing checked, so the record of what generates `site/llms-full.txt`
+  could fall out of step with the script that generates it while every other surface stayed green.
+
 ## 2026-09-11
+
+### Added
+
+- Two gates for conventions this repository stated and never checked (#21).
+  `tools/check_verify_safety.py` fails when a command inside a Verify block skips TLS certificate
+  verification, a rule stated in `common-mistakes.md`, `self-signed.md` and `README.sources.md` and
+  broken in three Verify blocks before anything checked. `tools/check_prose_conventions.py` fails on
+  British `-ise` spellings and on placeholders outside the house set. Both found defects live on `main`
+  the first time they ran: `ray.md` carried `randomised`, which the corpus-wide conversion in #18 missed
+  because its word list omitted that stem, and `pocketbase.md` carried `yourdomain.com`, a real
+  registered domain that an audit had identified and no change had fixed.
+- Three Verify steps that asserted a certificate check they did not perform (#21). `kafka.md`,
+  `neo4j.md` and `memcached.md` each ran a bare `openssl s_client -connect` in a Verify block, two of
+  them commented "TLS handshake with your certificate". Without `-CAfile`, `-verify_hostname` or
+  `-verify_return_error` the handshake succeeds against any certificate, so the comment asserted what
+  the command did not check, and `self-signed.md` and `rabbitmq.md` already carried the correct form.
+  These surfaced only because the first version of the new gate got the openssl case backwards: it
+  matched `-verify_return_error 0`, a syntax OpenSSL does not have, for a flag whose presence is the
+  safe state. Cross-family review found the dead pattern, and fixing it exposed the guides behind it.
+  The exemption for certificate inspection was removed after review showed it was a laundering pipe,
+  since appending `| openssl x509` to an unverified handshake made the line pass, and the two guides
+  that inspect a publicly trusted certificate, `deployment-lifecycle.md` and `free-certificates.md`,
+  now pass because their commands carry `-verify_hostname` and `-verify_return_error`, not because an
+  exemption covers them.
+- `tools/test_convention_gates.py`, the regression suite for the two new gates (#21). It records one case
+  per input a reviewer demonstrated against them, so every way past a gate that review found is a
+  standing check rather than a one-off fix, and the inputs the gates still get wrong are asserted as the
+  gates' current answer rather than dropped: quote state is per physical line, so a quotation spanning a
+  line break hides what follows it, and inside a fence only a shell-style trailing comment is read as
+  prose, so a hash inside a Python triple-quoted string is read as one. Both limits are named in the
+  gates' docstrings as well.
+- A "Bound the expensive endpoints" section in each of the four proxy guides (#20).
+  `realtime-webhooks.md` and `authentication.md` both require request-size, concurrency and timeout
+  limits on inference, upload and job-submission endpoints, naming denial of wallet as the failure
+  mode, and `realtime-webhooks.md` recorded that the proxy guides did not carry those directives.
+  They do now, and that sentence is rewritten to state what each proxy actually enforces rather than
+  implying parity: nginx carries all four controls, Traefik body size, concurrency and rate but no
+  timeout, HAProxy timeouts with an aggregate connection cap and a Content-Length body check, and
+  Caddy body size only, with no rate limiting in its standard build. Two of those are CONTRIBUTING
+  rule 3 statements rather than directives, since the control does not exist to configure. The change
+  took four cross-family review rounds, three of them returning DO NOT SHIP from both families: the
+  directives were correct throughout, while the snippets and the verification claims were not. Two
+  snippets would have dropped a security directive if pasted over an existing block, so every snippet
+  is now an explicit fragment, and the Verify steps report what they observe rather than asserting
+  which limiter fired, because a backend returning the same status explains the result with no proxy
+  limit present.
+- `exposure-index.md`, a lookup from an observed listening port to the guides worth reading (#19). The
+  corpus routes from a known mistake to its fix in `common-mistakes.md`; this routes from an observed
+  symptom, which is the direction a reader arrives from. It claims deliberately little. A port does not
+  identify a service here: 23 guides mention 3000, 21 mention 443, and six mention 8443, so the table says
+  what may be listening and sends the reader to the owning process. Its Verify section is stated as a
+  baseline inventory that cannot establish completeness, because a container on a bridge network
+  publishes no host port and one on routed IPv6 answers on its own address whatever the host publishes.
+  It took four cross-family review rounds: the first two returned DO NOT SHIP from both families, one
+  for the false premise and one for a Verify section that certified an exposed application through an
+  outbound tunnel and through endpoints no linked guide enumerates.
+- A gate, `tools/check_guide_shape.py`, requiring every guide to carry a Verify section with a
+  non-empty body and a `Sources (checked <month year>)` heading whose date names a real month, is not
+  in the future, and cites at least one absolute URL with a hostname. It is deterministic and offline
+  like the rest of the suite, and monotonic in time: its only date comparison can turn a failing guide
+  into a passing one as the clock advances, never the reverse, so no build can go red from the
+  calendar alone. The gate covers only the structural floor of `CONTRIBUTING.md` rule 5: it cannot
+  prove that a Verify body holds a runnable command, that a Verify step fails while the service is
+  still exposed, or that a cited page contains the line it is cited for, and it says so rather than
+  implying wider coverage. `common-mistakes.md` is the one documented exemption. (#9)
+- `README.sources.md`, holding the citations for the README verification checklist. The checklist
+  names tools, status codes and services without citing them inline, so the sources now sit in a
+  companion file and the front page stays readable. `README.md` is held to the same Verify and Sources
+  contract as any guide, resolving its Sources through that file. Nothing mechanically ties a numbered
+  check to its citation, so that correspondence is kept by reading. (#9)
+- A fifth copy-ready prompt on the site that audits the AI and agent stack. (#6)
+- A gate in `tools/run_all_checks.sh` that fails if the README guide-index category headings and the
+  site menu category headings drift apart. (#6)
+
+### Changed
+
+- CONTRIBUTING rule 2 now states the Oxford `-ize` convention and the RFC 2606 placeholder set
+  (#21). `tools/check_prose_conventions.py` enforces both, and rule 2 stated neither, so the gate
+  was citing a rule as its source for something that rule did not say.
+
+- Prose now uses Oxford `-ize` spellings throughout (#18). The corpus mixed British `-ise` and Oxford
+  `-ize`, with the `-ise` forms holding the recurring line "login is not authorisation" in `README.md`,
+  `authentication.md`, the `oidc-integration.md` heading and the site's front page. 27 instances were
+  converted across 12 files. Technical identifiers were already `-ize` and are untouched: the
+  `Authorization` header, `authorization_endpoint`, `authorizationEnabled`, AWS `authorizer`, and the
+  term of art "authorization code flow". The case worth naming is `oidc-integration.md` lines 24 and 35,
+  where prose `organisation` sat on the same line as the Microsoft Entra authority name `organizations`
+  in backticks; both lines now carry the converted prose word and the identifier unchanged.
+
+- The project was renamed from `sslconfig` to `secureconfig`. The GitHub repository is now
+  `jposluns/secureconfig` and the site is served at `secureconfig.ai`; GitHub redirects the old
+  repository path. Every
+  absolute repository and site URL in `site/index.html`, `site/llms.txt`, `site/robots.txt`,
+  `README.md` and `scripts/build-llms-full.sh` was updated, along with the `AIQT_SITE_HOST` gate
+  variable in `tools/run_all_checks.sh` and the patch notes in `.aiqt/PIN`; `site/llms-full.txt` was
+  regenerated. Earlier entries in this changelog keep the old name: they record what shipped under
+  it. (#8)
+
+- The `sslconfig.ai` domain was retired. Its DNS record was removed on 2026-09-11, so the old
+  hostname no longer resolves and `secureconfig.ai` is now the only site hostname. GitHub continues
+  to redirect the old `jposluns/sslconfig` repository path, but there is no redirect for the old
+  domain: URLs in the wild that point at `sslconfig.ai` fail to resolve rather than forwarding. (#9)
+
+- Three items in the README verification checklist were rewritten so that they discriminate. Each
+  could previously be recorded as verified while the exposure it exists to catch was still standing.
+  Item 4 now asks the reader to establish whether a failed `openssl s_client -tls1_1` came from the
+  server or from a local client that never offered TLS 1.1, since the two are indistinguishable from
+  the error alone. Item 7 now requires confirming that something is scheduled to invoke
+  `certbot renew`, because a passing dry run proves the command works and nothing about whether it
+  will ever be run. Item 10 no longer accepts a Shodan or Censys lookup in place of a live probe from
+  a second host, because those services report what they last observed rather than what is listening
+  now. (#10)
+
+- The "Jump to" line was removed from the top of `site/index.html`. The left-hand menu and the
+  in-page anchors it pointed at are unchanged. (#9)
+
+- The README and the site front page (`site/index.html`) were realigned with the current corpus.
+  One canonical description now appears in the README title, the site tagline, and both the meta and
+  Open Graph descriptions. The AI-assistant rules, the decision guide, and the verification checklist
+  were rewritten to cover identity and the allowlist, machine credentials, secrets, egress and
+  metadata, exposed files, and the AI stack, and the README and site rule lists were reconciled. The
+  flat guide index and the site menu were regrouped into the same twelve categories. No guide content
+  changed. (#6)
 
 ### Fixed
 
@@ -115,127 +261,12 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   client certificates were required while they were not. It now names
   `listener.name.sasl_ssl.ssl.client.auth=required`, which is what the rest of the guide already says.
   The clause was added earlier in this branch and corrected within it.
+- `ollama.md`'s bearer-token variant silently dropped two directives its `location /` variant
+  carries (#22). `proxy_set_header Host localhost:11434` and `proxy_read_timeout 300s` are restored,
+  so a reader who chose the authenticated variant gets the same upstream settings as the other one.
+  The RunPod port wording in `gpu-clouds.md` was corrected in the same change.
 
-### Changed
-
-- Prose now uses Oxford `-ize` spellings throughout (#18). The corpus mixed British `-ise` and Oxford
-  `-ize`, with the `-ise` forms holding the recurring line "login is not authorisation" in `README.md`,
-  `authentication.md`, the `oidc-integration.md` heading and the site's front page. 27 instances were
-  converted across 12 files. Technical identifiers were already `-ize` and are untouched: the
-  `Authorization` header, `authorization_endpoint`, `authorizationEnabled`, AWS `authorizer`, and the
-  term of art "authorization code flow". The case worth naming is `oidc-integration.md` lines 24 and 35,
-  where prose `organisation` sat on the same line as the Microsoft Entra authority name `organizations`
-  in backticks; both lines now carry the converted prose word and the identifier unchanged.
-
-- The project was renamed from `sslconfig` to `secureconfig`. The GitHub repository is now
-  `jposluns/secureconfig` and the site is served at `secureconfig.ai`; GitHub redirects the old
-  repository path. Every
-  absolute repository and site URL in `site/index.html`, `site/llms.txt`, `site/robots.txt`,
-  `README.md` and `scripts/build-llms-full.sh` was updated, along with the `AIQT_SITE_HOST` gate
-  variable in `tools/run_all_checks.sh` and the patch notes in `.aiqt/PIN`; `site/llms-full.txt` was
-  regenerated. Earlier entries in this changelog keep the old name: they record what shipped under
-  it. (#8)
-
-- The `sslconfig.ai` domain was retired. Its DNS record was removed on 2026-09-11, so the old
-  hostname no longer resolves and `secureconfig.ai` is now the only site hostname. GitHub continues
-  to redirect the old `jposluns/sslconfig` repository path, but there is no redirect for the old
-  domain: URLs in the wild that point at `sslconfig.ai` fail to resolve rather than forwarding. (#9)
-
-- Three items in the README verification checklist were rewritten so that they discriminate. Each
-  could previously be recorded as verified while the exposure it exists to catch was still standing.
-  Item 4 now asks the reader to establish whether a failed `openssl s_client -tls1_1` came from the
-  server or from a local client that never offered TLS 1.1, since the two are indistinguishable from
-  the error alone. Item 7 now requires confirming that something is scheduled to invoke
-  `certbot renew`, because a passing dry run proves the command works and nothing about whether it
-  will ever be run. Item 10 no longer accepts a Shodan or Censys lookup in place of a live probe from
-  a second host, because those services report what they last observed rather than what is listening
-  now. (#10)
-
-- The "Jump to" line was removed from the top of `site/index.html`. The left-hand menu and the
-  in-page anchors it pointed at are unchanged. (#9)
-
-- The README and the site front page (`site/index.html`) were realigned with the current corpus.
-  One canonical description now appears in the README title, the site tagline, and both the meta and
-  Open Graph descriptions. The AI-assistant rules, the decision guide, and the verification checklist
-  were rewritten to cover identity and the allowlist, machine credentials, secrets, egress and
-  metadata, exposed files, and the AI stack, and the README and site rule lists were reconciled. The
-  flat guide index and the site menu were regrouped into the same twelve categories. No guide content
-  changed. (#6)
-
-### Added
-
-- Two gates for conventions this repository stated and never checked (#21).
-  `tools/check_verify_safety.py` fails when a command inside a Verify block skips TLS certificate
-  verification, a rule stated in `common-mistakes.md`, `self-signed.md` and `README.sources.md` and
-  broken in three Verify blocks before anything checked. `tools/check_prose_conventions.py` fails on
-  British `-ise` spellings and on placeholders outside the house set. Both found defects live on `main`
-  the first time they ran: `ray.md` carried `randomised`, which the corpus-wide conversion in #18 missed
-  because its word list omitted that stem, and `pocketbase.md` carried `yourdomain.com`, a real
-  registered domain that an audit had identified and no change had fixed.
-- Three Verify steps that asserted a certificate check they did not perform (#21). `kafka.md`,
-  `neo4j.md` and `memcached.md` each ran a bare `openssl s_client -connect` in a Verify block, two of
-  them commented "TLS handshake with your certificate". Without `-CAfile`, `-verify_hostname` or
-  `-verify_return_error` the handshake succeeds against any certificate, so the comment asserted what
-  the command did not check, and `self-signed.md` and `rabbitmq.md` already carried the correct form.
-  These surfaced only because the first version of the new gate got the openssl case backwards: it
-  matched `-verify_return_error 0`, a syntax OpenSSL does not have, for a flag whose presence is the
-  safe state. Cross-family review found the dead pattern, and fixing it exposed the guides behind it.
-  The exemption for certificate inspection was removed after review showed it was a laundering pipe,
-  since appending `| openssl x509` to an unverified handshake made the line pass, and the two guides
-  that inspect a publicly trusted certificate, `deployment-lifecycle.md` and `free-certificates.md`,
-  now pass because their commands carry `-verify_hostname` and `-verify_return_error`, not because an
-  exemption covers them.
-- `tools/test_convention_gates.py`, the regression suite for the two new gates (#21). It records one case
-  per input a reviewer demonstrated against them, so every way past a gate that review found is a
-  standing check rather than a one-off fix, and the inputs the gates still get wrong are asserted as the
-  gates' current answer rather than dropped: quote state is per physical line, so a quotation spanning a
-  line break hides what follows it, and inside a fence only a shell-style trailing comment is read as
-  prose, so a hash inside a Python triple-quoted string is read as one. Both limits are named in the
-  gates' docstrings as well.
-- A "Bound the expensive endpoints" section in each of the four proxy guides (#20).
-  `realtime-webhooks.md` and `authentication.md` both require request-size, concurrency and timeout
-  limits on inference, upload and job-submission endpoints, naming denial of wallet as the failure
-  mode, and `realtime-webhooks.md` recorded that the proxy guides did not carry those directives.
-  They do now, and that sentence is rewritten to state what each proxy actually enforces rather than
-  implying parity: nginx carries all four controls, Traefik body size, concurrency and rate but no
-  timeout, HAProxy timeouts with an aggregate connection cap and a Content-Length body check, and
-  Caddy body size only, with no rate limiting in its standard build. Two of those are CONTRIBUTING
-  rule 3 statements rather than directives, since the control does not exist to configure. The change
-  took four cross-family review rounds, three of them returning DO NOT SHIP from both families: the
-  directives were correct throughout, while the snippets and the verification claims were not. Two
-  snippets would have dropped a security directive if pasted over an existing block, so every snippet
-  is now an explicit fragment, and the Verify steps report what they observe rather than asserting
-  which limiter fired, because a backend returning the same status explains the result with no proxy
-  limit present.
-- `exposure-index.md`, a lookup from an observed listening port to the guides worth reading (#19). The
-  corpus routes from a known mistake to its fix in `common-mistakes.md`; this routes from an observed
-  symptom, which is the direction a reader arrives from. It claims deliberately little. A port does not
-  identify a service here: 23 guides mention 3000, 21 mention 443, and six mention 8443, so the table says
-  what may be listening and sends the reader to the owning process. Its Verify section is stated as a
-  baseline inventory that cannot establish completeness, because a container on a bridge network
-  publishes no host port and one on routed IPv6 answers on its own address whatever the host publishes.
-  It took four cross-family review rounds: the first two returned DO NOT SHIP from both families, one
-  for the false premise and one for a Verify section that certified an exposed application through an
-  outbound tunnel and through endpoints no linked guide enumerates.
-- A gate, `tools/check_guide_shape.py`, requiring every guide to carry a Verify section with a
-  non-empty body and a `Sources (checked <month year>)` heading whose date names a real month, is not
-  in the future, and cites at least one absolute URL with a hostname. It is deterministic and offline
-  like the rest of the suite, and monotonic in time: its only date comparison can turn a failing guide
-  into a passing one as the clock advances, never the reverse, so no build can go red from the
-  calendar alone. The gate covers only the structural floor of `CONTRIBUTING.md` rule 5: it cannot
-  prove that a Verify body holds a runnable command, that a Verify step fails while the service is
-  still exposed, or that a cited page contains the line it is cited for, and it says so rather than
-  implying wider coverage. `common-mistakes.md` is the one documented exemption. (#9)
-- `README.sources.md`, holding the citations for the README verification checklist. The checklist
-  names tools, status codes and services without citing them inline, so the sources now sit in a
-  companion file and the front page stays readable. `README.md` is held to the same Verify and Sources
-  contract as any guide, resolving its Sources through that file. Nothing mechanically ties a numbered
-  check to its citation, so that correspondence is kept by reading. (#9)
-- A fifth copy-ready prompt on the site that audits the AI and agent stack. (#6)
-- A gate in `tools/run_all_checks.sh` that fails if the README guide-index category headings and the
-  site menu category headings drift apart. (#6)
-
-## 2026-09-10 (gap guides)
+## 2026-09-10
 
 ### Added
 
@@ -244,39 +275,34 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   `egress-metadata.md`, `realtime-webhooks.md`, `container-hardening.md`, `deployment-lifecycle.md`,
   `image-gen-uis.md`, `chat-uis.md`, `llm-observability.md`, `workflow-orchestrators.md`,
   `gpu-clouds.md`, `nats.md`, `search-engines.md`, `bi-dashboards.md`, `pocketbase.md`,
-  `frontend-frameworks.md`, `sqlite.md`, `tunnels.md`, and `surrealdb.md`. Each cites vendor pages
+  `frontend-frameworks.md`, `sqlite.md`, `tunnels.md`, and `surrealdb.md` (#5). Each cites vendor pages
   fetched in September 2026; unconfirmable details were left out.
 - Sections folded into existing guides: a shared-cache disclosure section in `headers.md`, a
   fail-closed rule in `cloud-identity-proxies.md`, CAA records in `free-certificates.md`, an
   expensive-endpoint limit note and an offboarding rule in `authentication.md`, an offboarding check
   in `mfa.md`, Dozzle, Docker Registry, Filebrowser, and Node-RED in `devops-uis.md`, Hugging Face
-  Spaces in `paas.md`, a Redpanda note in `kafka.md`, and a Valkey note in `redis.md`.
+  Spaces in `paas.md`, a Redpanda note in `kafka.md`, and a Valkey note in `redis.md` (#5).
 - README gained an outside-in verification checklist item, a fronting-auth pointer in the
   authentication rule and decision guide, and index rows for every new guide; the site menu,
-  `site/llms.txt`, the build script, and `.aiqt/gensrc.json` were updated to match.
-
-## 2026-09-10
-
-### Added
-
+  `site/llms.txt`, the build script, and `.aiqt/gensrc.json` were updated to match (#5).
 - Twenty-one guides: `identity-providers.md`, `oidc-integration.md`, `cloud-identity-proxies.md`,
   `machine-auth.md`, `nextjs.md`, `go.md`, `dotnet.md`, `java.md`, `php.md`, `ruby.md`, `kafka.md`,
   `clickhouse.md`, `neo4j.md`, `memcached.md`, `object-storage.md`, `vector-databases.md`,
-  `mcp-servers.md`, `ray.md`, `mlflow.md`, `agent-builders.md`, and `devops-uis.md`. Configuration
+  `mcp-servers.md`, `ray.md`, `mlflow.md`, `agent-builders.md`, and `devops-uis.md` (#4). Configuration
   syntax in each was checked against vendor documentation fetched in September 2026, and each
   guide's Sources section lists the pages. A three-family review (Claude, Codex, Gemini) of the
   whole branch then found and corrected further defects, listed under Fixed; details that no page
   confirmed were left out.
 - `authentication.md` rules 11 to 15: federated login is not authorization, OIDC and OAuth hygiene,
   MFA enforced where access is granted, control-plane MFA, and authentication on every transport;
-  plus a negative-test quick check.
+  plus a negative-test quick check (#4).
 - `mfa.md`: a phishing-resistant factor for administrators, enrolment is not enforcement, a pointer
-  to hosted providers, and a section on passkeys and hardware keys.
+  to hosted providers, and a section on passkeys and hardware keys (#4).
 - `common-mistakes.md` items 15 to 19, including federated login treated as authorization and MCP
-  servers bound to all interfaces.
-- `model-servers.md` now covers Text Generation Inference, SGLang, Triton, and LM Studio.
+  servers bound to all interfaces (#4).
+- `model-servers.md` now covers Text Generation Inference, SGLang, Triton, and LM Studio (#4).
 - README: an AI-assistant rule on federated login and a decision-guide entry for team and customer
-  login. Site: menu entries for every new guide, the same rule, and a fourth copy-ready prompt,
+  login (#4). Site: menu entries for every new guide, the same rule, and a fourth copy-ready prompt,
   "Add single sign-on and MFA".
 - The wiring gate now also fails when a guide is missing from `README.md` or the site menu.
 

@@ -38,8 +38,15 @@ MFA: there is no login for a person, so no second factor applies; human access t
 
 ```bash
 ss -tlnup | grep 11211                                    # 127.0.0.1 or the private address; no UDP line
-printf 'stats\r\nquit\r\n' | nc 127.0.0.1 11211           # works locally
-printf 'stats\r\nquit\r\n' | nc cache.example.com 11211   # from outside: connection refused or timeout
+printf 'stats\r\nquit\r\n' | nc 127.0.0.1 11211           # only for the loopback, no-auth, no-TLS
+                                                          # configuration in step 1. On the recommended
+                                                          # deployment this FAILS three times over:
+                                                          # nothing listens on loopback, -S rejects a
+                                                          # plain stats, and -Z makes the port TLS. That
+                                                          # failure is expected and proves nothing
+printf 'stats\r\nquit\r\n' | nc cache.example.com 11211   # from outside: connection refused or timeout.
+                                                          # A refusal here is the point; it is the one
+                                                          # thing this plaintext probe can still tell you
 openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_ip 10.0.0.5 \
   -verify_return_error </dev/null
                                                           # prints Verification: OK when -Z is on. A bare

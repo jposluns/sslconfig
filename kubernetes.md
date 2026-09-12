@@ -220,17 +220,22 @@ if not p.hostname:
 print(p.hostname, p.port or (80 if p.scheme == "http" else 443),
       p.scheme + "://" + p.netloc)
 PY
-) || exit 1
-read -r HOST PORT URL <<<"$PARSED"
-echo "$URL"
-nc -vz -w 3 "$HOST" "$PORT"
+) || { echo "could not read the API server endpoint; skipping the probe" >&2; PARSED=; }
+if [ -n "$PARSED" ]; then
+  read -r HOST PORT URL <<<"$PARSED"
+  echo "$URL"
+  nc -vz -w 3 "$HOST" "$PORT"
+fi
 # Parsed with python3 rather than cut with sed. A bracketed IPv6 address breaks on the
 # colons, and the failure looks exactly like the clean drop you were hoping for.
 # A bare host with no scheme is also legal in a kubeconfig, and the scheme it implies depends
 # on the TLS settings beside it rather than on a convention, so those are read and the URL the
 # probe uses is the normalized one. Getting that wrong sends both layers of this check at a
-# port the cluster was never using, where a refusal proves nothing. This step needs python3,
-# nc and nmap on the machine you run it from, none of which the cluster provides for you.
+# port the cluster was never using, where a refusal proves nothing.
+# A context with no user entry would make the TLS jsonpath error out; every real one names
+# a user, and kubectl says so if yours does not.
+# This step needs python3, nc and nmap on the machine you run it from, none of which the
+# cluster provides for you.
 # "succeeded" means something is listening and reachable from here, whatever it does next.
 
 # Then at the HTTP layer, with verification left ON.
