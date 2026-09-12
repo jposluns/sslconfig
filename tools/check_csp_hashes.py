@@ -6,7 +6,7 @@ by hash. A hash is exact, so editing either block without repinning it produces 
 style or script the browser silently refuses. Nothing said so, and the page is the first thing
 a security-minded reader inspects.
 
-IT REFUSES WHAT IT CANNOT MODEL, WHICH IS THE WHOLE DESIGN. Three rounds were spent teaching
+IT REFUSES WHAT IT CANNOT MODEL, WHICH IS THE WHOLE DESIGN. Four rounds were spent teaching
 this gate about HTML: `src` on a style, foreign content in `<svg>`, HTML integration points,
 MathML, inert script types. Each round closed the case in front of it and the next round found
 another divergence between `html.parser` and a browser, including two silent fail-opens: a
@@ -17,16 +17,30 @@ one hand-written file with two inline blocks.
 
 So the model is deliberately tiny and everything outside it is a finding:
 
-  - exactly one `<style>` and one `<script>`, each carrying NO attributes;
+  - exactly one `<style>` and one `<script>`, each carrying NO attributes, and NEITHER
+    written self-closing: `html.parser` reads `<style/>` as an empty element and never enters
+    CDATA, while a browser ignores the self-closing flag and reads to the real `</style>`.
+    That one was the worst thing this gate has done. It hashed the empty string, printed that
+    hash in its own failure message, and went green once an author pinned what it asked for,
+    with the whole stylesheet refused by the browser;
   - every literal `<style` or `<script` in the file accounted for, either as one of those two
     elements or as text INSIDE one of them (a `<style>` written in a JavaScript string is
     fine and is the round-1 case; one hiding anywhere else is not);
+  - every literal `style=` accounted for the same way, because the blind spot that hides an
+    element hides an attribute too: `<title>` content is RCDATA, so a `style=` smuggled
+    through `<svg><title>` was invisible here and applied in a browser;
+  - exactly one `<meta charset="utf-8">` and no other charset declaration, because this always
+    decodes UTF-8 and a page declaring something else would be decoded differently, and hashed
+    differently, by a browser that has no transport charset to override it;
   - no `<!--` inside the script, because that is what opens HTML's script-data escape states,
     which is where the parser and the browser part company;
   - no NUL byte, which a browser's tokenizer turns into U+FFFD before hashing and this would
     not.
 
-Any of those fails with a message saying the page outgrew the gate. That is a real cost: a
+Any of those fails with a message saying the page outgrew the gate.
+
+WHAT IT STILL DOES NOT COVER, stated rather than left to be found: a document embedded with
+`srcdoc` inherits this page's CSP, and nothing here looks inside one. That is a real cost: a
 page that legitimately needs a second script has to change this file. It buys the property no
 amount of parser detail delivered, which is that a green result means the hash is right.
 
@@ -47,7 +61,9 @@ case-insensitively and the first occurrence of a directive wins, both per CSP3.
 THE HEADERS FILE IS CLOUDFLARE'S, AND ITS SYNTAX DOES MORE THAN THIS ONCE ASSUMED. All of this
 is from the Pages documentation. A rule may be an absolute URL, so `https://host/*` reaches the
 root as surely as `/*` does, and "an incoming request which matches multiple rules' URL patterns
-will inherit all rules' headers", so every matching block counts. `#` starts a comment, which
+will inherit all rules' headers", so every matching block counts. A single header VALUE is also
+more than one policy when it contains a comma, and a browser enforces each of them, so a comma
+is refused rather than read as part of a directive. `#` starts a comment, which
 this gate used to read as a path and so stole the following headers. And a header name prefixed
 with `!` DETACHES it: a later `/* ! Content-Security-Policy` removes the policy completely and
 the page ships with no CSP at all, which passed silently because a detach line has no colon.
@@ -70,7 +86,12 @@ HEADERS = Path("site") / "_headers"
 KINDS = (("script", ("script-src-elem", "script-src", "default-src")),
          ("style", ("style-src-elem", "style-src", "default-src")))
 OPENER = re.compile(r"<(style|script)\b", re.I)
+STYLE_ATTR = re.compile(r"\bstyle\s*=", re.I)
+CHARSET = re.compile(r"charset\s*=", re.I)
+META_UTF8 = '<meta charset="utf-8">'
 CSP = "content-security-policy"
+# CSP3 allows sha256, sha384 and sha512, and matches the algorithm name case-insensitively.
+ALGORITHMS = (("sha256", hashlib.sha256), ("sha384", hashlib.sha384), ("sha512", hashlib.sha512))
 
 
 class Inline(HTMLParser):
@@ -81,6 +102,7 @@ class Inline(HTMLParser):
         self.blocks = {"script": [], "style": []}
         self.attrs = {"script": [], "style": []}
         self.style_attrs = []
+        self.self_closing = []
         self._open = None
 
     def handle_starttag(self, tag, attrs):
@@ -90,6 +112,16 @@ class Inline(HTMLParser):
             self._open = tag
             self.blocks[tag].append([])
             self.attrs[tag].append(([k.lower() for k, _ in attrs], self.getpos()[0]))
+
+    def handle_startendtag(self, tag, attrs):
+        # `<style/>` never enters CDATA mode in html.parser, so the element records an EMPTY
+        # body and the stylesheet is parsed as markup after it. A browser ignores the
+        # self-closing flag on a non-void HTML element and reads to the real `</style>`. The
+        # gate used to hand the author the hash of the empty string and go green once it was
+        # pinned, which is the whole stylesheet refused under a passing gate.
+        if tag in ("script", "style"):
+            self.self_closing.append((tag, self.getpos()[0]))
+        super().handle_startendtag(tag, attrs)
 
     def handle_endtag(self, tag):
         if tag == self._open:
@@ -105,6 +137,22 @@ class Inline(HTMLParser):
 
 def sha256_b64(text):
     return base64.b64encode(hashlib.sha256(text.encode("utf-8")).digest()).decode()
+
+
+def pin_tokens(text):
+    """Every `'<algorithm>-<base64>'` token a browser would accept for this text."""
+    return {f"'{name}-{base64.b64encode(fn(text.encode('utf-8')).digest()).decode()}'"
+            for name, fn in ALGORITHMS}
+
+
+def normalize_pin(token):
+    """A source expression with only its algorithm name lower-cased.
+
+    CSP3 matches the algorithm ASCII-case-insensitively, so `'SHA256-...'` is the same pin.
+    The base64 after it is case-SENSITIVE, which is why this cannot simply lower the token.
+    """
+    head, sep, tail = token.partition("-")
+    return head.lower() + sep + tail if sep else token
 
 
 def normalized(data: bytes) -> str:
@@ -129,6 +177,15 @@ def parse_page(html):
 def simple_enough(page, html):
     """Reasons this page is outside the shape the gate can hash. See the docstring."""
     out = []
+    for tag, line in page.self_closing:
+        out.append(f"the <{tag}> at {PAGE}:{line} is written self-closing. html.parser reads "
+                   f"that as an empty element and a browser reads to the real </{tag}>, so "
+                   f"the hash here would be the hash of nothing; write it with a separate "
+                   f"closing tag")
+    if CHARSET.search(html.replace(META_UTF8, "", 1)) or META_UTF8 not in html:
+        out.append(f"{PAGE} does not declare exactly one {META_UTF8}, and this gate always "
+                   f"decodes UTF-8; a different declared charset would make a browser decode "
+                   f"other bytes and hash a different stylesheet")
     if "\x00" in html:
         out.append("the page contains a NUL byte, which a browser's tokenizer replaces with "
                    "U+FFFD before hashing and this gate would not")
@@ -144,6 +201,15 @@ def simple_enough(page, html):
             out.append(f"the <{tag}> at {PAGE}:{line} carries attributes ({', '.join(names)}), "
                        f"and whether a browser runs an element with them depends on rules this "
                        f"gate does not model; keep it bare or extend the gate deliberately")
+    # A literal `style=` the parser never reported is the same blind spot as an unreported
+    # element: html.parser swallows <title> content as RCDATA, so an attribute smuggled
+    # through <svg><title> was invisible while a browser applies it and CSP-checks it.
+    in_body = sum(len(STYLE_ATTR.findall(b))
+                  for tag in ("style", "script") for b in page.bodies(tag))
+    if len(STYLE_ATTR.findall(html)) != len(page.style_attrs) + in_body:
+        out.append(f"the page contains literal `style=` text this gate cannot account for; a "
+                   f"style attribute the parser did not report, such as one inside <svg> or "
+                   f"<title>, is still applied and still CSP-checked by a browser")
     scripts = page.bodies("script")
     if len(scripts) == 1 and "<!--" in scripts[0]:
         out.append("the inline <script> contains `<!--`, which opens HTML's script-data escape "
@@ -229,6 +295,15 @@ def main() -> int:
               f"governs an inline block")
         return 1
     csp = csps[0][1]
+    if "," in csp:
+        # A CSP header value is a comma-separated LIST of policies and a browser enforces
+        # every one of them. Splitting on `;` alone read two policies as one directive list,
+        # so `style-src 'none', style-src '<the real pin>'` passed while a browser blocked the
+        # stylesheet under the first policy.
+        print(f"  FAIL  the Content-Security-Policy value contains a comma, which makes it "
+              f"more than one policy; a browser enforces all of them and this gate reads only "
+              f"the directives it can see")
+        return 1
 
     directives = {}
     for d in csp.split(";"):
@@ -250,10 +325,16 @@ def main() -> int:
         if "'unsafe-inline'" in found:
             findings.append(
                 f"{used} carries 'unsafe-inline', which permits any inline <{tag}> including "
-                f"one injected into the page; pin the hash instead")
-        h = sha256_b64(body)
-        if f"'sha256-{h}'" not in found:
-            findings.append(f"{used} lacks the hash of the inline <{tag}> in {PAGE} (sha256-{h})")
+                f"one injected into the page. A browser ignores it while a hash is present, "
+                f"so this is not broken today; it is one edit from permitting everything, and "
+                f"this site's whole claim is that it does not need it")
+        accepted = pin_tokens(body)
+        # The algorithm name is matched case-insensitively per CSP3; the base64 is not, so
+        # lowercasing a whole token would destroy it.
+        present = {normalize_pin(token) for token in found}
+        if not (accepted & present):
+            findings.append(f"{used} lacks the hash of the inline <{tag}> in {PAGE} "
+                            f"(sha256-{sha256_b64(body)})")
         else:
             pinned += 1
 

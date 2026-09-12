@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Cases for check_csp_hashes.py, one per defect a reviewer demonstrated against it.
 
-Four rounds are recorded, and the arc matters more than any single case. Round 1 broke a
+Five rounds are recorded, and the arc matters more than any single case. Round 1 broke a
 regular-expression reader and the gate moved to `html.parser`. Rounds 2, 3 and 4 then spent
 themselves teaching that parser about HTML: `src` on a style, foreign content, integration
 points, MathML, inert script types. Round 3 found that a round-2 fix was BACKWARDS and that the
 case written for it was holding the wrong answer in place. Round 4 found two more silent
 fail-opens in the same family, a `<style>` inside `<svg><title>` that `html.parser` swallows
-entirely and a `<script>` whose escape states it misreads.
+entirely and a `<script>` whose escape states it misreads. Round 5 found three wrong pages that
+satisfied every one of the new guards, the worst of which had this gate printing the hash of the
+EMPTY STRING in its own failure message and going green once an author pinned what it asked for.
 
 So the gate stopped modelling HTML and started refusing what it cannot model, and most of the
 cases below are now assertions that it refuses. Several of them USED to be passes, and each
@@ -63,6 +65,12 @@ def repinned(page, tag, headers=None):
     """HEADERS with that element's pin replaced by what the page now hashes to."""
     base = HEADERS if headers is None else headers
     return base.replace(f"'sha256-{body_hash(PAGE, tag)}'", f"'sha256-{body_hash(page, tag)}'")
+
+
+def alt_pin(page, tag, fn):
+    """The same element text under another CSP-permitted hash algorithm."""
+    m = re.search(rf"<{tag}>(.*?)</{tag}>", page, re.S)
+    return base64.b64encode(fn(m.group(1).encode("utf-8")).digest()).decode()
 
 
 STYLE_PIN = f"'sha256-{body_hash(PAGE, 'style')}'"
@@ -177,6 +185,46 @@ CASES = (
     ("a lone-CR page against the real pins, normalized the same way",
      CR_PAGE, None, False, None),
 
+    # ROUND 5. Three wrong pages that passed every guard, each verified against html5lib and
+    # Gumbo. The first is the worst thing this gate has done: it handed the author the hash of
+    # the EMPTY STRING and went green once that was pinned, while a browser refused the whole
+    # stylesheet. html.parser routes `<style/>` to handle_startendtag and never enters CDATA.
+    ("a self-closing <style/>, which html.parser reads as empty and a browser does not",
+     PAGE.replace("<style>", "<style/>", 1), None, True, "self-closing"),
+    ("a charset declaration this gate does not obey",
+     PAGE.replace('<meta charset="utf-8">', '<meta charset="windows-1252">', 1), None, True,
+     "charset"),
+    # The round-4 RCDATA blind spot, still open for ATTRIBUTES: <title> content is swallowed,
+    # so the parser never reported the style= and a browser applies it.
+    ("a style= attribute smuggled through <svg><title>",
+     PAGE.replace("</svg>", '<title>t<div style="display:none">x</div></title>\n    </svg>', 1),
+     None, True, "style="),
+    # A CSP value is a comma-separated LIST of policies and a browser enforces all of them.
+    ("a comma splitting the CSP into two policies, the first hostile",
+     None, HEADERS.replace("style-src ", "style-src 'none', style-src ", 1), True, "comma"),
+    # Kills the mutant that drops re.I from the opener expression: both browser parsers report
+    # this as a live style element.
+    ("an uppercase <STYLE> smuggled through <svg><title>",
+     PAGE.replace("</svg>", "<title>t<STYLE>p{color:red}</STYLE></title>\n    </svg>", 1),
+     None, True, "openers"),
+    ("a CSP with no style-src, style-src-elem or default-src at all",
+     None, re.sub(r"Content-Security-Policy: .*$", "Content-Security-Policy: img-src 'self'",
+                  HEADERS, count=1, flags=re.M), True, "no script-src directive"),
+    # Kills the mutant that matches a pin as a substring: a browser ignores an invalid source
+    # expression, so the style is blocked.
+    ("the correct hash embedded in a longer, invalid token",
+     None, HEADERS.replace(STYLE_PIN, STYLE_PIN[:-1] + "x'", 1), True, "lacks the hash"),
+    # Kills the mutant that only checks 'unsafe-inline' on the style directive.
+    ("'unsafe-inline' on script-src beside the correct pin",
+     None, HEADERS.replace("script-src ", "script-src 'unsafe-inline' ", 1), True,
+     "'unsafe-inline'"),
+    # CSP3 matches the algorithm name case-insensitively, and sha384 is as valid as sha256.
+    ("a pin whose algorithm name is upper case, which CSP3 accepts",
+     None, HEADERS.replace(STYLE_PIN, STYLE_PIN.replace("sha256", "SHA256"), 1), False, None),
+    ("a sha384 pin, which is stronger and equally valid",
+     None, HEADERS.replace(STYLE_PIN, f"'sha384-{alt_pin(PAGE, 'style', hashlib.sha384)}'", 1),
+     False, None),
+
     # REPINNED, ASSERTING A PASS. These hold a closed round-1 defect closed.
     ("stylesheet text containing <!-- and -->, which is text and not a comment node",
      COMMENT_PAGE, repinned(COMMENT_PAGE, "style"), False, None),
@@ -219,7 +267,7 @@ def main() -> int:
         for f in failures:
             print(f"  FAIL  {f}")
         return 1
-    print(f"  ok    {len(CASES)} recorded cases for the CSP hash gate, across four review "
+    print(f"  ok    {len(CASES)} recorded cases for the CSP hash gate, across five review "
           f"rounds")
     return 0
 
