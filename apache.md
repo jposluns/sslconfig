@@ -75,11 +75,46 @@ Basic authentication is single-factor, and Authelia documents Apache as unsuppor
 
 ## 5. Verify
 
+These are read-and-judge checks. `curl` exits 0 for a 401 as readily as for a 200, so the
+status code is printed and you compare it; nothing here fails on its own.
+
 ```bash
 sudo apachectl configtest && sudo systemctl reload apache2   # httpd on RHEL
 curl -sI http://example.com/            # expect 301 with a https:// Location
-curl -sI https://example.com/           # expect 200 without -k
-curl -s  https://example.com/           # expect 401 when basic auth is on
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/
+                                        # 200 before section 4, 401 after it. Once
+                                        # authentication is on, a 200 here is the finding
+
+# Read every listener. Do not filter to the ports you expect: a filter cannot show you a port
+# you did not think of, which is the whole question, and `grep ':(80|443)'` also matches an
+# address such as [2001:db8:80::1]:9000.
+ss -tlnp
+
+# A request whose name matches no ServerName or ServerAlias does not fail. Apache falls through
+# to "the first listed virtual host that matches" the address and port, so a vhost listed
+# before yours over the same DocumentRoot answers without your authentication.
+#
+# Over TLS the name that selects the vhost is the SNI one, not the Host header: Apache says
+# that when the handshake carries it, "that hostname is used below just like the Host: header
+# would be used on a non-SSL connection". So setting only the header tests nothing. It leaves
+# SNI saying example.com, which selects YOUR vhost and answers 401, or makes mod_ssl reject the
+# mismatched pair with 421; both look like a pass and neither is the request an attacker sends.
+# --connect-to sets the name in the handshake AND the header, and still dials your address:
+curl -s -o /dev/null -w '%{http_code}\n' \
+  --connect-to REPLACE_WITH_AN_UNCONFIGURED_NAME:443:example.com:443 \
+  https://REPLACE_WITH_AN_UNCONFIGURED_NAME/REPLACE_WITH_A_PROTECTED_PATH
+                                        # 401 is the pass. 200 means another vhost served the
+                                        # protected resource with no authentication at all
+```
+
+That name has to be one your certificate already covers, typically a spare label under a
+wildcard SAN, because the guide will not tell you to disable certificate verification to run a
+test. If the certificate covers no name you can spare, this check is a configuration review
+instead: list the vhosts for that address and port, and confirm the first one Apache would
+choose does not serve the protected `DocumentRoot`.
+
+```bash
+sudo apachectl -S                       # the vhost list, in Apache's own matching order
 ```
 
 ## Common mistakes
@@ -93,4 +128,7 @@ curl -s  https://example.com/           # expect 401 when basic auth is on
 
 - Apache SSL/TLS how-to: https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html
 - Apache authentication how-to: https://httpd.apache.org/docs/2.4/howto/auth.html
+- Apache name-based virtual hosts, for which vhost answers an unmatched Host header: https://httpd.apache.org/docs/2.4/vhosts/name-based.html
+- Apache mod_ssl `SSLVHostSNIPolicy`, for the 421 a mismatched SNI and Host pairing can produce: https://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslvhostsnipolicy
+- Apache virtual host matching in detail, for SNI selecting the vhost on a TLS connection: https://httpd.apache.org/docs/2.4/vhosts/details.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/

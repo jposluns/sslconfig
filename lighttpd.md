@@ -67,10 +67,28 @@ Basic authentication is single-factor, and lighttpd is absent from Authelia's su
 
 ## 4. Verify
 
+These are read-and-judge checks: the status code is printed and you compare it.
+
 ```bash
 sudo lighttpd -tt -f /etc/lighttpd/lighttpd.conf && sudo systemctl reload lighttpd
 curl -sI http://example.com/        # expect a redirect to https://
-curl -sI https://example.com/       # expect 401 without credentials once auth is on
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/
+                                    # expect 401 without credentials once auth is on
+
+# Read every listener rather than filtering to the ports you expect. The checks above prove
+# the front door asks for credentials; they do not prove it is the only door, and a filtered
+# list cannot show you a port you did not think of.
+ss -tlnp
+
+# `auth.require` can sit at the top level or inside a `$HTTP["host"]` conditional, and a
+# conditional one applies only to the hosts it names. If yours is conditional, a request
+# carrying a host it does not name is served by the global configuration instead. That
+# conditional reads the Host HEADER, so setting the header is the right test here, unlike
+# Apache, which selects its virtual host by the SNI name when the connection is TLS:
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' \
+  https://example.com/REPLACE_WITH_A_PROTECTED_PATH
+                                    # 401 is the pass. 200 means the protected path is served
+                                    # without authentication to anyone who sends another host
 ```
 
 ## Common mistakes
@@ -82,6 +100,6 @@ curl -sI https://example.com/       # expect 401 without credentials once auth i
 ## Sources (checked September 2026)
 
 - lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
-- lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_auth
+- lighttpd mod_auth documentation, including `auth.require` inside a `$HTTP["host"]` conditional: https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_auth
 - lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
 - lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions
