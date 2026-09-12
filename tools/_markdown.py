@@ -19,7 +19,9 @@ https://spec.commonmark.org/0.31.2/#fenced-code-blocks
 This is not a Markdown parser. It does not know about list indentation, HTML blocks, or
 link reference definitions, and it is not trying to. It answers one question for both
 gates in the same way, so that a construction cannot be a fence in one and prose in the
-other.
+other. A fence indented four or more spaces, which is what a fence nested two list levels
+deep looks like, is not recognized. A renderer shows it as code and a reader copies from it,
+and no guide in this corpus has one today, so this is disclosed rather than handled.
 """
 import re
 

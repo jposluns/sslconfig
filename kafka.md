@@ -4,7 +4,7 @@ Kafka's broker defaults are `listeners=PLAINTEXT://:9092`, `security.inter.broke
 
 ## 1. Replace the plaintext listener
 
-In `server.properties`, publish one `SASL_SSL` listener and use it between brokers too. Remove `PLAINTEXT://:9092`; if local tooling still needs it, bind it to `127.0.0.1` and never advertise it. KRaft controllers use their own listener (`controller.listener.names`); map it to `SASL_SSL` in `listener.security.protocol.map` (the documentation's example is `BROKER:SASL_SSL,CONTROLLER:SASL_SSL`) or keep it on a private interface.
+In `server.properties`, publish one `SASL_SSL` listener and use it between brokers too. Remove `PLAINTEXT://:9092`; if local tooling still needs it, bind it to `127.0.0.1` and never advertise it. KRaft controllers use their own listener (`controller.listener.names`); map it to `SASL_SSL` in `listener.security.protocol.map` (the documentation's example is `BROKER:SASL_SSL,CONTROLLER:SASL_SSL`) or keep it on a private interface. The prefix in `listener.name.<name>.*` is the listener's name lowercased, so if you rename a listener you must rename the prefix on every such line in this guide; a prefix that matches no listener is silently ignored rather than rejected.
 
 ```properties
 listeners=SASL_SSL://0.0.0.0:9093

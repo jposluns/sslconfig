@@ -186,9 +186,9 @@ else
 fi
 
 echo "== the convention gates still catch what review found =="
-# The two gates above were broken more than thirty times across four rounds of cross-family
-# review, and three of those rounds broke something an earlier round had fixed. Each case in
-# this file is an input a reviewer actually ran, recorded so that a future change lands on a
+# The two gates above were broken repeatedly across rounds of cross-family review, and
+# several of those rounds broke something an earlier round had fixed. Each case in this
+# file is an input a reviewer actually ran, recorded so that a future change lands on a
 # named prior finding instead of silently reopening it. It checks the gates, not the corpus.
 if gate_tests=$(python3 tools/test_convention_gates.py 2>&1); then
   printf '%s\n' "$gate_tests"

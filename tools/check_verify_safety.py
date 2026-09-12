@@ -4,7 +4,9 @@
 WHAT THIS CATCHES: the patterns listed in CHECKS below, in a command inside any fenced
 code block in a guide. Indented code blocks are NOT scanned. An earlier version scanned
 them and flagged a four-space-indented prose bullet that warned readers against the very
-flag it named. A fenced block inside a block quotation IS scanned, because a reader copies
+flag it named. That also means a fence nested two list levels deep, which is indented four
+spaces or more, is not seen; `tools/_markdown.py` says so too. A fenced block inside a block
+quotation IS scanned, because a reader copies
 from one just as readily; the quotation markers are stripped before the fence is read.
 Nested markers are stripped too, and a quotation that ends closes the fence inside it, since
 both were demonstrated to hide a block or to scan a paragraph. It scans every block rather
@@ -17,10 +19,10 @@ is satisfied by a substituted certificate as readily as by the right one, and on
 three sent credentials over the unverified connection.
 
 WHAT THIS IS NOT: a shell parser, and not a proof that a Verify block verifies anything.
-It is a TRIPWIRE for the accidental case, and a determined author walks past it. Two
-rounds of adversarial review demonstrated more than twenty bypasses of earlier versions.
-Most are closed. These are known to remain, and are recorded so nobody mistakes a pass
-for a guarantee:
+It is a TRIPWIRE for the accidental case, and a determined author walks past it. Successive
+rounds of adversarial review demonstrated a long list of bypasses of earlier versions,
+several of them in fixes made by the round before. Most are closed. These are known to
+remain, and are recorded so nobody mistakes a pass for a guarantee:
 
   - A line continuation SPLITTING A TOKEN: a backslash-newline inside a flag name. The
     shell rejoins it into a working flag; the scanner inserts a space and sees neither
@@ -42,13 +44,16 @@ for a guarantee:
   - A quotation spanning a line break. Quote state is tracked per physical line, so
     `curl --data-binary 'first line` followed by `# second line' -k https://host/` reads the
     second line as a comment and loses the flag with it.
-  - Anything else that needs a shell parser rather than a scanner. Six rounds of review have
-    now traded new edge cases for new edge cases here, and the line is drawn deliberately:
-    this file will not become a shell parser or a Markdown one, because a wrong parser that
-    looks authoritative is worse for a reader than a scanner that says what it is. Eight
-    rounds is where that line is drawn. What remains open is recorded in
-    `tools/test_convention_gates.py` as cases asserting the current wrong answer, so a
-    future change that closes one will fail loudly rather than pass quietly.
+  - Anything else that needs a shell parser rather than a scanner. Review here has traded
+    new edge cases for new edge cases for round after round, and the line is drawn
+    deliberately: this file will not become a shell parser or a Markdown one, because a
+    wrong parser that looks authoritative is worse for a reader than a scanner that says
+    what it is. What remains open is either disclosed in the list above or recorded in
+    `tools/test_convention_gates.py` as a case asserting the current wrong answer, so a
+    future change that closes one fails loudly rather than passing quietly. That promise
+    has been broken once already, by a quoted flag token that was neither listed nor
+    recorded, so read it as an intention held to by review rather than as a guarantee the
+    code enforces.
 
 Passing this gate is not evidence that a Verify step is correct, that the certificate it
 accepts is the right one, or that the connection is trustworthy.
@@ -198,8 +203,11 @@ INSECURE_CURL = re.compile(r"(?:^|[\s'\"/=`(])curl\b")
 # asymmetry was fixed for the s_client flags in an earlier round and never mirrored here.
 # The combined-flag class takes digits and `#` as well as letters, because curl combines
 # short flags and `-4`, `-6` and `-#` are all real ones, so `curl -k4` was passing.
+# The LEADING class takes quotes too. Widening only the trailing side left `curl '-k'`
+# passing for two rounds, while the prefix class in front of `curl` had accepted quotes
+# all along.
 CURL_FLAG = re.compile(
-    r"""(?:\s|^)(?:-[a-zA-Z0-9#]*k[a-zA-Z0-9#]*|--insecure|--proxy-insecure)"""
+    r"""(?:^|[\s'"])(?:-[a-zA-Z0-9#]*k[a-zA-Z0-9#]*|--insecure|--proxy-insecure)"""
     r"""(?:[\s=)`'"<>|;&]|$)""")
 
 CHECKS = (
@@ -216,6 +224,15 @@ CHECKS = (
     ("git http.sslVerify false",
      re.compile(r"http\.sslVerify[\s=]+false", re.I)),
 )
+
+# A search command does not RUN what it searches for. A hardening guide legitimately tells a
+# reader to hunt their own tree for these strings, and widening the flag boundaries in rounds
+# 7 and 8 turned every such instruction into a finding. Only search tools are exempt, and
+# only as the segment's own command: `git -c http.sslVerify=false clone` is still caught,
+# because the exemption keys on `git grep` and `git log -S`, not on `git`.
+SEARCH_COMMAND = re.compile(
+    r"""^\s*['"(`]*(?:grep|egrep|fgrep|rg|ag|ack)\b"""
+    r"""|^\s*['"(`]*git\s+(?:grep\b|log\b.*?\s-S\b)""")
 
 # openssl s_client verifies nothing unless one of these appears.
 SCLIENT = re.compile(r"(?:^|[\s'\"/=`(])openssl\s+s_client\b")
@@ -340,6 +357,8 @@ def findings_for(code):  # noqa: C901
     """
     hits = []
     for segment, _sep in split_segments(code):
+        if SEARCH_COMMAND.search(segment):
+            continue
         if INSECURE_CURL.search(segment) and CURL_FLAG.search(segment):
             hits.append("curl -k / --insecure")
         if SCLIENT.search(segment) and not SCLIENT_HELP.search(segment):

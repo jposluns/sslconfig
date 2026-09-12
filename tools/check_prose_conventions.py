@@ -96,11 +96,19 @@ ISE_STEMS = (
     "tokenis", "anonymis", "pseudonymis", "capitalis", "centralis", "generalis",
     "localis", "modernis", "specialis", "visualis", "finalis", "dockeris",
     "stabilis", "modularis", "operationalis", "containeris",
+    "characteris", "neutralis", "penalis", "itemis", "formalis",
 )
 # No leading \b: `unauthorised` and `reinitialised` carry a listed stem mid-word, and an
 # anchored prefix let both through while claiming to cover `authoris` and `initialis`.
 ISE_RE = re.compile(r"(" + "|".join(ISE_STEMS) +
                     r")(e|es|ed|ing|ation|ations|er|ers|able|ables|ability|abilities|ational)?\b", re.I)
+
+# `emphasis` cannot go in ISE_STEMS: that list matches with an OPTIONAL suffix, so the stem
+# would flag the ordinary noun. This one requires a suffix, which `emphasise` has and
+# `emphasis` does not.
+ISE_NOUNLIKE_RE = re.compile(
+    r"(emphasis)(e|es|ed|ing|ation|ations|er|ers|able|ables|ability|abilities|ational)\b",
+    re.I)
 
 # Placeholders that are not in the house set. Each is a domain someone may actually own.
 BAD_PLACEHOLDERS = re.compile(
@@ -237,7 +245,9 @@ def main() -> int:
             # SPELLING check only. The placeholder check still reads them, because a fenced
             # command is the primary thing a reader copies, and exempting it there would
             # retire the check in the one place it matters.
-            quoted = line.lstrip().startswith(">")
+            # A `>` inside a fence is a redirection, not a quotation. Computing this before
+            # consulting fence state cost the comment scan on any line that starts with one.
+            quoted = not fences.inside and line.lstrip().startswith(">")
             prose = not (fences.inside or quoted)
             # Spelling ignores quoted spans; placeholders do not, since a placeholder
             # inside backticks is the normal case rather than a quotation.
@@ -247,7 +257,8 @@ def main() -> int:
             # A block quotation is exempt outright. Handing it to the fence-comment reader
             # made the `#` of a quoted Markdown heading a comment delimiter.
             spell_target = line if prose else ("" if quoted else _fence_comment(line))
-            m = ISE_RE.search(unquoted(spell_target))
+            blanked = unquoted(spell_target)
+            m = ISE_RE.search(blanked) or ISE_NOUNLIKE_RE.search(blanked)
             if m:
                 findings.append(
                     f"{path.relative_to(root)}:{lineno}: British spelling '{m.group(0)}', "

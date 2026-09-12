@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Regression cases for the two convention gates, one per demonstrated review finding.
 
-Four rounds of cross-family review broke these gates more than thirty times, and three of
-those rounds broke something an earlier round had fixed. A word list in a gate is checked
-by the gate; the gate itself was not checked by anything. This file is that check.
+Round after round of cross-family review broke these gates, and several of those rounds
+broke something an earlier round had fixed. Counts are deliberately absent: every version
+of this sentence that carried one went stale within a round or two, which is the same drift
+these gates exist to catch. A word list in a gate is checked by the gate; the gate itself
+was not checked by anything. This file is that check.
 
 Every case below is an input a reviewer actually constructed and ran, not a case imagined
 while writing the gate. MISSES are inputs that are real defects and must be caught. FALSE
@@ -110,6 +112,12 @@ TLS_CASES = (
     ("s_client binding an email SAN rather than the endpoint",
      'openssl s_client -connect mq.example.com:5671 -CAfile ca.pem '
      '-verify_return_error -verify_email ops@example.com', True, 9),
+    ("a quoted flag token",
+     "curl '-k' https://example.com/", True, 10),
+    ("a double-quoted flag token",
+     'curl "-k" https://example.com/', True, 10),
+    ("a git flag that really does disable verification is still caught",
+     "git -c http.sslVerify=false clone https://example.com/r.git", True, 10),
 
     # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
     ("sort -k inside a quoted command substitution",
@@ -149,6 +157,10 @@ TLS_CASES = (
     # run `-k` as a command. Two commands, which is exactly what the scanner sees.
     ("a blank line after a continuation really is two commands",
      'curl \\\n\n  -k https://example.com/', False, 9),
+    ("an audit command that searches for the flag",
+     "grep -rn 'curl -k' /etc/cron.d", False, 10),
+    ("a git history search for the pattern",
+     "git log -S 'rejectUnauthorized: false' -- src/", False, 10),
 )
 
 
@@ -159,10 +171,11 @@ def prose_hits(text):
     for lineno, line in enumerate(text.splitlines(), 1):
         if fences.feed(line):
             continue
-        quoted = line.lstrip().startswith(">")
+        quoted = not fences.inside and line.lstrip().startswith(">")
         is_prose = not (fences.inside or quoted)
         target = line if is_prose else ("" if quoted else prose._fence_comment(line))
-        if prose.ISE_RE.search(prose.unquoted(target)):
+        blanked = prose.unquoted(target)
+        if prose.ISE_RE.search(blanked) or prose.ISE_NOUNLIKE_RE.search(blanked):
             found.append((lineno, "spelling"))
         if prose.bad_placeholder(line):
             found.append((lineno, "placeholder"))
@@ -186,6 +199,10 @@ PROSE_CASES = (
      "```bash\ncurl https://example.com/  # tokens are randomised\n```", True, 3),
     ("a URL just inside a closing quotation mark",
      'The vendor says "see https://example.com/"; randomised ports are "normal".', True, 5),
+    ("a stem added after a reviewer named it",
+     "The vendor characterises the endpoint as internal.", True, 10),
+    ("emphasise, which needs a suffix to be wrong",
+     "They emphasise the default is insecure.", True, 10),
 
     # FALSE ALARMS.
     ("a .internal host whose left label looks like a placeholder",
@@ -239,6 +256,8 @@ PROSE_CASES = (
      "```bash\ncurl -f https://example.com/migration/yourdomain.com\n```", False, 9),
     ("a vendor quotation in typographic double quotes",
      "The vendor says “requests are randomised per connection”.", False, 9),
+    ("emphasis, the ordinary noun, is not a British spelling",
+     "The emphasis here is on the default.", False, 10),
 )
 
 

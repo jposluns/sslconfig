@@ -45,8 +45,9 @@ ss -tlnp | grep -E '5671|5672|15672'      # 5672 gone once listeners.tcp = none;
 # Positive: a client holding a certificate connects.
 # client.pem and client.key are a CLIENT certificate and key issued by the CA in
 # ssl_options.cacertfile, with TLS Web Client Authentication in its extended key usage.
-# A server certificate will not do: verify_peer checks the chain, and the broker must
-# trust the issuer.
+# A server certificate signed by that same CA is NOT a substitute, and the reason is the
+# extended key usage rather than the chain: the chain verifies either way, which is what
+# makes this an easy mistake to make and a hard one to see.
 sleep 10 | openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
   -cert client.pem -key client.key \
   -verify_hostname mq.example.com -verify_return_error
