@@ -33,3 +33,11 @@ jobs:
             './*.md'
             './site/index.html'
             './site/llms.txt'
+
+      - name: Report citations that have moved
+        # Advisory, and deliberately after the link sweep. The sweep accepts 301 and 302, so a
+        # citation that has moved passes it forever while pointing at a redirect; #16 and #17
+        # were spent cleaning that up once it had spread across 82 citations. This step names
+        # them while the redirect still says where the page went. It never fails the run.
+        if: always()
+        run: python3 tools/report_citation_drift.py
