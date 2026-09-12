@@ -16,7 +16,9 @@ a real registered domain and reached the corpus anyway.
 QUOTED TEXT IS EXEMPT FROM THE SPELLING CHECK ONLY. The changelog entry recording the
 spelling conversion has to quote the old spelling to say what changed, and a guide
 quoting a vendor must not have the quotation silently edited, so a spelling match inside
-`backticks` or "double quotes" is skipped.
+`backticks` or "double quotes" is skipped. A backtick span may be fenced by any run of
+backticks and closes only on a run of the same length, which is what makes
+``serialise(`value`)`` one span rather than three.
 
 The placeholder check does NOT take that exemption, because a placeholder's natural home
 is a command inside backticks. Applying the carve-out to both is how the first draft of
@@ -49,7 +51,12 @@ also listed example.org as a bad placeholder, which is wrong: RFC 2606 reserves
 example.com, example.net and example.org alike. A placeholder is also only judged on its
 own labels: `yourdomain.com.internal` and `yourdomain.com.example.com` are house
 placeholders whatever the label on the left, so the match is extended to the end of the
-hostname before it is judged.
+hostname before it is judged. Two exemption limits are known and left open rather than
+papered over. Quote state is per line, so a quotation opened on one line and closed on
+another does not blank the lines between. And inside a fenced block only a shell-style
+trailing comment is read as prose, which means a `#` inside a Python triple-quoted string
+is read as one; treating it correctly would mean tracking multiline string state per
+language, which is a parser, and this is not one.
 """
 import re
 import sys
@@ -100,10 +107,16 @@ HOSTNAME_TAIL = re.compile(r"[A-Za-z0-9.-]*")
 
 # Single quotes are NOT treated as a quotation delimiter: an apostrophe pair spanning a
 # contraction ("Don't ... admin's") blanked the prose between them and hid a real finding.
-QUOTED_RE = re.compile(r"`[^`]*`|\"[^\"]*\"")
+# A code span may be fenced by any RUN of backticks, and it closes only on a run of the same
+# length. The single-backtick form read the opening ``  of ``serialise(`value`)`` as an empty
+# span and then flagged the identifier inside it.
+QUOTED_RE = re.compile(r"(`+)(?:(?!\1)[\s\S])*?\1|\"[^\"]*\"")
 # A cited URL may contain a British spelling in its path, and respelling it breaks the
-# link. UK government and vendor documentation routinely does this.
-URL_RE = re.compile(r"https?://\S+")
+# link. UK government and vendor documentation routinely does this. The URL stops at a
+# quotation mark, a backtick or an angle bracket rather than running to whitespace: a
+# `\S+` tail ate the closing `"` of a quoted sentence, and the quotation blanking that
+# followed then hid real prose after the quotation ended.
+URL_RE = re.compile(r"""https?://[^\s"'`<>]+""")
 
 
 def unquoted(line):

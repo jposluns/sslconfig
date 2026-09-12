@@ -96,11 +96,11 @@ openssl s_client -connect kafka.example.com:9093 -verify_hostname kafka.example.
                                                               # correct cluster. Without the verify flags
                                                               # the handshake succeeds against any
                                                               # certificate and shows only that TLS is on
-                                                              # This matches the listener as configured above,
-                                                              # which does not require client certificates. If you
-                                                              # set ssl.client.auth=required, add -cert and -key:
-                                                              # without them the broker closes the connection after
-                                                              # the handshake and "Verification: OK" still prints.
+                                                              # This matches the listener as configured above, which
+                                                              # does not require client certificates. If you set
+                                                              # listener.name.sasl_ssl.ssl.client.auth=required, add
+                                                              # -cert and -key: without them the broker refuses the
+                                                              # connection and "Verification: OK" still prints.
 # wrong.properties: a copy of client.properties (security.protocol=SASL_SSL) with a deliberately wrong SCRAM password
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
   --group app-workers --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)

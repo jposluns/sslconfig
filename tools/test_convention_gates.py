@@ -12,6 +12,11 @@ so a future change that reintroduces one lands on a named prior finding rather t
 nameless assertion.
 
 This is not a proof of correctness. It is a record of what has already gone wrong.
+
+Some cases here record a KNOWN LIMIT rather than a fix. Their description begins "known limit:", they
+assert the gate's CURRENT wrong answer, and the gate's own docstring discloses the same thing in
+prose. They are counted separately in the success line, because reporting an open false alarm as a
+closed finding is the kind of quiet overclaim this whole file exists to prevent.
 """
 import sys
 from pathlib import Path
@@ -66,6 +71,14 @@ TLS_CASES = (
     ("redirect glued to the verifying flag",
      'openssl s_client -connect example.com:443 -CAfile ca.pem -verify_hostname '
      'example.com -verify_return_error</dev/null', False, 3),
+    ("quoted parenthesis inside a command substitution",
+     'curl -o "$(printf %s \'(\')" https://example.com/ -k', True, 5),
+    ("fenced block inside a block quotation",
+     "PLACEHOLDER_BLOCKQUOTE", True, 5),
+    # A KNOWN LIMIT, disclosed in the docstring rather than fixed: quote state is tracked
+    # per physical line, so a quotation spanning a line break hides what follows it.
+    ("known limit: quotation spanning a line break",
+     "curl --data-binary 'first line\n# second line' -k https://example.com/", False, 5),
 
     # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
     ("sort -k inside a quoted command substitution",
@@ -86,6 +99,14 @@ TLS_CASES = (
      '-verify_hostname example.com -verify_return_error </dev/null', False, 3),
     ("s_client -help is not a handshake",
      'openssl s_client -help', False, 2),
+    ("quoted closing parenthesis ends the substitution early",
+     'curl -o "$(printf %s \')\'; sort -k 2 paths.txt)" https://example.com/', False, 5),
+    ("backtick command substitution is lifted out too",
+     'curl -o "`sort -k 2 paths.txt`" https://example.com/', False, 5),
+    ("an escaped redirection operator is a filename",
+     'curl https://example.com/ -o \\>& sort -k 2 paths.txt', False, 5),
+    ("a doubled backslash is a literal argument, not a continuation",
+     'curl https://example.com/ -o \\\\\n sort -k 2 paths.txt', False, 5),
 )
 
 
@@ -121,6 +142,8 @@ PROSE_CASES = (
      "```bash\n./pocketbase serve yourdomain.com\n```", True, 2),
     ("trailing comment inside a fence",
      "```bash\ncurl https://example.com/  # tokens are randomised\n```", True, 3),
+    ("a URL just inside a closing quotation mark",
+     'The vendor says "see https://example.com/"; randomised ports are "normal".', True, 5),
 
     # FALSE ALARMS.
     ("a .internal host whose left label looks like a placeholder",
@@ -146,7 +169,7 @@ PROSE_CASES = (
     # A KNOWN LIMIT, recorded rather than fixed: the URL exemption keys on a scheme, so a
     # bare path fragment is read as prose. Exempting bare paths would blank any comment
     # containing a slash, which is most of them. The gate's docstring says so.
-    ("a bare path fragment is NOT exempt, and the docstring says so",
+    ("known limit: a bare path fragment is not URL-exempt",
      "```bash\ncurl -s https://vendor.example/tls  # see /tls#minimise-exposure\n```",
      True, 5),
     ("a vendor quotation in double quotes",
@@ -154,6 +177,13 @@ PROSE_CASES = (
      False, 2),
     ("Oxford English keeps analyse",
      "Analyse the output before changing anything.", False, 2),
+    ("a multi-backtick inline code span",
+     "Use ``serialise(`value`)`` from the vendor API.", False, 5),
+    # A KNOWN LIMIT, disclosed in the docstring rather than fixed: inside a fence only a
+    # shell-style trailing comment is read as prose, so a `#` inside a Python triple-quoted
+    # string is read as one. Fixing it means tracking multiline string state per language.
+    ("known limit: a hash inside a fenced triple-quoted string",
+     '```python\ntext = """\n# randomised\n"""\n```', True, 5),
 )
 
 
@@ -161,8 +191,14 @@ def main() -> int:
     failures = []
 
     for desc, body, should_catch, rnd in TLS_CASES:
-        marker = "````bash" if "```\nTEXT" in body else "```bash"
-        caught = bool(tls_hits(body, marker))
+        if body == "PLACEHOLDER_BLOCKQUOTE":
+            # A fenced block nested inside a block quotation, which `fenced()` cannot build.
+            doc = "## Verify\n\n> ```bash\n> curl -k https://example.com/\n> ```\n"
+            caught = bool([x for _n, ln in tls.logical_lines(doc)
+                           for x in tls.findings_for(tls.strip_comment(ln))])
+        else:
+            marker = "````bash" if "```\nTEXT" in body else "```bash"
+            caught = bool(tls_hits(body, marker))
         if caught != should_catch:
             want = "caught" if should_catch else "clean"
             failures.append(f"TLS (round {rnd}) {desc}: expected {want}, was not")
@@ -178,7 +214,9 @@ def main() -> int:
             print(f"  FAIL  {f}")
         return 1
     total = len(TLS_CASES) + len(PROSE_CASES)
-    print(f"  ok    {total} recorded review findings stay closed")
+    limits = sum(1 for c in TLS_CASES + PROSE_CASES if c[0].startswith("known limit:"))
+    print(f"  ok    {total} recorded review cases behave as recorded: "
+          f"{total - limits} findings closed, {limits} disclosed limits still open")
     return 0
 
 

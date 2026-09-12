@@ -4,13 +4,15 @@
 WHAT THIS CATCHES: the patterns listed in CHECKS below, in a command inside any fenced
 code block in a guide. Indented code blocks are NOT scanned. An earlier version scanned
 them and flagged a four-space-indented prose bullet that warned readers against the very
-flag it named. It scans every block rather than only Verify sections, because an insecure
-flag is a defect wherever a reader copies it from, and because two rounds of review found
-bugs in the section-tracking logic itself. It exists because this corpus forbids
-disabling TLS verification in three places (common-mistakes.md item 5, self-signed.md,
+flag it named. A fenced block inside a block quotation IS scanned, because a reader copies
+from one just as readily; the quotation markers are stripped before the fence is read. It
+scans every block rather than only Verify sections, because an insecure flag is a defect
+wherever a reader copies it from, and because two rounds of review found bugs in the
+section-tracking logic itself. It exists because this corpus forbids disabling TLS
+verification in three places (common-mistakes.md item 5, self-signed.md,
 README.sources.md) and three Verify blocks did it anyway. A probe that skips verification
-is satisfied by a substituted certificate as readily as by the right one, and one of
-those three sent credentials over the unverified connection.
+is satisfied by a substituted certificate as readily as by the right one, and one of those
+three sent credentials over the unverified connection.
 
 WHAT THIS IS NOT: a shell parser, and not a proof that a Verify block verifies anything.
 It is a TRIPWIRE for the accidental case, and a determined author walks past it. Two
@@ -35,6 +37,13 @@ for a guarantee:
     a server-side setting that tells Gradio not to validate its OWN certificate at startup,
     which is not a client skipping verification. Widening the pattern would reject that
     honest line, so the pattern stays anchored on the bare keyword.
+  - A quotation spanning a line break. Quote state is tracked per physical line, so
+    `curl --data-binary 'first line` followed by `# second line' -k https://host/` reads the
+    second line as a comment and loses the flag with it.
+  - Anything else that needs a shell parser rather than a scanner. Six rounds of review have
+    now traded new edge cases for new edge cases here, and the line is drawn deliberately:
+    this file will not become a shell parser, because a wrong parser that looks authoritative
+    is worse for a reader than a scanner that says what it is.
 
 Passing this gate is not evidence that a Verify step is correct, that the certificate it
 accepts is the right one, or that the connection is trustworthy.
@@ -64,6 +73,42 @@ SKIP_DIRS = {".git", "node_modules", "__pycache__", "site", "tools", "scripts", 
 NOT_A_GUIDE = {"CONTRIBUTING.md", "CLAUDE.md", "AGENTS.md", "CHANGELOG.md", "README.sources.md"}
 
 
+# A fenced block can sit inside a block quotation, where a reader copies from it exactly as
+# readily. Review showed a `> ```bash` / `> curl -k ...` block was invisible to this gate.
+BLOCKQUOTE_RE = re.compile(r"^ {0,3}(?:> ?)+")
+
+
+def _substitution_end(code, start):
+    """Index just past the `)` that closes the `$(` beginning at `start`, quote aware.
+
+    A blind parenthesis count broke in both directions, each demonstrated. A quoted `(`
+    inside the substitution, as in `curl -o "$(printf %s '(')" https://host/ -k`, made the
+    scanner swallow the rest of the line and lose the flag. A quoted `)`, as in
+    `curl -o "$(printf %s ')'; sort -k 2 paths.txt)"`, ended the substitution early and
+    attributed sort's `-k` to curl.
+    """
+    depth, j, quote = 1, start + 2, None
+    while j < len(code) and depth:
+        ch = code[j]
+        if ch == "\\" and quote != "'" and j + 1 < len(code):
+            j += 2
+            continue
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "'\"":
+            quote = ch
+        elif code.startswith("$(", j):
+            j = _substitution_end(code, j)
+            continue
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        j += 1
+    return j
+
+
 def split_segments(code, _depth=0):
     """Split a command line into (segment, preceding_separator) pairs.
 
@@ -86,24 +131,31 @@ def split_segments(code, _depth=0):
     `"$(...)"` is the more common spelling.
     """
     out, buf, quote, sep = [], [], None, ""
+    escaped = -1
     subs = []
     i = 0
     while i < len(code):
         ch = code[i]
         if ch == "\\" and quote != "'" and i + 1 < len(code):
             buf.append(code[i:i + 2])
+            escaped = i + 1   # `\>` is a filename, not a redirection operator
             i += 2
             continue
         if quote != "'" and code.startswith("$(", i):
-            depth, j = 1, i + 2
-            while j < len(code) and depth:
-                if code[j] == "(":
-                    depth += 1
-                elif code[j] == ")":
-                    depth -= 1
-                j += 1
-            subs.append(code[i + 2:j - 1] if not depth else code[i + 2:])
+            j = _substitution_end(code, i)
+            subs.append(code[i + 2:j - 1] if code[j - 1:j] == ")" else code[i + 2:])
             buf.append(" " * (j - i))  # the hole it leaves keeps column intent readable
+            i = j
+            continue
+        if quote != "'" and ch == "`":
+            # Backtick substitution is the same thing in older syntax, and leaving it
+            # inline attributed the inner command's flags to the outer one: review
+            # demonstrated `curl -o "`sort -k 2 paths.txt`" https://host/` reported as
+            # `curl -k`.
+            j = code.find("`", i + 1)
+            subs.append(code[i + 1:j] if j != -1 else code[i + 1:])
+            j = len(code) if j == -1 else j + 1
+            buf.append(" " * (j - i))
             i = j
             continue
         if quote:
@@ -113,7 +165,7 @@ def split_segments(code, _depth=0):
         elif ch in "'\"":
             quote = ch
             buf.append(ch)
-        elif ch == "&" and ((i and code[i - 1] in "<>")
+        elif ch == "&" and ((i and code[i - 1] in "<>" and i - 1 != escaped)
                             or (i + 1 < len(code) and code[i + 1] == ">")):
             buf.append(ch)  # `2>&1` and `&>log`: a redirection, not a separator
         elif ch in "|;&":
@@ -185,10 +237,18 @@ def logical_lines(text):
     curl and reported `curl -k` on legitimate text.
     """
     fences = Fences()
+    bq = False
     buf, buf_line = None, None
-    for i, line in enumerate(text.splitlines(), 1):
+    for i, raw in enumerate(text.splitlines(), 1):
+        line, marked = raw, False
+        m = BLOCKQUOTE_RE.match(raw)
+        if m and (not fences.inside or bq):
+            line, marked = raw[m.end():], True
+        was_inside = fences.inside
         if fences.feed(line):
-            if not fences.inside and buf is not None:
+            if not was_inside:
+                bq = marked           # remember the container the fence opened in
+            elif buf is not None:
                 yield buf_line, buf
                 buf, buf_line = None, None
             continue
@@ -200,7 +260,7 @@ def logical_lines(text):
                 yield buf_line, buf
                 buf, buf_line = None, None
             continue
-        if code.endswith("\\"):
+        if code.endswith("\\") and (len(code) - len(code.rstrip("\\"))) % 2:
             frag = code[:-1]
             buf = frag if buf is None else buf + " " + frag.strip()
             if buf_line is None:

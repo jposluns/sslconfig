@@ -43,6 +43,10 @@ The management plugin's web UI is an admin panel: keep it off public interfaces 
 ss -tlnp | grep -E '5671|5672|15672'      # 5672 gone once listeners.tcp = none; UI private
 
 # Positive: a client holding a certificate connects.
+# client.pem and client.key are a CLIENT certificate and key issued by the CA in
+# ssl_options.cacertfile, with TLS Web Client Authentication in its extended key usage.
+# A server certificate will not do: verify_peer checks the chain, and the broker must
+# trust the issuer.
 openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
   -cert client.pem -key client.key \
   -verify_hostname mq.example.com -verify_return_error </dev/null
@@ -53,8 +57,11 @@ openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
   -verify_hostname mq.example.com -verify_return_error </dev/null
 
 # "Verification: OK" reports the SERVER certificate only, and it prints in BOTH runs. The
-# pass condition is the pair: the first run reaches a session, the second ends in "peer did
-# not return a certificate" on TLS 1.2 or a "certificate required" alert on TLS 1.3. Reading
+# pass condition is the pair: the first run reaches a session and the second does not. Do
+# not match on a particular message. The broker rejects an empty client certificate list
+# with a fatal alert during the TLS 1.2 handshake, and after it on TLS 1.3, and the exact
+# wording comes from whichever TLS stack is reporting it. What you are looking for is that
+# the second run ends without a session while the first one has one. Reading
 # "Verification: OK" from the second run as a success is the mistake this pair exists to
 # catch. Without -verify_return_error the handshake completes even when the server
 # certificate fails to verify, so -CAfile alone proves only that TLS is on. If you set
