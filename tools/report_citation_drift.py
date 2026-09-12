@@ -60,7 +60,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # The heading walk as well as the expression. See WHERE THE SOURCES SECTION COMES FROM.
@@ -69,7 +69,10 @@ from check_guide_shape import (  # noqa: E402
 
 # Case-insensitive, because the shape gate's own URL expression is and an `HTTPS://` citation
 # would otherwise pass that gate and be silently skipped here.
-URL = re.compile(r"https?://[^\s<>\"'`)\],;]+", re.I)
+# The optional bracketed group is an IPv6 authority. Without it the expression stopped at the
+# `]`, truncating a valid citation into something urlsplit refuses, and the report then blamed
+# the citation for a defect this expression had introduced.
+URL = re.compile(r"""https?://(?:\[[0-9A-Fa-f:.]+\])?[^\s<>"'`)\],;]*""", re.I)
 DEFAULT_PORT = {"http": 80, "https": 443}
 
 # Reserved and documentation names, which never resolve and must never be curled. RFC 2606
@@ -101,7 +104,13 @@ EXPECTED = ()
 # exists to catch, and the shape rule would have suppressed it forever. So these are checked
 # on their FIRST hop instead, which is the vendor's own answer before the asset host is
 # reached. Checking the first hop also avoids downloading the asset every week.
-INHERENT = (re.compile(r"^https://github\.com/[^/]+/[^/]+/releases/download/"),)
+# (what a release citation looks like, where its asset handoff is allowed to land). Matching
+# only the first half accepted a redirect to ANY other host as an asset handoff, which is the
+# drift this exists to catch. Both are matched against the NORMALIZED url, because the literal
+# spelling `HTTPS://`, `GitHub.com` or `github.com:443` fell out of this branch entirely and
+# was then reported as a host move.
+INHERENT = ((re.compile(r"^https://github\.com/[^/]+/[^/]+/releases/download/"),
+             re.compile(r"(^|\.)githubusercontent\.com$")),)
 
 
 def skip_host(host: str) -> bool:
@@ -114,7 +123,65 @@ def expected(url: str, final: str) -> bool:
 
 
 def port_of(parts) -> int:
-    return parts.port or DEFAULT_PORT.get(parts.scheme, 0)
+    return parts.port or DEFAULT_PORT.get(parts.scheme.lower(), 0)
+
+
+def normal(url):
+    """A citation's comparable parts, with the differences a browser treats as none folded out.
+
+    Host case and IDN spelling are not moves, and neither is an omitted default port. Comparing
+    raw strings reported all three as drift.
+    """
+    p = urlsplit(url)
+    host = (p.hostname or "").lower()
+    try:
+        host = host.encode("idna").decode("ascii")
+    except (UnicodeError, ValueError):
+        pass
+    return host, p.port, port_of(p), p.scheme.lower(), p.path, p.query
+
+
+def normalized_url(url):
+    """The url rebuilt with a lower-case scheme and host and no redundant default port.
+
+    Rebuilt from parts rather than patched in place: `urlsplit` already lower-cases the scheme
+    it REPORTS, so replacing that value in the original string left an upper-case `HTTPS://`
+    exactly as it was, and the INHERENT match it feeds then missed the citation entirely.
+    """
+    p = urlsplit(url)
+    host = (p.hostname or "").lower()
+    if ":" in host:
+        host = f"[{host}]"
+    netloc = host
+    if p.port is not None and p.port != DEFAULT_PORT.get(p.scheme.lower()):
+        netloc = f"{host}:{p.port}"
+    return urlunsplit((p.scheme.lower(), netloc, p.path, p.query, p.fragment))
+
+
+def classify(url, final):
+    """Which bucket a redirect belongs in, or None when it is not a move at all.
+
+    The order is the whole content of this function and every line of it was a defect once.
+    Host first. Then the PATH, before anything about the scheme, because an http citation that
+    upgrades to https AND moves its page is a path move and reporting it as a mere upgrade was
+    a false green. Then the port, but only when one side states it: an upgrade changes the
+    effective port from 80 to 443 without moving anything, and comparing effective ports first
+    reported every upgrade as a host move, which was a false red. Then the scheme, the query,
+    and last the trailing slash.
+    """
+    a_host, a_exp, a_port, a_scheme, a_path, a_query = normal(url)
+    b_host, b_exp, b_port, b_scheme, b_path, b_query = normal(final)
+    if a_host != b_host:
+        return "host"
+    if a_path != b_path and a_path.rstrip("/") != b_path.rstrip("/"):
+        return "path"
+    if (a_exp is not None or b_exp is not None) and a_port != b_port:
+        return "host"
+    if a_scheme != b_scheme or a_query != b_query:
+        return "scheme_or_query"
+    if a_path != b_path:
+        return "slash"
+    return None
 
 
 def sources_text(text: str) -> str:
@@ -211,20 +278,36 @@ def main() -> int:
             # report or the step summary.
             print(f"  ...{n}/{total} checked", file=sys.stderr, flush=True)
         where = ", ".join(sorted(guides))
-        cited = urlsplit(url)
 
-        if any(p.match(url) for p in INHERENT):
+        norm = normalized_url(url)
+        release = next(((cite, dest) for cite, dest in INHERENT if cite.match(norm)), None)
+        if release:
             status, hop = first_hop(url, args.timeout)
+            line = f"{url}\n      -> {hop}\n      cited by {where}"
             if status is None:
                 unreachable.append(f"{url}\n      cited by {where}\n      {hop}")
-            elif hop and expected(url, hop):
+            elif not hop:
+                if not status.startswith("2"):
+                    refused.append(f"{url}  (HTTP {status}, cited by {where})")
+            elif expected(url, hop):
                 pass
-            elif hop and urlsplit(hop).hostname == cited.hostname:
-                # The vendor answered with a redirect of its own rather than handing over to
-                # the asset host, so the repository itself moved.
-                moved_path.append(f"{url}\n      -> {hop}\n      cited by {where}")
-            elif not hop and not status.startswith("2"):
-                refused.append(f"{url}  (HTTP {status}, cited by {where})")
+            elif release[1].search(urlsplit(hop).hostname or ""):
+                # The signed, expiring asset host. That handoff is how the hosting works.
+                pass
+            else:
+                # Everything else is judged by the ordinary rules. A different host that is NOT
+                # the asset infrastructure is exactly the drift this branch exists to catch, and
+                # it used to be accepted silently; a `?download=1` on the same path used to be
+                # reported as a path move.
+                bucket = classify(url, hop)
+                if bucket == "host":
+                    moved_host.append(line)
+                elif bucket == "path":
+                    moved_path.append(line)
+                elif bucket == "scheme_or_query":
+                    changed_query.append(line)
+                elif bucket == "slash":
+                    slash_only.append(f"{url}  (cited by {where})")
             continue
 
         status, final = resolve(url, args.timeout)
@@ -232,30 +315,19 @@ def main() -> int:
             unreachable.append(f"{url}\n      cited by {where}\n      {final}")
             continue
 
-        got = urlsplit(final)
         line = f"{url}\n      -> {final}\n      cited by {where}"
         if expected(url, final):
             continue
-        if cited.hostname != got.hostname:
+        bucket = classify(url, final)
+        if bucket == "host":
             moved_host.append(line)
-        elif cited.scheme != got.scheme:
-            # An http citation upgrading to https on the same host is not an estate move, and
-            # reporting it as one red the run over nearly every vendor. The scheme test has to
-            # come before the port test, because the port defaults follow the scheme and 80
-            # against 443 otherwise reads as a move.
-            changed_query.append(line)
-        elif port_of(cited) != port_of(got):
-            # `.hostname` drops the port, so a redirect to another port on the same host was
-            # compared as identical and counted clean.
-            moved_host.append(line)
-        elif cited.path != got.path and cited.path.rstrip("/") != got.path.rstrip("/"):
+        elif bucket == "path":
             moved_path.append(line)
-        elif cited.query != got.query:
-            # Session ids, locale parameters and http-to-https all land here. They are not
-            # fixable by editing the citation, and an earlier version printed them under the
-            # trailing-slash heading, which told the reader they were cosmetic. They are not.
+        elif bucket == "scheme_or_query":
+            # An upgrade to https, a session id, a locale parameter. None is fixable by editing
+            # the citation and none is an estate move, so they report without redding the run.
             changed_query.append(line)
-        elif cited.path != got.path:
+        elif bucket == "slash":
             slash_only.append(f"{url}  (cited by {where})")
         elif not status.startswith("2"):
             # Answered from where it points, but not with a page. 403, 429 and 999 are the
@@ -266,8 +338,8 @@ def main() -> int:
 
     out = [f"{len(urls)} cited URLs checked"]
     if malformed:
-        out.append(f"\n{len(malformed)} citation(s) this script could not parse, which is a "
-                   f"defect in the citation rather than drift:")
+        out.append(f"\n{len(malformed)} citation(s) this script could not parse. That is a defect "
+                   f"in this script's extraction or in the citation, and it is not drift:")
         out.extend(f"  - {u}  ({', '.join(sorted(g))})" for u, g in sorted(malformed.items()))
     for title, rows in (
             ("moved to a different HOST, which is the signal that a documentation estate "

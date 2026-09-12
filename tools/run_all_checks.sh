@@ -414,7 +414,10 @@ echo "== the advisory citation sweep still imports =="
 # check_guide_shape.py, and renaming or reshaping any of those would leave every gate green and
 # break the weekly run with a traceback nobody sees until Monday. Importing the module is
 # offline, costs nothing, and is the cheapest thing that keeps the two in step.
-if imp=$(cd tools && python3 -c 'import report_citation_drift' 2>&1); then
+# Calling sources_text exercises the borrowed signatures too: importing a name proves it still
+# exists, and a reviewer showed that reshaping one of them keeps the import green and fails at
+# the call, which is the same Monday-morning traceback one level down.
+if imp=$(cd tools && python3 -c 'import report_citation_drift as r; r.sources_text("")' 2>&1); then
   ok "report_citation_drift.py still imports what it borrows from check_guide_shape.py"
 else
   bad "report_citation_drift.py no longer imports; the weekly citation sweep would fail: $imp"
