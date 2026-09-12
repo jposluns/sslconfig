@@ -50,7 +50,7 @@ To require client certificates as well, set `client_tls_sslmode = verify-full` a
 
 Pgpool-II uses one switch for both hops: `ssl` is "off" by default, and setting it on "enables the SSL for both the frontend and backend communications". Its documentation notes that `ssl_key` and `ssl_cert` must also be configured for frontend connections to work.
 
-Turning it on makes TLS available and does not require it. A client that declines TLS still connects, because a `pool_hba.conf` `host` record "match[es] either SSL or non-SSL connection attempts". Requiring it means `hostssl` records, and those have their own trap in the other direction: "SSL must be enabled by setting the `ssl` configuration parameter. Otherwise, the `hostssl` record is ignored." So a `hostssl` rule written while `ssl` is off does not fail closed, it does not apply at all. Section 5 has the file.
+Turning it on makes TLS available and does not require it. A client that declines TLS still connects, because a `pool_hba.conf` `host` record "match[es] either SSL or non-SSL connection attempts". Requiring it means `hostssl` records, and those have their own trap in the other direction: "SSL must be enabled by setting the `ssl` configuration parameter. Otherwise, the `hostssl` record is ignored." A rule you wrote to require TLS is then simply not the rule being applied, and whichever other record matches decides instead. Section 5 has the file.
 
 ```ini
 ssl = on                        # default is off; covers frontend and backend
@@ -72,7 +72,13 @@ server_tls_sslmode = verify-full
 server_tls_ca_file = /etc/ssl/certs/postgres-ca.crt
 ```
 
-Pgpool-II's `ssl_ca_cert` and `ssl_ca_cert_dir` are documented as CA files "which can be used to verify the backend server certificates", and with neither set there is nothing to verify against. The documentation describes CA verification and does not document a host name check on the backend connection, so do not assume the two products' strictest modes are equivalent: where a host name match matters, PgBouncer's `verify-full` is the one that states it.
+Pgpool-II's `ssl_ca_cert` and `ssl_ca_cert_dir` are documented as CA files "which can be used to verify the backend server certificates", and with neither set there is nothing to verify against, so set one:
+
+```ini
+ssl_ca_cert = '/etc/ssl/certs/postgres-ca.crt'
+```
+
+The documentation describes CA verification and does not document a host name check on the backend connection, so do not assume the two products' strictest modes are equivalent: where a host name match matters, PgBouncer's `verify-full` is the one that states it.
 
 ## 4. A forced `user=` collapses every client into one PostgreSQL role
 
@@ -108,7 +114,7 @@ On the database server:
 
 ```
 # TYPE     DATABASE  USER  ADDRESS        METHOD
-hostssl    app       all   10.0.0.5/32    scram-sha-256    # the pooler, and only the pooler
+hostssl    app       all   10.0.0.5/32    scram-sha-256    # the address the pooler's backend connections come from
 ```
 
 At the pooler, `auth_type = hba` reads a `pg_hba`-style file so the same per-path distinctions apply to client connections. The documentation gives exactly this use: "This allows different authentication methods for different access paths, for example: connections over Unix socket use the peer authentication method, connections over TCP must use TLS."
@@ -135,17 +141,20 @@ pool_passwd = 'pool_passwd'
 
 ```
 # /etc/pgpool-II/pool_hba.conf
-# `host` matches SSL and non-SSL alike, so requiring TLS means hostssl plus an explicit
-# rejection of the plaintext path. The last line is what makes the requirement real: without
-# it an unmatched connection is denied anyway, but a later permissive `host` rule would not be.
-local      all       all                        trust
+# `host` matches SSL and non-SSL alike, so requiring TLS means hostssl rather than host.
+# The two reject lines are not redundant with the default: an unmatched connection is denied
+# anyway, but a later permissive rule would match first, and these stop that silently.
+local      all       all                        scram-sha-256
 hostssl    all       app   10.0.0.0/24          scram-sha-256
 hostnossl  all       all   0.0.0.0/0            reject
+hostnossl  all       all   ::/0                 reject
 ```
 
-A `hostssl` record is ignored entirely while `ssl` is off, so set `ssl = on` first and confirm it took effect before relying on these lines.
+Three things about that file are easy to get wrong. `local ... trust` is the tempting first line and it is a hole: the vendor says `trust` admits a client under "whatever database user name they specify", and the Unix socket lives in `unix_socket_dir`, which defaults to `/tmp`, so any local account can claim any database identity. Authenticate the local path too, or move the socket somewhere only the application user can reach. The `0.0.0.0/0` rejection covers IPv4 only, which is why the second one is there. And records are read in order, so a permissive rule above these wins; the rejections protect against what comes after them, not before.
 
-Because the server no longer sees the client, its logs no longer identify one either. `application_name_add_host` "adds the client host address and port to the application name setting set on connection start", and its default is `0`. It is diagnostic metadata rather than an audit trail: the same page says the value applies "only at the start of a connection" and that after a later `SET application_name` "PgBouncer does not change it again", so a client can overwrite it. PostgreSQL's `log_line_prefix` defaults to `'%m [%p] '`, which carries no application name at all, so turning the setting on changes nothing in the log until `%a` is in the prefix.
+A `hostssl` record is ignored entirely while `ssl` is off. That does not by itself open the plaintext path, because "if no record matches, access is denied"; what it means is that the rule you wrote to require TLS is not the rule being applied, so whichever other record does match is deciding instead. Set `ssl = on` first and confirm it took effect.
+
+Because the server no longer sees the client, its logs no longer identify one either. `application_name_add_host` adds "the client host address and port to the application name setting set on connection start", and its default is `0`. It is diagnostic metadata rather than an audit trail: the same page says the value applies "only at the start of a connection" and that after a later `SET application_name` "PgBouncer does not change it again", so a client can overwrite it. PostgreSQL's `log_line_prefix` defaults to `'%m [%p] '`, which carries no application name at all, so turning the setting on changes nothing in the log until `%a` is in the prefix.
 
 ```ini
 ; The default is 0.
@@ -203,23 +212,32 @@ The client hop takes three commands, not one. A single failing connection proves
 TLS="sslmode=verify-full sslrootcert=/etc/ssl/certs/ca.crt"
 
 # 1. Must FAIL, and the error must name TLS rather than authentication.
-psql "host=pooler.internal port=6432 dbname=app user=app sslmode=disable" -c 'SELECT 1;'
+psql -X "host=pooler.internal port=6432 dbname=app user=app sslmode=disable" -c 'SELECT 1;'
 
 # 2. Must SUCCEED. The control: the credential is good, so the failure above was
 #    the TLS requirement and not a bad password.
-psql "host=pooler.internal port=6432 dbname=app user=app $TLS" -c 'SELECT 1;'
+psql -X "host=pooler.internal port=6432 dbname=app user=app $TLS" -c 'SELECT 1;'
 
 # 3. Must FAIL on authentication. Without this, a `trust` method in auth_hba_file
 #    passes both commands above while checking no password at all.
-PGPASSWORD=definitely-not-the-password psql "host=pooler.internal port=6432 dbname=app user=app $TLS" -c 'SELECT 1;'
+PGPASSWORD=definitely-not-the-password psql -X "host=pooler.internal port=6432 dbname=app user=app $TLS" -c 'SELECT 1;'
 ```
 
 Run the same three against pgpool-II on port 9999 where that is the pooler in front, because nothing above tests its listener.
 
+Three commands from one address prove one path. They say nothing about a second `hostssl` line further down the file that ends in `trust`, and nothing at all if `auth_type` is not `hba`, because `auth_hba_file` is then never read and the client-range restriction you wrote is inert while still sitting in the repository looking applied. So read the effective configuration as well as probing it:
+
+```bash
+psql -X "host=/var/run/postgresql port=6432 dbname=pgbouncer user=pgbadmin" -c 'SHOW CONFIG;' | grep -E 'auth_type|auth_hba_file|client_tls_sslmode|server_tls_sslmode'
+grep -vE '^\s*(#|$)' /etc/pgbouncer/pg_hba.conf
+```
+
+`auth_type` must read `hba` for the file below it to matter, and every line in that file has to be one you meant, because the first match wins and a `trust` anywhere in it is a way in.
+
 For the database hop, know what the probe can and cannot tell you:
 
 ```bash
-psql "host=pooler.internal port=6432 dbname=app user=app sslmode=verify-full sslrootcert=/etc/ssl/certs/ca.crt" -c "SELECT current_user, inet_client_addr(), ssl FROM pg_stat_ssl JOIN pg_stat_activity USING (pid) WHERE pid = pg_backend_pid();"
+psql -X "host=pooler.internal port=6432 dbname=app user=app sslmode=verify-full sslrootcert=/etc/ssl/certs/ca.crt" -c "SELECT current_user, inet_client_addr(), ssl FROM pg_stat_ssl JOIN pg_stat_activity USING (pid) WHERE pid = pg_backend_pid();"
 ```
 
 `ssl` reports whether the pooler-to-PostgreSQL connection uses SSL. It does not report whether the pooler validated the certificate, so a `t` here is consistent with `server_tls_sslmode = require`, which validates nothing. Certificate validation cannot be observed from the client at all: the only test is to present the pooler with a certificate that should fail, one signed by an untrusted CA and one valid but issued for a different host name, and confirm that it refuses both. It has to be a fresh BACKEND connection rather than a fresh client one: a new client is routinely handed a server connection that was opened earlier, under the old certificate. `inet_client_addr()` is the address section 5 tells you to write into `pg_hba.conf`.
@@ -227,7 +245,7 @@ psql "host=pooler.internal port=6432 dbname=app user=app sslmode=verify-full ssl
 Ask the pooler what it negotiated, and what identity it forces:
 
 ```bash
-psql "host=/var/run/postgresql port=6432 dbname=pgbouncer user=pgbadmin" -c 'SHOW SERVERS;' -c 'SHOW DATABASES;'
+psql -X "host=/var/run/postgresql port=6432 dbname=pgbouncer user=pgbadmin" -c 'SHOW SERVERS;' -c 'SHOW DATABASES;'
 ```
 
 The `tls` column is "A string with TLS connection information, or empty if not using TLS". An empty `tls` on a server row is a plaintext database hop happening right now, which is section 3 caught in the act; it does not by itself distinguish the `prefer` fallback from TLS being disabled outright or from a Unix-socket backend. A non-empty one is weaker still: it says this connection negotiated TLS, not that a plaintext one would have been refused. These are snapshots of established connections, and enforcement is what the configuration file says.
@@ -237,14 +255,22 @@ The `tls` column is "A string with TLS connection information, or empty if not u
 Finally, the console must reject a user on neither list, and it must reject it at login:
 
 ```bash
-psql "host=pooler.internal port=6432 dbname=pgbouncer user=app" -c 'SHOW VERSION;'
+psql -X "host=pooler.internal port=6432 dbname=pgbouncer user=app $TLS" -c 'SHOW VERSION;'
 ```
 
-That has to fail while connecting, with `not allowed`. `SHOW VERSION` is chosen because it has no administrator gate of its own, so it cannot fail for the wrong reason: if the connection is accepted, the command succeeds and prints a version, which is exactly what `auth_type = any` produces. Any answer other than a refusal at login means the console admitted a user on neither list, and `auth_type` is the first thing to check.
+That has to fail while connecting, with `not allowed`. `SHOW VERSION` is chosen because it has no administrator gate of its own, so it cannot fail for the wrong reason: if the connection is accepted, the command succeeds and prints a version, which is exactly what `auth_type = any` produces. Read the outcome in three ways rather than two. A refusal at login is the pass. A version printed is a failure, and `auth_type` is the first thing to check. Anything else, a DNS failure, a TLS failure, a refused connection, is inconclusive and has to be resolved before the probe means anything.
 
-This probe must also be run as an OS user that does NOT map to a console account, or `peer` on the Unix socket answers instead of the rule being tested.
+None of this tests the privileged name, and testing an unlisted one only proves the list is consulted. Run the same pair on `pgbadmin` that section 7 runs on `app`: a correct password must succeed and a wrong one must be refused, because `admin_users` is an allowlist of names and says nothing about whether those names have to prove anything.
 
-MFA: neither pooler adds a factor of its own, and the PostgreSQL wire protocol has no TOTP dialogue, so there is nothing here to turn on. PgBouncer's `auth_type` accepts `pam` and `ldap`, which is the hook for chaining to an MFA service where policy requires one; `cert`, or `client_tls_sslmode = verify-full` with `client_tls_ca_file`, adds a possession factor held by the connecting machine rather than by a person. Put the human paths to the host behind MFA per [mfa.md](mfa.md).
+The console commands over the Unix socket are a different path with a different requirement, and `peer` there takes the identity from the operating system.
+
+MFA: neither pooler adds a factor of its own, and the PostgreSQL wire protocol has no TOTP dialogue, so there is nothing here to turn on and the honest answer is that this is not where a second factor goes.
+
+The hooks that exist come with conditions worth knowing before you reach for them. PgBouncer's `auth_type` accepts `pam` and `ldap`, and `ldap` arrived in 1.25.0. Only `ldap` can be named inside `auth_hba_file`; selecting `pam` means setting it globally, which stops the HBA file being consulted and takes the client-range restriction of section 5 with it. PAM is also not an interactive one-time-password conversation here: the released implementation answers a hidden prompt with the same password the client already supplied, so it forwards a credential rather than conducting a challenge.
+
+For a possession factor, `client_tls_sslmode = verify-full` with `client_tls_ca_file` requires a client certificate while leaving `auth_type = hba` and SCRAM in place, which is usually what you want. On that client-facing setting `verify-full` and `verify-ca` are the same thing; taking the user name from the certificate is what `auth_type = cert` does, and that, like `pam`, replaces HBA selection rather than adding to it.
+
+Put the human paths to the host behind MFA per [mfa.md](mfa.md).
 
 ## Common mistakes
 
@@ -276,6 +302,8 @@ MFA: neither pooler adds a factor of its own, and the PostgreSQL wire protocol h
 - PostgreSQL peer authentication, for why a console user name is not an OS identity: https://www.postgresql.org/docs/current/auth-peer.html
 - PostgreSQL environment variables, on `PGPASSWORD` being "not recommended for security reasons": https://www.postgresql.org/docs/current/libpq-envars.html
 - PostgreSQL password file, for the `~/.pgpass` format and its permission requirement: https://www.postgresql.org/docs/current/libpq-pgpass.html
-- psql, for what `-c` accepts: https://www.postgresql.org/docs/current/app-psql.html
+- psql, for what `-c` accepts and what `-X` suppresses: https://www.postgresql.org/docs/current/app-psql.html
+- PgBouncer 1.25.2 console source, which is what settles the `auth_type = any` disagreement above: https://raw.githubusercontent.com/pgbouncer/pgbouncer/pgbouncer_1_25_2/src/admin.c
+- PgBouncer 1.25.2 PAM source, for what `pam` does with the supplied password: https://raw.githubusercontent.com/pgbouncer/pgbouncer/pgbouncer_1_25_2/src/pam.c
 - Pgpool-II parameter syntax, which unlike pgbouncer.ini does treat a trailing `#` as a comment: https://www.pgpool.net/docs/latest/en/html/config-setting.html
 - Pgpool-II authentication methods: https://www.pgpool.net/docs/latest/en/html/auth-methods.html
