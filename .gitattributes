@@ -1,5 +1,6 @@
-# The CSP hash gate hashes the bytes of these two files, and a browser hashes the bytes it is
-# served. A CRLF checkout makes those differ: unstyled page, dead script, green gate. The gate
-# reads bytes so it is right either way; this keeps the bytes right in the first place.
+# These two files are the CSP hash gate's input and a browser's input, so keep them boring:
+# LF in the index and LF in every checkout. The gate normalizes newlines itself, the way HTML's
+# input-stream preprocessing does, so this pin is not what makes it correct. It just stops the
+# two files drifting between platforms for no reason.
 site/index.html text eol=lf
 site/_headers text eol=lf
