@@ -19,12 +19,24 @@ WHAT IT CHECKS, per entry under "generated":
 The third is the one with teeth. The other two only catch a rename.
 
 HOW IT READS THE SCRIPT, and the limit that comes with it: by matching a single
-`files=(...)` array assignment, not by running the script. Running it would be the
-accurate way and it is not worth executing a build to check a manifest. So this understands
-one array in one shape, and a script that built its list some other way would fail the
-match rather than be checked incorrectly, which is the direction to fail in. The failure
-message says so, rather than leaving a maintainer to guess why a valid script will not
-parse.
+`files=(...)` array assignment, not by running the script. Running it would be the accurate
+way and it is not worth executing a build to check a manifest.
+
+So this understands one array in one shape, and anything else must fail the MATCH rather
+than be checked incorrectly. That direction matters more than it sounds. Missing a real
+source is a silent false pass; inventing one is a fabricated drift finding against a
+correct repository, which is worse than no gate, because a maintainer told their manifest
+is wrong when it is right learns to distrust the whole suite. The first version of this
+file did exactly that: a comment line, a line continuation and a quoted filename each
+produced invented sources, while a `files+=` later in the script, a trailing comment, and
+a glob each produced silent passes. All six were demonstrated by a reviewer and are
+recorded in `tools/test_gensrc_gate.py`.
+
+It now refuses, with a reason, when the script assigns to `files` more than once, when a
+token carries shell syntax it would have to expand, or when the array is empty. It reads a
+comment to end of line rather than as one word, and unwraps a quoted filename. The
+manifest side is checked too: `sources` must be a list of non-empty strings, because a
+JSON object passed once when converting it to a set silently took its keys.
 
 WHAT THIS DOES NOT PROVE: that the regenerate command produces the target, that the target
 is current, or that the sources are the right sources. The bundle-freshness gate covers
@@ -36,17 +48,50 @@ import sys
 from pathlib import Path
 
 MANIFEST = Path(".aiqt") / "gensrc.json"
-# One array assignment, opened on its own line and closed on its own line. Anything else is
-# reported as unreadable rather than silently half-matched.
+# One array assignment, opened on its own line and closed on its own line.
 FILES_ARRAY = re.compile(r"^files=\(\n(.*?)^\)", re.S | re.M)
+# Any OTHER assignment to the same name. A `files+=(...)` later in the script, or a second
+# `files=(...)`, changes the real list while leaving the first match looking authoritative.
+FILES_AGAIN = re.compile(r"^files\+?=", re.M)
+# Characters the shell would act on. A token carrying one is not a filename, and certifying
+# it literally would bless a manifest that lists a wildcard as though it were a source.
+SHELL_ACTIVE = re.compile(r"[*?\[\]${}~!&|;<>()`\\]")
+
+
+class Unreadable(Exception):
+    """The script's list is not in the one shape this gate reads."""
 
 
 def script_inputs(script: Path):
-    """The files a build script lists, or None if its list is not in the shape we read."""
-    m = FILES_ARRAY.search(script.read_text(encoding="utf-8"))
+    """The files a build script lists.
+
+    Raises Unreadable with a reason rather than guessing. Every branch here exists because
+    a reviewer demonstrated the previous version getting it wrong, and the two directions
+    were not equally bad: missing a real source is a silent false pass, while inventing one
+    produces a fabricated drift finding against a correct repository, which is worse than
+    no gate because it teaches a maintainer to distrust the suite.
+    """
+    text = script.read_text(encoding="utf-8")
+    m = FILES_ARRAY.search(text)
     if not m:
-        return None
-    return [w for w in m.group(1).split() if w and not w.startswith("#")]
+        raise Unreadable("no files=(...) array opened and closed on their own lines")
+    if len(FILES_AGAIN.findall(text)) > 1:
+        raise Unreadable("more than one assignment to `files`, so the first is not the whole list")
+
+    out = []
+    for line in m.group(1).splitlines():
+        line = line.split("#", 1)[0]          # a comment runs to end of line, not one word
+        for token in line.split():
+            if token.startswith(("'", '"')) and token.endswith(("'", '"')) and len(token) > 1:
+                token = token[1:-1]           # a quoted filename is that filename
+            if not token:
+                continue
+            if SHELL_ACTIVE.search(token):
+                raise Unreadable(f"{token!r} is shell syntax rather than a plain filename")
+            out.append(token)
+    if not out:
+        raise Unreadable("the files=(...) array is empty")
+    return out
 
 
 def main() -> int:
@@ -83,16 +128,29 @@ def main() -> int:
             findings.append(f"{MANIFEST}: {target}: regenerate names {named[0]}, which does not exist")
             continue
 
-        listed = script_inputs(script)
-        if listed is None:
+        try:
+            listed = script_inputs(script)
+        except Unreadable as why:
             findings.append(
-                f"{MANIFEST}: {target}: cannot read a files=(...) array out of {named[0]}. "
+                f"{MANIFEST}: {target}: cannot read the source list out of {named[0]}: {why}. "
                 f"This gate reads one array in one shape; if the script changed how it "
                 f"builds its list, teach this gate the new shape rather than deleting it")
             continue
 
+        sources = entry.get("sources")
+        if not isinstance(sources, list) or not all(
+                isinstance(x, str) and x.strip() for x in sources):
+            findings.append(
+                f"{MANIFEST}: {target}: sources must be a list of non-empty strings. "
+                f"A JSON object passed this check once, because converting it to a set "
+                f"silently took its keys")
+            continue
+        duplicates = sorted({x for x in sources if sources.count(x) > 1})
+        for d in duplicates:
+            findings.append(f"{MANIFEST}: {target}: {d} is recorded more than once")
+
         expected = set(listed) | {named[0]}
-        declared = set(entry.get("sources", []))
+        declared = set(sources)
         for missing in sorted(expected - declared):
             findings.append(f"{MANIFEST}: {target}: {missing} is built in but not recorded here")
         for extra in sorted(declared - expected):

@@ -66,6 +66,29 @@ else
   printf '%s\n' "$gensrc" | sed 's/^/          /'
 fi
 
+echo "== the generated-file record gate still catches what review found =="
+# The first version of the gate above was naive in both directions, and the two are not
+# equally bad: missing a source is a silent pass, while inventing one is a fabricated
+# finding against a correct repository, which teaches a maintainer to distrust the suite.
+# Each case here is a fixture a reviewer ran against it. They build throwaway repositories
+# and invoke the real gate, so what is under test is the shipped entry point.
+if gensrc_tests=$(python3 tools/test_gensrc_gate.py 2>&1); then
+  printf '%s\n' "$gensrc_tests"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$gensrc_tests"; then
+    bad "test_gensrc_gate.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$gensrc_tests"; then
+  bad "test_gensrc_gate.py crashed; the record gate is unverified"
+  printf '%s\n' "$gensrc_tests" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$gensrc_tests"; then
+  printf '%s\n' "$gensrc_tests"
+  fail=1
+else
+  bad "test_gensrc_gate.py exited non-zero without reporting a result"
+  printf '%s\n' "$gensrc_tests" | sed 's/^/          /'
+fi
+
 echo "== every guide is wired into the site =="
 wired=1
 # Strip HTML comments across the whole file (re.S, not a line-at-a-time sed) so a menu link or
