@@ -90,7 +90,7 @@ NO_PLACEHOLDER_CHECK = {"CHANGELOG.md"}
 # regex for "any -ise word" would flag exercise, advertise, comprise and the rest.
 ISE_STEMS = (
     "authoris", "organis", "recognis", "randomis", "normalis", "synchronis",
-    "initialis", "customis", "minimis", "maximis", "categoris", "prioritis",
+    "initialis", "customis", "maximis", "categoris", "prioritis",
     "standardis", "summaris", "utilis", "optimis", "serialis", "deserialis",
     "sanitis", "virtualis", "parameteris",
     "tokenis", "anonymis", "pseudonymis", "capitalis", "centralis", "generalis",
@@ -101,13 +101,15 @@ ISE_STEMS = (
 # No leading \b: `unauthorised` and `reinitialised` carry a listed stem mid-word, and an
 # anchored prefix let both through while claiming to cover `authoris` and `initialis`.
 ISE_RE = re.compile(r"(" + "|".join(ISE_STEMS) +
-                    r")(e|es|ed|ing|ation|ations|er|ers|able|ables|ability|abilities|ational)?\b", re.I)
+                    r")(e|es|ed|ing|ation|ations|er|ers|able|ables|ably|ability|abilities|"
+                    r"ational|ationally)?\b", re.I)
 
-# `emphasis` cannot go in ISE_STEMS: that list matches with an OPTIONAL suffix, so the stem
-# would flag the ordinary noun. This one requires a suffix, which `emphasise` has and
-# `emphasis` does not.
+# Two stems cannot go in ISE_STEMS: that list matches with an OPTIONAL suffix, so `emphasis`
+# would flag the ordinary noun and `minimis` would flag the Latin in `de minimis`. This
+# pattern requires a suffix, which `emphasise` and `minimise` have and the bare forms do not.
 ISE_NOUNLIKE_RE = re.compile(
-    r"(emphasis)(e|es|ed|ing|ation|ations|er|ers|able|ables|ability|abilities|ational)\b",
+    r"(emphasis|minimis)(e|es|ed|ing|ation|ations|er|ers|able|ables|ably|ability|abilities|"
+    r"ational|ationally)\b",
     re.I)
 
 # Placeholders that are not in the house set. Each is a domain someone may actually own.

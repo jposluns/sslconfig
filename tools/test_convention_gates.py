@@ -11,7 +11,10 @@ Every case below is an input a reviewer actually constructed and ran, not a case
 while writing the gate. MISSES are inputs that are real defects and must be caught. FALSE
 ALARMS are legitimate text that must not be. The comment on each says which round found it,
 so a future change that reintroduces one lands on a named prior finding rather than a
-nameless assertion.
+nameless assertion. One case here depends on the ORDER of an alternation rather than on a
+named branch: a longer adverbial suffix is reached only because a shorter one matches first,
+fails its word boundary, and the engine retries. It is recorded precisely because nothing else
+would notice if a future reordering broke it.
 
 This is not a proof of correctness. It is a record of what has already gone wrong.
 
@@ -120,6 +123,8 @@ TLS_CASES = (
      "git -c http.sslVerify=false clone https://example.com/r.git", True, 10),
     ("a search tool handed something to run",
      "git grep --open-files-in-pager='curl -k https://example.com/' certificate", True, 13),
+    ("a wget prefix abbreviation shorter than the full flag",
+     "wget --no-check https://example.com/", True, 15),
 
     # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
     ("sort -k inside a quoted command substitution",
@@ -166,6 +171,12 @@ TLS_CASES = (
     ("quoted s_client flags are still the flags",
      "openssl s_client -connect example.com:443 '-verify_hostname' example.com "
      "'-verify_return_error'", False, 13),
+    ("a wrapper command's own -k, before the curl it does not belong to",
+     "timeout -k 5 30 curl -sf https://example.com/health", False, 15),
+    ("the same, through ssh",
+     "ssh -k deploy@host 'curl -sf https://example.com/health'", False, 15),
+    ("the glued form of the git pickaxe is still a search",
+     "git log -Shttp.sslVerify=false -- src/", False, 15),
 )
 
 
@@ -210,6 +221,12 @@ PROSE_CASES = (
      "They emphasise the default is insecure.", True, 10),
     ("a URL ending against a typographic closing quote",
      "The vendor says “see https://example.com/”; randomised ports are “normal”.", True, 13),
+    ("an adverbial suffix of a listed stem",
+     "The endpoint is recognisably the same one.", True, 15),
+    ("a longer adverbial suffix, which the alternation reaches by backtracking",
+     "They are organisationally separate.", True, 15),
+    ("minimise still needs catching after its stem moved",
+     "They minimise the risk.", True, 15),
 
     # FALSE ALARMS.
     ("a .internal host whose left label looks like a placeholder",
@@ -267,6 +284,8 @@ PROSE_CASES = (
      "The emphasis here is on the default.", False, 10),
     ("a placeholder in a URL query is not the hostname",
      "See https://example.com?previous=yourdomain.com for migration details.", False, 13),
+    ("de minimis is Latin, not a British spelling",
+     "The remaining de minimis exposure is accepted.", False, 15),
 )
 
 

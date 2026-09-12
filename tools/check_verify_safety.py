@@ -44,6 +44,12 @@ remain, and are recorded so nobody mistakes a pass for a guarantee:
   - A quotation spanning a line break. Quote state is tracked per physical line, so
     `curl --data-binary 'first line` followed by `# second line' -k https://host/` reads the
     second line as a comment and loses the flag with it.
+  - Anything inside a SEARCH command's arguments. A segment whose own command is `grep`,
+    `rg`, `git grep` or `git log -S` is skipped entirely, so that a guide can tell a reader
+    to hunt their own tree for these strings. A real defect written inside those arguments
+    is skipped with it, and process substitution makes that reachable:
+    `grep -f <(curl -k https://host/list) /etc` passes. The exemption stands down when the
+    search command carries a flag that RUNS something, which is the case that mattered most.
   - Anything else that needs a shell parser rather than a scanner. Review here has traded
     new edge cases for new edge cases for round after round, and the line is drawn
     deliberately: this file will not become a shell parser or a Markdown one, because a
@@ -211,8 +217,10 @@ CURL_FLAG = re.compile(
     r"""(?:[\s=)`'"<>|;&]|$)""")
 
 CHECKS = (
+    # `--no-ch[a-z-]*` because wget accepts any unambiguous prefix, and among its --no-c
+    # options only check-certificate begins --no-ch.
     ("wget --no-check-certificate (prefix abbreviations included)",
-     re.compile(r"(?:^|[\s'\"/=`(])wget\b[^\n]*?--no-check-cert\w*")),
+     re.compile(r"(?:^|[\s'\"/=`(])wget\b[^\n]*?--no-ch[a-z-]*")),
     ("python verify=False or verify=0",
      re.compile(r"\bverify\s*=\s*(?:False|0)\b")),
     ("node rejectUnauthorized false",
@@ -230,9 +238,11 @@ CHECKS = (
 # 7 and 8 turned every such instruction into a finding. Only search tools are exempt, and
 # only as the segment's own command: `git -c http.sslVerify=false clone` is still caught,
 # because the exemption keys on `git grep` and `git log -S`, not on `git`.
+# The pickaxe is matched without a trailing word boundary because `-S<string>` glued is as
+# idiomatic as `-S <string>`, and only the spaced form was being recognized.
 SEARCH_COMMAND = re.compile(
     r"""^\s*['"(`]*(?:grep|egrep|fgrep|rg|ag|ack)\b"""
-    r"""|^\s*['"(`]*git\s+(?:grep\b|log\b.*?\s-S\b)""")
+    r"""|^\s*['"(`]*git\s+(?:grep\b|log\b.*?\s-S)""")
 
 # A search tool that has been handed something to RUN is not searching any more. `git grep
 # --open-files-in-pager=...` executes its argument on a match, and ripgrep's --pre runs a
@@ -368,7 +378,12 @@ def findings_for(code):  # noqa: C901
     for segment, _sep in split_segments(code):
         if SEARCH_COMMAND.search(segment) and not SEARCH_EXECUTES.search(segment):
             continue
-        if INSECURE_CURL.search(segment) and CURL_FLAG.search(segment):
+        curl_at = INSECURE_CURL.search(segment)
+        # The flag has to come AFTER the curl it would belong to. `timeout -k 5 30 curl -sf`
+        # and `ssh -k host 'curl -sf'` put a wrapper's own -k in the same segment as a safe
+        # curl, and the splitter cannot break on a command that takes a command as its
+        # argument.
+        if curl_at and CURL_FLAG.search(segment, curl_at.end()):
             hits.append("curl -k / --insecure")
         if SCLIENT.search(segment) and not SCLIENT_HELP.search(segment):
             if not SCLIENT_VERIFIES.search(segment):
