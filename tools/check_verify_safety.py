@@ -11,7 +11,7 @@ from one just as readily; the quotation markers are stripped before the fence is
 Nested markers are stripped too, and a quotation that ends closes the fence inside it, since
 both were demonstrated to hide a block or to scan a paragraph. It scans every block rather
 than only Verify sections, because an insecure flag is a defect wherever a reader copies it
-from, and because two rounds of review found bugs in the section-tracking logic itself. It
+from, and because review found bugs in the section-tracking logic itself. It
 exists because this corpus forbids disabling TLS verification in three places
 (common-mistakes.md item 5, self-signed.md, README.sources.md) and three Verify blocks did
 it anyway. A probe that skips verification
@@ -204,7 +204,7 @@ INSECURE_CURL = re.compile(r"(?:^|[\s'\"/=`(])curl\b")
 # The combined-flag class takes digits and `#` as well as letters, because curl combines
 # short flags and `-4`, `-6` and `-#` are all real ones, so `curl -k4` was passing.
 # The LEADING class takes quotes too. Widening only the trailing side left `curl '-k'`
-# passing for two rounds, while the prefix class in front of `curl` had accepted quotes
+# passing round after round, while the prefix class in front of `curl` had accepted quotes
 # all along.
 CURL_FLAG = re.compile(
     r"""(?:^|[\s'"])(?:-[a-zA-Z0-9#]*k[a-zA-Z0-9#]*|--insecure|--proxy-insecure)"""
