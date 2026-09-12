@@ -82,7 +82,9 @@ ss -tlnp
 
 # `auth.require` can sit at the top level or inside a `$HTTP["host"]` conditional, and a
 # conditional one applies only to the hosts it names. If yours is conditional, a request
-# carrying a host it does not name is served by the global configuration instead:
+# carrying a host it does not name is served by the global configuration instead. That
+# conditional reads the Host HEADER, so setting the header is the right test here, unlike
+# Apache, which selects its virtual host by the SNI name when the connection is TLS:
 curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' \
   https://example.com/REPLACE_WITH_A_PROTECTED_PATH
                                     # 401 is the pass. 200 means the protected path is served

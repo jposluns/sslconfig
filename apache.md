@@ -90,20 +90,31 @@ curl -s -o /dev/null -w '%{http_code}\n' https://example.com/
 # address such as [2001:db8:80::1]:9000.
 ss -tlnp
 
-# A request whose Host matches no ServerName or ServerAlias does not fail. Apache says it falls
-# through to "the first listed virtual host that matches" the address and port, so a vhost
-# listed before yours over the same DocumentRoot answers without your authentication. Ask for
-# the PROTECTED path rather than `/`, because `/` can legitimately be public:
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' \
-  https://example.com/REPLACE_WITH_A_PROTECTED_PATH
+# A request whose name matches no ServerName or ServerAlias does not fail. Apache falls through
+# to "the first listed virtual host that matches" the address and port, so a vhost listed
+# before yours over the same DocumentRoot answers without your authentication.
+#
+# Over TLS the name that selects the vhost is the SNI one, not the Host header: Apache says
+# that when the handshake carries it, "that hostname is used below just like the Host: header
+# would be used on a non-SSL connection". So setting only the header tests nothing. It leaves
+# SNI saying example.com, which selects YOUR vhost and answers 401, or makes mod_ssl reject the
+# mismatched pair with 421; both look like a pass and neither is the request an attacker sends.
+# --connect-to sets the name in the handshake AND the header, and still dials your address:
+curl -s -o /dev/null -w '%{http_code}\n' \
+  --connect-to REPLACE_WITH_AN_UNCONFIGURED_NAME:443:example.com:443 \
+  https://REPLACE_WITH_AN_UNCONFIGURED_NAME/REPLACE_WITH_A_PROTECTED_PATH
                                         # 401 is the pass. 200 means another vhost served the
-                                        # protected resource with no authentication. 421 means
-                                        # the TLS configuration for that combination was
-                                        # rejected before any of this was decided, so the probe
-                                        # says nothing: curl sends SNI for the URL's hostname
-                                        # and not for the Host header, and Apache's
-                                        # SSLVHostSNIPolicy decides whether that pairing is
-                                        # allowed at all
+                                        # protected resource with no authentication at all
+```
+
+That name has to be one your certificate already covers, typically a spare label under a
+wildcard SAN, because the guide will not tell you to disable certificate verification to run a
+test. If the certificate covers no name you can spare, this check is a configuration review
+instead: list the vhosts for that address and port, and confirm the first one Apache would
+choose does not serve the protected `DocumentRoot`.
+
+```bash
+sudo apachectl -S                       # the vhost list, in Apache's own matching order
 ```
 
 ## Common mistakes
@@ -119,4 +130,5 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' \
 - Apache authentication how-to: https://httpd.apache.org/docs/2.4/howto/auth.html
 - Apache name-based virtual hosts, for which vhost answers an unmatched Host header: https://httpd.apache.org/docs/2.4/vhosts/name-based.html
 - Apache mod_ssl `SSLVHostSNIPolicy`, for the 421 a mismatched SNI and Host pairing can produce: https://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslvhostsnipolicy
+- Apache virtual host matching in detail, for SNI selecting the vhost on a TLS connection: https://httpd.apache.org/docs/2.4/vhosts/details.html
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
