@@ -81,12 +81,17 @@ RESERVED = (".example.com", ".example.net", ".example.org",
 RESERVED_EXACT = {"example.com", "example.net", "example.org", "localhost",
                   "test", "invalid", "example"}
 # RFC 5737 documentation addresses, which this corpus uses as house placeholders.
-RESERVED_PREFIX = ("192.0.2.", "198.51.100.", "203.0.113.")
+RESERVED_PREFIX = ("192.0.2.", "198.51.100.", "203.0.113.", "2001:db8:")
 
 # A cross-host redirect that is the vendor's own canonical answer rather than drift. This list
 # is the only way to acknowledge one: without it a consent interstitial or a vendor that always
 # redirects would red the weekly run forever, and a report that is always red is a report
 # nobody reads. Each entry is (cited prefix, destination prefix) and both must match.
+#
+# End both prefixes at a `/` boundary. They are matched with `startswith`, so `https://a.com`
+# would also swallow `https://a.com.evil.example/`, and `https://a.com/x` would swallow
+# `https://a.com/x-private/`. The report names this list when it reds, so a maintainer looking
+# at a false positive is told where the acknowledgement goes.
 EXPECTED = ()
 
 # A release download redirects to a signed, expiring asset URL on another host. That is how
@@ -126,16 +131,27 @@ def sources_text(text: str) -> str:
 
 
 def cited_urls(root: Path):
-    """Every distinct URL in a Sources section, with the guides that cite it."""
-    seen = {}
+    """Every distinct URL in a Sources section, with the guides that cite it.
+
+    Returns (urls, malformed). A URL that urlsplit refuses is collected rather than raised: the
+    expression excludes `]`, so an IPv6 citation extracts as `https://[2001:db8::1` and
+    `.hostname` raised ValueError, crashing the whole sweep before a single URL was checked.
+    A malformed citation is worth reporting; it is not worth losing the run over.
+    """
+    seen, malformed = {}, {}
     for path in sorted(root.glob("*.md")):
         body = sources_text(path.read_text(encoding="utf-8"))
         for m in URL.finditer(body):
             u = m.group(0).rstrip(".,")
-            if skip_host(urlsplit(u).hostname or ""):
+            try:
+                host = urlsplit(u).hostname or ""
+            except ValueError as exc:
+                malformed.setdefault(u, set()).add(f"{path.name} ({exc})")
+                continue
+            if skip_host(host):
                 continue
             seen.setdefault(u, set()).add(path.name)
-    return seen
+    return seen, malformed
 
 
 def curl(url, timeout, *flags):
@@ -183,7 +199,7 @@ def main() -> int:
     args = ap.parse_args()
     root = Path(__file__).resolve().parents[1]
 
-    urls = cited_urls(root)
+    urls, malformed = cited_urls(root)
     moved_host, moved_path, changed_query, slash_only = [], [], [], []
     refused, unreachable = [], []
 
@@ -201,6 +217,8 @@ def main() -> int:
             status, hop = first_hop(url, args.timeout)
             if status is None:
                 unreachable.append(f"{url}\n      cited by {where}\n      {hop}")
+            elif hop and expected(url, hop):
+                pass
             elif hop and urlsplit(hop).hostname == cited.hostname:
                 # The vendor answered with a redirect of its own rather than handing over to
                 # the asset host, so the repository itself moved.
@@ -220,13 +238,19 @@ def main() -> int:
             continue
         if cited.hostname != got.hostname:
             moved_host.append(line)
+        elif cited.scheme != got.scheme:
+            # An http citation upgrading to https on the same host is not an estate move, and
+            # reporting it as one red the run over nearly every vendor. The scheme test has to
+            # come before the port test, because the port defaults follow the scheme and 80
+            # against 443 otherwise reads as a move.
+            changed_query.append(line)
         elif port_of(cited) != port_of(got):
             # `.hostname` drops the port, so a redirect to another port on the same host was
             # compared as identical and counted clean.
             moved_host.append(line)
         elif cited.path != got.path and cited.path.rstrip("/") != got.path.rstrip("/"):
             moved_path.append(line)
-        elif cited.query != got.query or cited.scheme != got.scheme:
+        elif cited.query != got.query:
             # Session ids, locale parameters and http-to-https all land here. They are not
             # fixable by editing the citation, and an earlier version printed them under the
             # trailing-slash heading, which told the reader they were cosmetic. They are not.
@@ -241,6 +265,10 @@ def main() -> int:
             refused.append(f"{url}  (HTTP {status}, cited by {where})")
 
     out = [f"{len(urls)} cited URLs checked"]
+    if malformed:
+        out.append(f"\n{len(malformed)} citation(s) this script could not parse, which is a "
+                   f"defect in the citation rather than drift:")
+        out.extend(f"  - {u}  ({', '.join(sorted(g))})" for u, g in sorted(malformed.items()))
     for title, rows in (
             ("moved to a different HOST, which is the signal that a documentation estate "
              "has moved", moved_host),
@@ -256,6 +284,11 @@ def main() -> int:
             out.extend(f"  - {r}" for r in rows)
 
     moves = len(moved_host) + len(moved_path)
+    if moves:
+        out.append("\nThis step exits non-zero on a host or path move, which is what puts it in "
+                   "front of a person. If one of the moves above is a vendor's permanent "
+                   "answer rather than drift, add it to EXPECTED in this script rather than "
+                   "letting the run stay red.")
     if not moves:
         out.append("\nno citation resolves at a different host or path; "
                    "this says nothing about whether a page still supports the claim it is "

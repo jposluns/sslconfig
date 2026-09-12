@@ -408,6 +408,18 @@ PY
 )
 [ "$csp_ok" = 1 ] && ok "every inline script hash in site/index.html is pinned in the site/_headers script-src directive"
 
+echo "== the advisory citation sweep still imports =="
+# NOT a gate on the citations themselves: report_citation_drift.py reaches the network and can
+# never run in this suite. But it imports SOURCES_RE, headings and section_body from
+# check_guide_shape.py, and renaming or reshaping any of those would leave every gate green and
+# break the weekly run with a traceback nobody sees until Monday. Importing the module is
+# offline, costs nothing, and is the cheapest thing that keeps the two in step.
+if imp=$(cd tools && python3 -c 'import report_citation_drift' 2>&1); then
+  ok "report_citation_drift.py still imports what it borrows from check_guide_shape.py"
+else
+  bad "report_citation_drift.py no longer imports; the weekly citation sweep would fail: $imp"
+fi
+
 echo "== AIQT baseline =="
 # The vendored gates derive the repo root from their own location, so they operate on this tree.
 # AIQT_SITE_HOST retargets the upstream helper, which hardcodes aiqt.ai; see .aiqt/PIN.
