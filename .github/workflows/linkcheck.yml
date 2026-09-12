@@ -11,6 +11,7 @@ permissions:
 jobs:
   lychee:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Check links
@@ -35,9 +36,13 @@ jobs:
             './site/llms.txt'
 
       - name: Report citations that have moved
-        # Advisory, and deliberately after the link sweep. The sweep accepts 301 and 302, so a
-        # citation that has moved passes it forever while pointing at a redirect; #16 and #17
-        # were spent cleaning that up once it had spread across 82 citations. This step names
-        # them while the redirect still says where the page went. It never fails the run.
+        # Deliberately after the link sweep. The sweep accepts 301 and 302, so a citation that
+        # has moved passes it forever while pointing at a redirect; #16 and #17 were spent
+        # cleaning that up once it had spread across 82 citations. This step names them while
+        # the redirect still says where the page went, and it FAILS the run when a citation has
+        # moved host or path, because GitHub notifies on a failed scheduled run and on nothing
+        # else. Anything softer, including a host that refuses automated clients and a URL that
+        # did not answer, is reported without failing. This workflow is not a required status
+        # check, so a red run here blocks no merge.
         if: always()
         run: python3 tools/report_citation_drift.py
