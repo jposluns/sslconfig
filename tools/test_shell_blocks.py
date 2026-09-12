@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-r"""Cases for check_shell_blocks.py, including the two defects it cannot catch.
+r"""Cases for check_shell_blocks.py, including the defects it cannot catch.
 
-The placeholder rule changed twice under review and is now one expression: `<[^\s<>]+>` not
-preceded by a slash. The cases below are split accordingly. The FALSE ALARM group is the
-reviewer's own inputs, each of which the previous rule reported as a shell redirection and
-none of which is one; they are here because a rule that fires on `'<Location />'` inside
-single quotes trains a reader to ignore it. The CAUGHT group includes a placeholder inside
-double quotes, which this rule reports on purpose: quoting makes it legal shell, and it is
-still a value the reader must replace, and no other gate in this suite would say so.
+Four review rounds are recorded. Three of them were spent on a placeholder check that no longer
+exists: five rules were written for it and all five were beaten by legal shell a guide could
+plausibly carry, the last of them by an ordinary sed substitution. The gate's docstring tells
+that story. What this file keeps from it is the KNOWN LIMITS group, which now records the gap
+that removal left, with the shapes that fall into it, so nobody reads the gate's name and
+assumes coverage it does not have.
 
-Two cases are KNOWN LIMITS and neither is a pass. This gate was written because the corpus
-produced two shell defects every other gate missed, and it catches neither: `head -c 11m` is
-valid syntax with an invalid argument, and an asterisk stored in a variable and expanded
-unquoted is the normal way to use a variable holding a command. Both assert the gate's
-CURRENT answer so that a change closing one fails loudly instead of being quietly dropped.
+The FALSE ALARMS group is retained for the same reason in the other direction: those are the
+reviewers' own inputs, every one legal shell or legal configuration, and they are the cases that
+would go red the moment anyone reintroduces a placeholder rule. That is deliberate. A sixth rule
+should have to face them before it ships.
 
-The cases that need shellcheck SKIP when shellcheck is absent rather than failing. The gate
-itself skips in that situation and its docstring promises the suite stays green; before this,
-the gate skipped and these cases went red one file later, so the promise was false.
+What remains is shellcheck, and most of this file is now about making sure it actually ran. The
+canary case is the important one: a reviewer used an environment variable to make the real
+shellcheck exit 1, write to stderr and print nothing, which the gate read as a clean run over
+every block in the corpus.
 
-Each case builds a throwaway repository with one guide and runs the real gate in it.
+The cases that need shellcheck SKIP when shellcheck is absent rather than failing, because the
+gate skips too and its docstring promises the suite stays green.
 """
 import os
 import shutil
@@ -32,20 +32,24 @@ TOOLS = Path(__file__).resolve().parent
 HAVE_SHELLCHECK = shutil.which("shellcheck") is not None
 
 
-def run_against(block, fence="```bash", env=None, path_prefix=None):
+def run_against(block, fence="```bash", env=None, path_prefix=None, raw=None, home=None):
     """Build a throwaway repository holding one guide and run the real gate. (exit, output)."""
     d = Path(tempfile.mkdtemp())
     try:
         (d / "tools").mkdir()
         for f in ("check_shell_blocks.py", "_walk.py", "_markdown.py"):
             shutil.copy(TOOLS / f, d / "tools" / f)
-        marker = fence.split("bash")[0].rstrip()
-        (d / "guide.md").write_text(
-            "# T\n\n## Verify\n\n" + fence + "\n" + block + "\n" + marker + "\n",
-            encoding="utf-8")
+        if raw is not None:
+            body = raw
+        else:
+            marker = fence.split("bash")[0].rstrip()
+            body = "# T\n\n## Verify\n\n" + fence + "\n" + block + "\n" + marker + "\n"
+        (d / "guide.md").write_text(body, encoding="utf-8")
         run_env = dict(os.environ)
         if env:
             run_env.update(env)
+        if home:
+            run_env["HOME"] = home
         if path_prefix:
             run_env["PATH"] = f"{path_prefix}{os.pathsep}{run_env.get('PATH', '')}"
         r = subprocess.run([sys.executable, "tools/check_shell_blocks.py"], cwd=d,
@@ -59,31 +63,57 @@ APACHE = "<Location />\n  Require valid-user\n</Location>"
 
 # (description, block, must_fail, expected substring or None, needs_shellcheck)
 CASES = (
-    # CAUGHT BY THE PLACEHOLDER RULE. Each was a real defect in this corpus.
-    ("two competing redirections from an angle-bracket host",
-     "curl -sI https://<machine>.<tailnet>.ts.net/", True, "is a redirection", False),
-    ("a single redirection shellcheck does not flag",
-     "curl -s http://<public-ip>:11434/api/tags", True, "is a redirection", False),
-    ("a placeholder as a command argument",
-     "chown <service-user> server.key", True, "is a redirection", False),
-    ("a placeholder containing a colon",
-     "curl -s http://<IP:PORT>/api/tags", True, "is a redirection", False),
-    ("a placeholder containing an at sign",
-     "ssh <user@host> 'ss -tlnp'", True, "is a redirection", False),
-    # Deliberate: quoting makes it legal shell and leaves it a value the reader must replace.
-    ("a placeholder inside double quotes, which this rule reports on purpose",
-     'curl -s https://app.example.com/ -H "Authorization: Bearer <key>"', True,
-     "is a redirection", False),
+    # CAUGHT BY SHELLCHECK. These are why it is here at all.
+    ("a placeholder as a command argument, which SC2217 catches",
+     "chown <service-user> server.key", True, "SC2217", True),
+    ("two competing redirections",
+     "curl -sI https://<machine>.<tailnet>.ts.net/", True, "SC2261", True),
+    ("an unquoted expansion that breaks on a path with a space",
+     "cp a.pem ${HOME}/certs/b.pem", True, "SC2086", True),
+    ("an unquoted command substitution",
+     "kafka-storage.sh format -t $(kafka-storage.sh random-uuid)", True, "SC2046", True),
+    # No longer excluded: this is what catches a misspelled variable.
+    ("a variable referenced and never assigned",
+     'cert=/etc/ssl/a.pem\nopenssl x509 -in "$cret" -noout', True, "SC2154", True),
+    ("a sourced file that cannot be followed",
+     "source ./deployment.env\ncurl -sS https://app.example.com/", True, "SC1091", True),
+    # The escape a guide should use when a fragment genuinely needs a rule off, in view of the
+    # reader rather than buried in a suite-wide exclusion.
+    ("a fragment that disables one rule in view of the reader",
+     "# shellcheck disable=SC1091\nsource ./deployment.env\ncurl -sS https://app.example.com/",
+     False, None, True),
 
-    # FALSE ALARMS UNDER THE PREVIOUS RULE. A reviewer demonstrated every one of these.
+    # FALSE ALARMS UNDER THE FIVE DELETED PLACEHOLDER RULES. Reviewers' own inputs, plus the
+    # three that beat the last rule. Any sixth rule has to pass all of these first.
+    ("ordinary input and output redirection with no space",
+     "cat <request.txt>response.txt", False, None, False),
+    ("a heredoc opener followed by a redirect with no space",
+     "cat <<EOF>response.txt\nplain text\nEOF", False, None, False),
+    ("a here-string followed by a redirect",
+     'cat <<<"ok">response.txt', False, None, False),
+    ("process substitution followed by a redirect",
+     "cat <(hostname)>response.txt", False, None, False),
+    ("a PCRE named capture group",
+     "grep -P '(?<scheme>https)://' urls.txt", False, None, False),
+    ("a PCRE named group after a scheme, which beat the URL-anchored rule",
+     "grep -oP 'https://(?<host>[^/]+)' urls.txt", False, None, False),
+    ("a sed substitution producing angle brackets, which beat the URL-anchored rule",
+     r"sed -E 's#https://([^/]+)#<\1>#' urls.txt", False, None, False),
+    ("a sed substitution between two URLs, which beat the URL-anchored rule",
+     r"sed 's|http://old|<https://new>|' urls.txt", False, None, False),
+    ("a sed word boundary",
+     r"sed 's/\<http\>/https/g' urls.txt", False, None, False),
+    ("a self-closing element in a heredoc body",
+     "cat > /tmp/x <<'EOF'\n<deny/>\nEOF", False, None, False),
+    ("an XML comment in a heredoc body",
+     "cat > /tmp/x <<'EOF'\n<!--deny-->\nEOF", False, None, False),
+    ("an email address in angle brackets",
+     "printf '%s\\n' 'To: <ops@example.com>'", False, None, False),
     ("Apache syntax inside single quotes",
      "grep -F '<Location />' /etc/apache2/auth.conf", False, None, False),
     ("Apache syntax inside a comment",
      "# Check that <Location /> requires authentication.\n"
      "grep -F 'Require valid-user' /etc/apache2/auth.conf", False, None, False),
-    ("ordinary input and output redirection on one command",
-     "openssl s_client -connect app.example.com:443 <request.txt >response.txt",
-     False, None, False),
     ("a heredoc body holding configuration that looks like shell",
      "cat > /etc/apache2/auth.conf <<'EOF'\n" + APACHE + "\nEOF", False, None, False),
     ("a backslash-quoted heredoc delimiter",
@@ -92,45 +122,31 @@ CASES = (
      "cat > /etc/apache2/auth.conf <<'END-CONFIG'\n" + APACHE + "\nEND-CONFIG",
      False, None, False),
     ("two heredocs opened on one line",
-     "cat /dev/fd/3 3<<'A'\nplain\nA", False, None, False),
-    ("a here-string",
-     "grep -q ok <<<'ok'", False, None, False),
-    ("process substitution",
-     "diff <(sort /etc/hosts) <(sort /etc/hosts)", False, None, False),
-    ("a closing tag, which the leading-slash exclusion is for",
-     "printf '%s\\n' '<Location />' 'Require valid-user' '</Location>'", False, None, False),
-    ("a heredoc opener carrying its own redirect",
-     "cat <<EOF > /tmp/x\nplain text\nEOF", False, None, False),
+     "cat /dev/fd/3 /dev/fd/4 3<<'A' 4<<'B'\n" + APACHE + "\nA\nplain\nB", False, None, False),
     ("a house placeholder address",
      "curl -s http://203.0.113.10:11434/api/tags", False, None, False),
-    ("a quoted expansion",
-     'cp a.pem "${HOME}/certs/b.pem"', False, None, False),
     ("an ordinary correct Verify block",
      "ss -tlnp | grep 8080\ncurl -sS -o /dev/null -w '%{http_code}\\n' https://app.example.com/",
      False, None, False),
 
-    # CAUGHT BY SHELLCHECK. These are why shellcheck is here at all.
-    ("an unquoted expansion that breaks on a path with a space",
-     "cp a.pem ${HOME}/certs/b.pem", True, "SC2086", True),
-    ("an unquoted command substitution",
-     "kafka-storage.sh format -t $(kafka-storage.sh random-uuid)", True, "SC2046", True),
-
-    # FRAGMENT POLICY. Excluded on purpose: see DETERMINISM in the gate's docstring.
-    ("a variable from an earlier block, which SC2154 is excluded for",
-     'if [ "$n" -lt 5 ]; then echo low; fi', False, None, True),
-    ("a sourced deployment file, which SC1091 is excluded for",
-     "source ./deployment.env\ncurl -sS https://app.example.com/", False, None, True),
-
-    # KNOWN LIMITS. Both are the defects that motivated this gate, and it catches neither.
+    # KNOWN LIMITS. Each asserts the gate's CURRENT answer so a change that closes one is loud.
+    # The first three are the gap that deleting the placeholder check left, and nothing else in
+    # this suite covers them. The last two are the defects that motivated the gate.
+    ("known limit: an angle-bracket placeholder in a URL",
+     "curl -s http://<public-ip>:11434/api/tags", False, None, True),
+    ("known limit: an angle-bracket placeholder in a quoted header value",
+     'curl -s https://app.example.com/ -H "Authorization: Bearer <key>"', False, None, True),
+    ("known limit: an angle-bracket placeholder ssh does not redirect over",
+     "ssh <user@host> 'uptime'", False, None, True),
     ("known limit: a valid command carrying an invalid argument",
      "head -c 11m /dev/zero | curl -X POST --data-binary @- https://app.example.com/",
-     False, None, False),
+     False, None, True),
     ("known limit: a glob stored in a variable and expanded unquoted",
      'CURL="curl -q --noproxy * -sS"\n$CURL -o /dev/null https://app.example.com/',
-     False, None, False),
+     False, None, True),
 )
 
-# (description, fence, closing marker) for fences the previous expression silently skipped.
+# Fences the pre-`Fences` expression silently skipped.
 FENCES = (
     ("a fence with a trailing space after the info string", "```bash "),
     ("a four-backtick fence", "````bash"),
@@ -153,41 +169,99 @@ def main() -> int:
                 f"{desc}: the gate's exit status was right but its message was not. "
                 f"Expected it to contain {expected!r}. It said: {out!r}")
 
-    # Every fence form must actually be read. The previous expression matched none of these,
-    # so a block behind one left "every fenced bash block" without anything saying so.
-    for desc, fence in FENCES:
-        rc, out = run_against("curl -s http://<public-ip>:11434/api/tags", fence=fence)
-        if not rc:
-            failures.append(f"{desc}: the block was not read at all, so the gate passed ({out})")
-
-    # The line number and column a finding reports have to be the ones a reader sees. Neither
-    # was asserted before, and a reviewer mutated both by 100 without a single case noticing.
-    rc, out = run_against("echo one\necho two\ncurl -s http://<public-ip>:9090/")
-    if "guide.md:8:16:" not in out:
-        failures.append(
-            f"the finding's line and column are wrong: the block opens on line 5, so the "
-            f"third command is line 8 and the placeholder starts at column 16. It said: {out!r}")
-
     if HAVE_SHELLCHECK:
+        # Every fence form must actually be read. The previous expression matched none of
+        # these, so a block behind one left "every fenced bash block" silently.
+        for desc, fence in FENCES:
+            rc, out = run_against("cp a.pem ${HOME}/b.pem", fence=fence)
+            if not rc or "SC2086" not in out:
+                failures.append(f"{desc}: the block was not linted ({out})")
+
+        # A non-bash info string must not be linted as bash.
+        rc, out = run_against("cp a.pem ${HOME}/b.pem", fence="```text")
+        if rc:
+            failures.append(f"a ```text fence was linted as bash: {out!r}")
+
+        # An indented fence has its own indentation removed, per CommonMark. Leaving it on
+        # handed shellcheck an indented script and produced a parse error against a block that
+        # renders and runs correctly.
+        rc, out = run_against(None, raw=(
+            "# T\n\n## Verify\n\n- step:\n\n  ```bash\n  cat <<'EOF'\n  Require valid-user\n"
+            "  EOF\n  ```\n"))
+        if rc:
+            failures.append(f"an indented fence was linted with its indentation on: {out!r}")
+
+        # A block the file never closed is still shell a reader copies.
+        rc, out = run_against(None, raw="# T\n\n## Verify\n\n```bash\ncp a.pem ${HOME}/b.pem\n")
+        if not rc or "SC2086" not in out:
+            failures.append(f"an unclosed block was not linted: {out!r}")
+
+        # A finding's line number is mapped back through the added shebang, and a mutant
+        # shifting that mapping by one survived every case.
+        rc, out = run_against("echo one\necho two\ncp a.pem ${HOME}/b.pem")
+        if "guide.md:8:" not in out or "SC2086" not in out:
+            failures.append(f"the finding is not mapped to the guide's line 8: {out!r}")
+
         # Ambient configuration must not change the answer. A reviewer turned this corpus from
-        # passing to seven findings with this variable alone.
+        # passing to seven findings with SHELLCHECK_OPTS alone.
         rc, out = run_against('cp a.pem "${HOME}/certs/b.pem"',
                               env={"SHELLCHECK_OPTS": "--enable=all"})
         if rc:
-            failures.append(
-                f"SHELLCHECK_OPTS reached the child and changed the result: {out!r}")
+            failures.append(f"SHELLCHECK_OPTS reached the child and changed the result: {out!r}")
 
-        # A shellcheck that does not lint must not read as a clean run. Given a bad option the
-        # real one exits 3 with nothing on stdout, and this gate used to call that a pass.
+        # GHCRTS made the real shellcheck exit 1 with an empty stdout, which the gate read as a
+        # clean run over every block.
+        rc, out = run_against('cp a.pem "${HOME}/certs/b.pem"', env={"GHCRTS": "-M1m"})
+        if rc:
+            failures.append(f"GHCRTS reached the child and stopped the lint: {out!r}")
+
+        # --norc: a .shellcheckrc in the invoking user's home must not turn a rule off.
+        rc_home = Path(tempfile.mkdtemp())
+        try:
+            (rc_home / ".shellcheckrc").write_text("disable=SC2086\n", encoding="utf-8")
+            rc, out = run_against("cp a.pem ${HOME}/b.pem", home=str(rc_home))
+            # The finding has to be reported against the GUIDE. Asserting only that the output
+            # mentions SC2086 let this pass on the canary's own failure message, which names
+            # the same code, so the mutant that drops --norc survived the first version of it.
+            if not rc or "guide.md:6:" not in out or "SC2086" not in out:
+                failures.append(
+                    f"a .shellcheckrc in HOME disabled a rule, so --norc is not in effect: "
+                    f"{out!r}")
+        finally:
+            shutil.rmtree(rc_home, ignore_errors=True)
+
+        # The canary: a shellcheck that answers without linting must not read as a pass,
+        # whatever exit code it chooses. This stub is the GHCRTS shape through a channel the
+        # gate does not strip.
         stub = Path(tempfile.mkdtemp())
         try:
             (stub / "shellcheck").write_text(
-                "#!/bin/sh\necho 'shellcheck: broken' >&2\nexit 3\n", encoding="utf-8")
+                '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "version: 9.9.9"; exit 0; fi\n'
+                'echo "shellcheck: broken" >&2\nexit 1\n', encoding="utf-8")
             (stub / "shellcheck").chmod(0o755)
             rc, out = run_against("echo ok", path_prefix=str(stub))
-            if not rc or "exited 3" not in out:
+            if not rc or "did not lint" not in out:
                 failures.append(
-                    f"a shellcheck exiting 3 was not treated as a failure to lint: {out!r}")
+                    f"a shellcheck that exited 1 without linting was read as a pass: {out!r}")
+        finally:
+            shutil.rmtree(stub, ignore_errors=True)
+
+        # An exit code that is neither clean nor findings means the run did not finish, so its
+        # output is not the whole answer even when the canary came back. This stub lints the
+        # canary correctly and then exits 2, which nothing else here covers.
+        stub = Path(tempfile.mkdtemp())
+        try:
+            (stub / "shellcheck").write_text(
+                '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "version: 9.9.9"; exit 0; fi\n'
+                'for a in "$@"; do case "$a" in */canary.sh) printf "%s:2:4: note: Double quote '
+                'to prevent globbing and word splitting. [SC2086]\\n" "$a";; esac; done\n'
+                'echo "shellcheck: could not read one file" >&2\nexit 2\n', encoding="utf-8")
+            (stub / "shellcheck").chmod(0o755)
+            rc, out = run_against("echo ok", path_prefix=str(stub))
+            if not rc or "exited 2" not in out:
+                failures.append(
+                    f"a shellcheck that linted the canary and then exited 2 was read as a "
+                    f"pass: {out!r}")
         finally:
             shutil.rmtree(stub, ignore_errors=True)
 
