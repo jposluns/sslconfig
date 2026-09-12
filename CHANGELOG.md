@@ -13,6 +13,27 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 
 ### Added
 
+- `connection-poolers.md`, covering PgBouncer and pgpool-II (#30). A pooler becomes the thing
+  clients connect to, so the database's own `hostssl` rules and TLS settings stop governing the
+  client and start governing the pooler. Two PgBouncer defaults fail open: `client_tls_sslmode`
+  is documented as "TLS connections are disabled by default", so a carefully TLS'd database
+  gains nothing once a pooler fronts it, and `server_tls_sslmode` defaults to `prefer`, which
+  "If refused, the connection will be established over plain TCP" and validates no certificate;
+  `require` and `verify-ca` each close only half of that. A forced `user=` in a `[databases]`
+  entry makes every client the same PostgreSQL role, so every `GRANT` and every per-user
+  `pg_hba.conf` line stops discriminating. `exposure-index.md` gained 6432, 9898 and 9999.
+- A shell-block gate (#27). Every fenced bash block is linted by shellcheck and parsed by
+  `bash -n`, with the version reported rather than pinned, and a canary block whose finding has
+  to come back: a reviewer silenced the real shellcheck through an environment variable so that
+  it exited 1 with empty output, and the gate had read that as 156 blocks passing. It found five
+  real defects in the corpus on its first run. A placeholder check shipped alongside it was
+  deleted after five successive rules were each beaten by legal shell, the last by an ordinary
+  `sed` substitution; CONTRIBUTING rule 6 now names that hazard as a review obligation and says
+  plainly that no gate catches it reliably.
+- A category gate covering `site/llms.txt` (#36). The README's guide index, the site menu and
+  `llms.txt` are three hand-maintained copies of one category list, and nothing compared the
+  third: it carried ten sections of its own against the README's twelve. The gate now checks all
+  three, and checks `llms.txt`'s guide membership per category as well as its headings.
 - A control-plane section in `kubernetes.md` (#23). A managed cluster's API server is reachable from
   the internet the moment the cluster is created, so a control plane nobody exposed on purpose is
   exposed; a kubeconfig may be a credential in itself or only a pointer to one, which decides what
@@ -31,6 +52,58 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   the build script it describes (#25). A new guide touches five wiring surfaces, and this was the
   fifth and the only one nothing checked, so the record of what generates `site/llms-full.txt`
   could fall out of step with the script that generates it while every other surface stayed green.
+
+
+### Changed
+
+- `site/_headers` pins the inline stylesheet by hash and drops `'unsafe-inline'` from
+  `style-src`, with a gate that keeps the pin honest (#28). The gate refuses what it cannot
+  model rather than modelling HTML: exactly one bare `<style>` and one bare `<script>`, every
+  literal opener accounted for, no script-data escape states, no NUL byte, and one declared
+  charset. Four review rounds of parser detail preceded that decision, and the round that
+  settled it found the gate handing an author the hash of the empty string for a self-closing
+  `<style/>` and going green once it was pinned.
+- The weekly citation sweep reports where a cited page has moved, and fails the run when it has
+  (#29). The link sweep accepts 301 and 302, so a moved citation passes it forever; #16 and #17
+  were spent on that drift once it had spread across 82 citations. A green scheduled run
+  notifies nobody, so a host or path move now reds the weekly workflow, which is not a required
+  check and blocks no merge.
+- `site/llms.txt` uses the README guide index's twelve categories, in the same order, with the
+  same guides in each (#36). Seventeen entries that carried no description now have one, and two
+  guides that were listed twice are listed once.
+
+### Fixed
+
+- `chat-uis.md` no longer reproduces Chainlit's own login example (#31). The vendor's snippet
+  compares a literal `"admin"` against a literal `"admin"`; the guide had swapped the literal
+  for a house placeholder and kept both real defects underneath, a credential in application
+  source compared with `==`. It reads both values from the environment and compares them with
+  `hmac.compare_digest`, and the paragraph beside it no longer claims constant time the function
+  does not promise, nor that rotating the password ends existing sessions, which
+  `CHAINLIT_AUTH_SECRET` does.
+- `kubernetes.md` no longer passes a password as a command-line argument (#33). Apache's own
+  page says of `htpasswd -b` that "the password is clearly visible on the command line. For
+  script use see the -i option", and the guide had copied Envoy Gateway's example. `-s` stays,
+  because Envoy Gateway's basic auth documentation says "only SHA hash algorithm is supported
+  for now", and the guide now says that rather than leaving SHA-1 looking like a free choice.
+  `secrets.md` gained the rule that was missing, with the reason a probe for it is not offered:
+  `grep` for the words password, token and secret finds only commands that spell them out, and
+  a check that reads clean while the exposure is running is worse than none.
+- `cloudflare.md` no longer publishes an application before authenticating it (#34). The guide
+  said "The app is now reachable" at the end of step 2 and added Access in step 4, so a reader
+  following the numbered order had a public, unauthenticated application in between, which
+  `deployment-lifecycle.md` already warns against.
+- `apache.md` and `lighttpd.md` probe more than the front door (#32). Four of the six
+  fronting-proxy guides had been fixed and these two were missed, because neither proxies to an
+  origin so the check the others use did not transfer. Apache's bypass is documented: an
+  unmatched name falls through to "the first listed virtual host that matches" the address and
+  port. Over TLS that name is the SNI one, so the probe sets both it and the Host header.
+- `cors.md` and `host.md` cite the tools whose syntax they show (#35). `cors.md` showed Express
+  and FastAPI middleware while citing only MDN's protocol guide, and `host.md` showed five
+  `ufw` and `firewall-cmd` invocations and cited neither tool, so rule 1 could not be exercised
+  on either.
+- `kubernetes.md` and `memcached.md` gained Verify steps that discriminate (#26), and the
+  changelog was brought up to date through #25.
 
 ## 2026-09-11
 
