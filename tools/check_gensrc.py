@@ -29,12 +29,22 @@ its maintenance cost. Requiring a build script to be able to say what it builds 
 smaller thing to ask than reimplementing bash.
 
 WHAT `--list-inputs` PROVES, AND WHAT IT DOES NOT. It proves what the script SAYS it builds
-from. A script can report one list and build from another, and a reviewer demonstrated that
-with an append placed after the listing exits. The mitigation is placement rather than
-detection: the listing block sits immediately before the work, so anything changing the list
-has to happen above it. That is a convention this gate cannot enforce, and it is the honest
-cost of asking the script instead of reading it. The alternative was reimplementing bash,
-which lost three rounds running.
+from, and nothing else. A script can report one list and build from another, and a reviewer
+demonstrated two separate ways: an append placed after the listing exits, and an append
+placed above it but guarded on the argument count, so that a `--list-inputs` run never
+reaches it. Placement narrows the first and does nothing at all about the second, so read it
+as a convention that reduces accidents rather than as a mitigation. The only real assurance
+is that the listing and the build read the same array, which a reader can check and this gate
+cannot. That is the honest cost of asking the script instead of reading it, and the
+alternative was reimplementing bash, which lost three rounds running.
+
+HOW IT RUNS THE COMMAND: directly, never through a shell. So the regenerate command has to be
+a plain script invocation, optionally preceded by one interpreter, and the gate says so when
+it is not. A reviewer demonstrated why that has to be stated rather than assumed: `LC_ALL=C
+bash build.sh` tried to execute a program named `LC_ALL=C`, while a trailing `# comment` or
+`> /dev/null` arrived as literal arguments, displacing `--list-inputs` from `$1` so the
+script performed a full BUILD while the gate was only supposed to be reading it. A check that
+rewrites the tree it is checking is worse than the drift it was looking for.
 
 The manifest side is checked too: `sources` must be a list of non-empty strings, because a
 JSON object passed once when converting it to a set silently took its keys.
@@ -55,6 +65,40 @@ MANIFEST = Path(".aiqt") / "gensrc.json"
 
 class Unreadable(Exception):
     """The script's list is not in the one shape this gate reads."""
+
+
+SHELL_ONLY = {"|", "||", "&&", "&", ";", ";;", ">", ">>", "<", "<<", "<<<", "2>", "2>&1"}
+SHELL_CHARS = "|&;<>()`$"
+
+
+def not_a_plain_invocation(words):
+    """Why this gate cannot run the command directly, or None when it can.
+
+    The gate executes the regenerate command itself rather than handing it to a shell,
+    so anything whose meaning depends on a shell is not something it can run. A reviewer
+    demonstrated all three shapes that mattered, and the third is the dangerous one: a
+    `VAR=value` prefix became a program name, and a trailing comment or redirection became
+    literal arguments, which pushed `--list-inputs` out of `$1` and made the script perform
+    a full build while the gate was only reading it.
+    """
+    if not words:
+        return "regenerate command is empty"
+    for w in words:
+        if w in SHELL_ONLY or w.startswith("#") or any(c in w for c in SHELL_CHARS):
+            return (f"regenerate command uses shell syntax ({w!r}), and this gate runs the "
+                    f"command directly rather than through a shell")
+    scripts = [i for i, w in enumerate(words) if w.endswith(".sh") or w.endswith(".py")]
+    if not scripts:
+        return "regenerate command names no script"
+    i = scripts[0]
+    if i > 1 or (i == 1 and "=" in words[0]):
+        return ("regenerate command must be a plain script invocation, optionally preceded "
+                "by one interpreter. An environment assignment or any other prefix needs a "
+                "shell, and this gate runs the command directly")
+    if len(words) > i + 1:
+        return ("regenerate command has arguments after the script name, and this gate "
+                "appends --list-inputs, which those arguments would displace")
+    return None
 
 
 def script_inputs(command, root: Path):
@@ -107,9 +151,14 @@ def main() -> int:
         return 1
 
     for entry in entries:
-        target = entry.get("target", "<no target>")
-        if not (root / target).exists():
-            findings.append(f"{MANIFEST}: target {target} does not exist")
+        target = entry.get("target")
+        if not isinstance(target, str) or not target.strip():
+            # `root / ""` is the repository directory and `.exists()` said yes, so an entry
+            # with no target name passed and the summary counted it as a generated file.
+            findings.append(f"{MANIFEST}: an entry has no target file name")
+            continue
+        if not (root / target).is_file():
+            findings.append(f"{MANIFEST}: target {target} is not a file in this repository")
 
         command = entry.get("regenerate", "")
         try:
@@ -119,10 +168,11 @@ def main() -> int:
                 f"{MANIFEST}: {target}: regenerate command does not parse as a shell "
                 f"command line ({exc}): {command!r}")
             continue
-        named = [w for w in words if w.endswith(".sh") or w.endswith(".py")]
-        if not named:
-            findings.append(f"{MANIFEST}: {target}: regenerate command names no script: {command!r}")
+        why = not_a_plain_invocation(words)
+        if why:
+            findings.append(f"{MANIFEST}: {target}: {why}: {command!r}")
             continue
+        named = [w for w in words if w.endswith(".sh") or w.endswith(".py")]
         script = root / named[0]
         if not script.exists():
             findings.append(f"{MANIFEST}: {target}: regenerate names {named[0]}, which does not exist")
@@ -161,8 +211,8 @@ def main() -> int:
             print(f"  FAIL  {f}")
         return 1
     n = len(entries)
-    print(f"  ok    {MANIFEST} records the real inputs of {n} generated "
-          f"file{'' if n == 1 else 's'}")
+    print(f"  ok    {MANIFEST} agrees with what {n} generated "
+          f"file{'' if n == 1 else 's'} report as their inputs")
     return 0
 
 

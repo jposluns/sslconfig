@@ -41,14 +41,15 @@ if bash scripts/build-llms-full.sh >/dev/null 2>&1; then
 else
   bad "scripts/build-llms-full.sh exited non-zero"
 fi
-cp "$orig" site/llms-full.txt
+# An unchecked restore could leave a half-written bundle for every later gate to read.
+cp "$orig" site/llms-full.txt || { bad "could not restore site/llms-full.txt from $orig"; exit 1; }
 
 echo "== the generated-file record matches how they are generated =="
 # CLAUDE.md names .aiqt/gensrc.json as the record of which sources produce site/llms-full.txt.
 # Adding a guide touches five wiring surfaces and four of them were gated; this was the fifth,
 # so a guide added to the build script and forgotten in the manifest left the record wrong and
 # nothing said so. The check above proves the bundle is current. This one proves the manifest
-# still describes how it is built.
+# still agrees with what the build script reports as its inputs.
 if gensrc=$(python3 tools/check_gensrc.py 2>&1); then
   printf '%s\n' "$gensrc"
   # A gate that exits 0 while printing findings would otherwise read as a pass.

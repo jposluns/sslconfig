@@ -13,11 +13,13 @@ cases because placement is what decides whether the listing reports it. They are
 beat both earlier implementations, and they are here to show the current one handles them by
 construction rather than by another special case.
 
-One case here records a KNOWN LIMIT rather than a closed finding. Its description begins
-"known limit:", it asserts the gate's CURRENT answer rather than the right one, and the gate's
-own docstring discloses the same thing in prose. The success line counts those separately,
-because reporting an open limit as a closed finding is the kind of quiet overclaim this file
-exists to prevent.
+One case here records a KNOWN LIMIT rather than a closed finding, and it lives outside the
+table in `disclosed_limit()` because asserting an exit status was not enough to record it. It
+used to be a table row asserting that the gate passes, which it does whether or not the bug is
+present; a reviewer removed the bug and the suite stayed green. The replacement runs the build
+as well as the listing and fails unless the disagreement it discloses is really there. The
+success line still counts it separately, because reporting an open limit as a closed finding is
+the kind of quiet overclaim this file exists to prevent.
 
 A case earns its place by failing when its bug is restored, and most assert on the gate's
 MESSAGE as well as its exit status, because an exit code cannot tell a diagnosis from a
@@ -48,7 +50,7 @@ set -euo pipefail
   printf '%s\\n' "${{files[@]}}"
   exit 0
 fi
-{tail}echo built > site/llms-full.txt
+{tail}cat "${{files[@]}}" > site/llms-full.txt
 """
 
 
@@ -69,7 +71,7 @@ def fixture(script_body, sources, extra_files=(), write_script=True, regenerate=
             sh.chmod(0o755)
         (d / "site" / "llms-full.txt").write_text("x", encoding="utf-8")
         for f in ("README.md", "README.sources.md", "nginx.md", *extra_files):
-            (d / f).write_text("x", encoding="utf-8")
+            (d / f).write_text(f"content of {f}\n", encoding="utf-8")
         (d / ".aiqt" / "gensrc.json").write_text(json.dumps({"generated": [{
             "kind": "file", "target": "site/llms-full.txt",
             "regenerate": regenerate, "sources": sources}]}),
@@ -142,18 +144,59 @@ CASES = (
     ("an append before the listing is reported",
      script("  README.md", middle="typeset -a files+=(nginx.md)\n"),
      BASE + ["nginx.md"], False, (), None, True),
-    # This case asserts the gate's CURRENT answer, not the right one: an append below the
-    # listing changes what the script builds from, the listing never mentions it, and the gate
-    # believes the listing. Placement is the mitigation and it is a convention this gate cannot
-    # enforce. A change that closes this should make this case fail loudly rather than be
-    # quietly deleted.
-    ("known limit: an append AFTER the listing is a disagreement this gate cannot see",
-     script("  README.md", tail="typeset -a files+=(nginx.md)\n"), BASE, False, (),
-     None, True),
     ("an append above the listing is included in what it reports",
      script("  README.md", middle="typeset -a files+=(nginx.md)\n"), BASE, True, (),
      "nginx.md is built in but not recorded here", True),
 )
+
+
+def disclosed_limit():
+    """The one thing this gate cannot see, demonstrated instead of asserted.
+
+    An append placed AFTER the listing exits changes what the script builds from and never
+    reaches the listing. The table case that used to record this only asserted that the gate
+    passed, which it does with or without the append, so a reviewer removed the append and
+    the suite stayed green: the case was vacuous. This runs the build too, so it fails unless
+    the disagreement is really present. Returns a list of problems, empty when the limit is
+    still open exactly as disclosed.
+    """
+    d = Path(tempfile.mkdtemp())
+    try:
+        for sub in ("tools", "scripts", ".aiqt", "site"):
+            (d / sub).mkdir()
+        shutil.copy(GATE, d / "tools" / GATE.name)
+        sh = d / "scripts" / "build-llms-full.sh"
+        sh.write_text(script("  README.md", tail="typeset -a files+=(nginx.md)\n"),
+                      encoding="utf-8")
+        sh.chmod(0o755)
+        (d / "site" / "llms-full.txt").write_text("x", encoding="utf-8")
+        for f in ("README.md", "README.sources.md", "nginx.md"):
+            (d / f).write_text(f"content of {f}\n", encoding="utf-8")
+        (d / ".aiqt" / "gensrc.json").write_text(json.dumps({"generated": [{
+            "kind": "file", "target": "site/llms-full.txt",
+            "regenerate": REGENERATE, "sources": BASE}]}), encoding="utf-8")
+
+        listed = subprocess.run(["bash", "scripts/build-llms-full.sh", "--list-inputs"],
+                                cwd=d, capture_output=True, text=True)
+        subprocess.run(["bash", "scripts/build-llms-full.sh"], cwd=d,
+                       capture_output=True, text=True, check=True)
+        built = (d / "site" / "llms-full.txt").read_text(encoding="utf-8")
+        gate = subprocess.run([sys.executable, f"tools/{GATE.name}"], cwd=d,
+                              capture_output=True, text=True)
+
+        problems = []
+        if "nginx.md" in listed.stdout:
+            problems.append("the listing named nginx.md, so there is no disagreement here "
+                            "to disclose and this case is testing nothing")
+        if "content of nginx.md" not in built:
+            problems.append("the build did not consume nginx.md, so the append had no "
+                            "effect and this case would pass with its own bug removed")
+        if gate.returncode:
+            problems.append(f"the gate FAILED, so this limit is closed: delete this case "
+                            f"rather than leave it claiming an open gap ({gate.stdout.strip()})")
+        return problems
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def main() -> int:
@@ -170,15 +213,16 @@ def main() -> int:
                 f"{desc}: the gate's exit status was right but its message was not. "
                 f"Expected it to contain {expected!r}. It said: {out!r}")
 
+    for problem in disclosed_limit():
+        failures.append(f"known limit: an append AFTER the listing: {problem}")
+
     if failures:
         for f in failures:
             print(f"  FAIL  {f}")
         return 1
-    total = len(CASES)
-    limits = sum(1 for c in CASES if c[0].startswith("known limit:"))
+    total = len(CASES) + 1
     print(f"  ok    {total} recorded cases for the generated-file record gate: "
-          f"{total - limits} findings closed, {limits} disclosed "
-          f"limit{'' if limits == 1 else 's'} still open")
+          f"{total - 1} findings closed, 1 disclosed limit still open and demonstrated")
     return 0
 
 
