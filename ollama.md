@@ -65,7 +65,7 @@ MFA: Ollama has no login of its own, so a second factor can only come from the f
 
 ```bash
 ss -tlnp | grep 11434                                  # 127.0.0.1 only
-curl -s http://<public-ip>:11434/api/tags              # from another machine: connection refused
+curl -s http://203.0.113.10:11434/api/tags             # from another machine: connection refused
 curl -s https://ollama.example.com/api/tags            # 401 without credentials
 curl -su admin https://ollama.example.com/api/tags     # model list with credentials
 ```

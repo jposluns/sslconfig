@@ -32,7 +32,7 @@ listener.name.sasl_ssl.ssl.client.auth=none
 The documentation says SCRAM should be used only with TLS, hence `SASL_SSL` rather than `SASL_PLAINTEXT`. In KRaft the inter-broker credential must exist before the brokers first start, so create it while formatting storage. Once the cluster is up, give each application its own credential ([authentication.md](authentication.md)) with `kafka-configs.sh`, authenticating as the admin through a properties file like the one in step 5.
 
 ```bash
-bin/kafka-storage.sh format -t $(bin/kafka-storage.sh random-uuid) -c config/server.properties \
+bin/kafka-storage.sh format -t "$(bin/kafka-storage.sh random-uuid)" -c config/server.properties \
   --add-scram 'SCRAM-SHA-512=[name="admin",password="REPLACE_WITH_LONG_RANDOM_VALUE"]'
 # after the brokers are running:
 bin/kafka-configs.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties \

@@ -34,7 +34,7 @@ Rules that make the certificate actually work:
 
 ```bash
 chmod 600 server.key
-chown <service-user> server.key
+chown app:app server.key      # whichever user your service runs as
 ```
 
 Never commit a private key to version control. Add `*.key` and `*.pem` to `.gitignore` before generating anything inside a repository, and treat any key that has ever been committed or pasted into a chat as compromised: regenerate it.

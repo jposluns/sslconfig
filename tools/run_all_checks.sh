@@ -185,6 +185,49 @@ else
   printf '%s\n' "$prose_conv" | sed 's/^/          /'
 fi
 
+echo "== every fenced bash block is shell =="
+# Nothing in this suite checked whether the shell in a Verify block parses, and a reader
+# pastes these into a terminal. The gate is honest about the two defects that motivated it,
+# which it does not catch; what it does catch is five real defects this corpus was carrying,
+# plus a class shellcheck structurally cannot see, where an angle-bracket placeholder is a
+# redirection rather than a placeholder.
+if shellblocks=$(python3 tools/check_shell_blocks.py 2>&1); then
+  printf '%s\n' "$shellblocks"
+  # A gate that exits 0 while printing findings would otherwise read as a pass. A SKIP line
+  # is not a finding: shellcheck may not be installed, which the gate says plainly.
+  if grep -q '^  FAIL  ' <<< "$shellblocks"; then
+    bad "check_shell_blocks.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$shellblocks"; then
+  bad "check_shell_blocks.py crashed; the bash blocks are unchecked"
+  printf '%s\n' "$shellblocks" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$shellblocks"; then
+  printf '%s\n' "$shellblocks"
+  fail=1
+else
+  bad "check_shell_blocks.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$shellblocks" | sed 's/^/          /'
+fi
+
+echo "== the shell-block gate still catches what it claims =="
+# Two of these cases assert what the gate does NOT catch, which are the very defects that
+# prompted it. They are recorded so the file cannot quietly start claiming that coverage.
+if shellblock_tests=$(python3 tools/test_shell_blocks.py 2>&1); then
+  printf '%s\n' "$shellblock_tests"
+  if grep -q '^  FAIL  ' <<< "$shellblock_tests"; then
+    bad "test_shell_blocks.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$shellblock_tests"; then
+  bad "test_shell_blocks.py crashed; the shell-block gate is unverified"
+  printf '%s\n' "$shellblock_tests" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$shellblock_tests"; then
+  printf '%s\n' "$shellblock_tests"
+  fail=1
+else
+  bad "test_shell_blocks.py exited non-zero without reporting a result"
+  printf '%s\n' "$shellblock_tests" | sed 's/^/          /'
+fi
+
 echo "== the convention gates still catch what review found =="
 # The two gates above were broken repeatedly across rounds of cross-family review, and
 # several of those rounds broke something an earlier round had fixed. Each case in this

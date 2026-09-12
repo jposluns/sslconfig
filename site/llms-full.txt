@@ -375,7 +375,7 @@ Rules that make the certificate actually work:
 
 ```bash
 chmod 600 server.key
-chown <service-user> server.key
+chown app:app server.key      # whichever user your service runs as
 ```
 
 Never commit a private key to version control. Add `*.key` and `*.pem` to `.gitignore` before generating anything inside a repository, and treat any key that has ever been committed or pasted into a chat as compromised: regenerate it.
@@ -553,7 +553,7 @@ Serve for anything private (most things). Funnel or [cloudflare.md](cloudflare.m
 
 ```bash
 tailscale serve status
-curl -sI https://<machine>.<tailnet>.ts.net/     # from a tailnet device: works
+curl -sI https://host.tailnet.ts.net/            # from a tailnet device: works
 # From a non-tailnet network: serve URL unreachable; funnel URL reachable, so its app login must gate it.
 ```
 
@@ -4678,8 +4678,8 @@ Never run with the historic `minioadmin`/`minioadmin` pair; scanners try it cons
 MinIO serves HTTPS automatically when it finds a PEM key pair named `public.crt` and `private.key` in `${HOME}/.minio/certs` (or the directory given with `--certs-dir`):
 
 ```bash
-cp fullchain.pem ${HOME}/.minio/certs/public.crt
-cp privkey.pem   ${HOME}/.minio/certs/private.key
+cp fullchain.pem "${HOME}/.minio/certs/public.crt"
+cp privkey.pem   "${HOME}/.minio/certs/private.key"
 ```
 
 Certificates per [free-certificates.md](free-certificates.md) or [self-signed.md](self-signed.md); clients then use `https://` endpoints and, for self-signed, trust the CA rather than disabling verification.
@@ -4893,7 +4893,7 @@ listener.name.sasl_ssl.ssl.client.auth=none
 The documentation says SCRAM should be used only with TLS, hence `SASL_SSL` rather than `SASL_PLAINTEXT`. In KRaft the inter-broker credential must exist before the brokers first start, so create it while formatting storage. Once the cluster is up, give each application its own credential ([authentication.md](authentication.md)) with `kafka-configs.sh`, authenticating as the admin through a properties file like the one in step 5.
 
 ```bash
-bin/kafka-storage.sh format -t $(bin/kafka-storage.sh random-uuid) -c config/server.properties \
+bin/kafka-storage.sh format -t "$(bin/kafka-storage.sh random-uuid)" -c config/server.properties \
   --add-scram 'SCRAM-SHA-512=[name="admin",password="REPLACE_WITH_LONG_RANDOM_VALUE"]'
 # after the brokers are running:
 bin/kafka-configs.sh --bootstrap-server kafka.example.com:9093 --command-config admin.properties \
@@ -5759,7 +5759,7 @@ MFA: Ollama has no login of its own, so a second factor can only come from the f
 
 ```bash
 ss -tlnp | grep 11434                                  # 127.0.0.1 only
-curl -s http://<public-ip>:11434/api/tags              # from another machine: connection refused
+curl -s http://203.0.113.10:11434/api/tags             # from another machine: connection refused
 curl -s https://ollama.example.com/api/tags            # 401 without credentials
 curl -su admin https://ollama.example.com/api/tags     # model list with credentials
 ```

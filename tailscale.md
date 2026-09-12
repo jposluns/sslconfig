@@ -32,7 +32,7 @@ Serve for anything private (most things). Funnel or [cloudflare.md](cloudflare.m
 
 ```bash
 tailscale serve status
-curl -sI https://<machine>.<tailnet>.ts.net/     # from a tailnet device: works
+curl -sI https://host.tailnet.ts.net/            # from a tailnet device: works
 # From a non-tailnet network: serve URL unreachable; funnel URL reachable, so its app login must gate it.
 ```
 
