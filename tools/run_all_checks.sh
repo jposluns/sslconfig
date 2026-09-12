@@ -116,9 +116,14 @@ for f in *.md; do
 done
 [ "$wired" = 1 ] && ok "every guide is listed in the build script, linked from llms.txt, indexed in README.md, and in the site menu"
 
-echo "== README guide-index categories match the site menu =="
-# The README's "## Guide index" section and the site's left-hand menu are two hand-maintained
-# copies of the same category list; nothing else in this suite catches them drifting apart.
+echo "== README guide-index categories match the site menu and site/llms.txt =="
+# The README's "## Guide index" section, the site's left-hand menu and site/llms.txt are three
+# hand-maintained copies of the same category list; nothing else in this suite catches them
+# drifting apart. They had drifted: llms.txt carried ten sections of its own against the
+# README's twelve, and three independent reviews raised it before anything compared them.
+# llms.txt is checked on its guide MEMBERSHIP too, not just its headings, because a guide
+# filed under a different category in one file than the other is the same defect one level
+# down. Its "Start here" and "Optional" sections are the llms.txt format's own and are exempt.
 if cat_diff=$(python3 - <<'PY'
 import re, sys
 
@@ -138,22 +143,53 @@ html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
 excluded = {"On this page", "Reference"}
 site_cats = [c for c in re.findall(r'<p class="sidenav-h">([^<]*)</p>', html) if c not in excluded]
 
-if readme_cats == site_cats:
+llms = open("site/llms.txt", encoding="utf-8").read()
+llms = re.sub(r"<!--.*?-->", "", llms, flags=re.S)
+exempt = {"Start here", "Optional"}
+llms_blocks = re.split(r"^## ", llms, flags=re.M)[1:]
+llms_cats, llms_members = [], {}
+for block in llms_blocks:
+    name = block.split("\n", 1)[0].strip()
+    if name in exempt:
+        continue
+    llms_cats.append(name)
+    llms_members[name] = re.findall(r"^- \[([a-z0-9.-]+)\]\(", block, re.M)
+
+readme_members = {}
+for block in re.split(r"^### ", section, flags=re.M)[1:]:
+    name = block.split("\n", 1)[0].strip()
+    readme_members[name] = [g[:-3] for g in
+                            re.findall(r"^\|\s*\[([^\]]+\.md)\]\(", block, re.M)]
+
+problems = []
+if readme_cats != site_cats:
+    problems.append(("site menu", site_cats))
+if readme_cats != llms_cats:
+    problems.append(("site/llms.txt", llms_cats))
+
+if not problems:
+    for name in readme_cats:
+        if readme_members.get(name) != llms_members.get(name):
+            print(f"category {name!r} lists different guides in README.md and site/llms.txt")
+            print("  README:    " + repr(readme_members.get(name)))
+            print("  llms.txt:  " + repr(llms_members.get(name)))
+            sys.exit(1)
     sys.exit(0)
 
 print("README guide-index categories: " + repr(readme_cats))
-print("site menu categories:          " + repr(site_cats))
-for i, (a, b) in enumerate(zip(readme_cats, site_cats)):
-    if a != b:
-        print(f"first difference at position {i}: README={a!r} site={b!r}")
-        break
-else:
-    print("one list is a prefix of the other; lengths differ "
-          f"({len(readme_cats)} vs {len(site_cats)})")
+for label, other in problems:
+    print(f"{label} categories: " + repr(other))
+    for i, (a, b) in enumerate(zip(readme_cats, other)):
+        if a != b:
+            print(f"  first difference at position {i}: README={a!r} {label}={b!r}")
+            break
+    else:
+        print(f"  one list is a prefix of the other; lengths differ "
+              f"({len(readme_cats)} vs {len(other)})")
 sys.exit(1)
 PY
 ); then
-  ok "README guide-index categories match the site menu categories"
+  ok "README guide-index, the site menu and site/llms.txt carry the same categories"
 else
   bad "README guide-index categories do not match the site menu categories"
   printf '%s\n' "$cat_diff" | sed 's/^/          /'
