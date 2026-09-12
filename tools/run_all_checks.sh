@@ -43,6 +43,29 @@ else
 fi
 cp "$orig" site/llms-full.txt
 
+echo "== the generated-file record matches how they are generated =="
+# CLAUDE.md names .aiqt/gensrc.json as the record of which sources produce site/llms-full.txt.
+# Adding a guide touches five wiring surfaces and four of them were gated; this was the fifth,
+# so a guide added to the build script and forgotten in the manifest left the record wrong and
+# nothing said so. The check above proves the bundle is current. This one proves the manifest
+# still describes how it is built.
+if gensrc=$(python3 tools/check_gensrc.py 2>&1); then
+  printf '%s\n' "$gensrc"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$gensrc"; then
+    bad "check_gensrc.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$gensrc"; then
+  bad "check_gensrc.py crashed; the generated-file record is unverified"
+  printf '%s\n' "$gensrc" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$gensrc"; then
+  printf '%s\n' "$gensrc"
+  fail=1
+else
+  bad "check_gensrc.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$gensrc" | sed 's/^/          /'
+fi
+
 echo "== every guide is wired into the site =="
 wired=1
 # Strip HTML comments across the whole file (re.S, not a line-at-a-time sed) so a menu link or
