@@ -452,15 +452,19 @@ Per the Cloudflare docs as of June 2026 (menu locations change; the sources belo
 
 1. In the Cloudflare dashboard go to **Networking > Tunnels** and create a tunnel (connector type `cloudflared`).
 2. Copy the installation command the dashboard shows for your OS and run it on the host. It embeds a tunnel token and installs `cloudflared` as a service (`cloudflared service install <TOKEN>` on Linux).
-3. Add a route: **Routes > Add route > Published application**, choose the subdomain (for example `app.example.com`), and set the service URL to the local service, for example `http://localhost:3000`.
+3. Last, and only after step 4 below: add a route: **Routes > Add route > Published application**, choose the subdomain (for example `app.example.com`), and set the service URL to the local service, for example `http://localhost:3000`.
 
-The app is now reachable at `https://app.example.com` over TLS terminated at Cloudflare's edge. Traffic between `cloudflared` and Cloudflare travels inside the encrypted tunnel; the `http://localhost:3000` hop stays on the host itself.
+The moment that route exists the app is reachable at `https://app.example.com`, by anyone, with no login in front of it. Access is what adds the login and it is step 4, so doing these steps in the order they are numbered leaves a window in which the application is published and unauthenticated, however short you make it. Close it rather than racing it: complete step 4 first and add the route afterwards, or leave the local service stopped until Access is in place, so that the route resolves to nothing until there is something guarding it. [deployment-lifecycle.md](deployment-lifecycle.md) makes the same point about previews and first deployments.
+
+Once routed, the app is served over TLS terminated at Cloudflare's edge. Traffic between `cloudflared` and Cloudflare travels inside the encrypted tunnel; the `http://localhost:3000` hop stays on the host itself.
 
 ## 3. CLI alternative (locally-managed tunnel)
 
 ```bash
 cloudflared tunnel login
 cloudflared tunnel create myapp
+# `route dns` is what publishes the hostname, so it has the same problem as the dashboard's
+# routing step: run it after the Access application and policy of step 4 exist, not before.
 cloudflared tunnel route dns myapp app.example.com
 ```
 
