@@ -3,11 +3,13 @@
 
 WHAT THIS PROVES: two conventions this repository states and did not enforce.
 
-Spelling. CONTRIBUTING and the project's writing standard settle on Oxford English with
--ize. A corpus-wide conversion missed `randomised`, because the word list used for that
-conversion was itself incomplete, and the same word was then written into a new guide
-hours later. A word list in a gate is checked by the gate; a word list in someone's head
-is not.
+Spelling. CONTRIBUTING rule 2 and the project's writing standard settle on Oxford English
+with -ize. That CONTRIBUTING sentence was added when this gate was, because a reviewer
+pointed out that the gate cited a rule its source did not state, which is the same defect
+class the gate exists to catch. A corpus-wide conversion missed `randomised`, because the
+word list used for that conversion was itself incomplete, and the same word was then
+written into a new guide hours later. A word list in a gate is checked by the gate; a
+word list in someone's head is not.
 
 Placeholders. CONTRIBUTING rule 2 fixes the placeholder set: example.com and its
 subdomains, hosts under .internal, loopback, and RFC 1918 addresses. `yourdomain.com` is
@@ -17,8 +19,11 @@ QUOTED TEXT IS EXEMPT FROM THE SPELLING CHECK ONLY. The changelog entry recordin
 spelling conversion has to quote the old spelling to say what changed, and a guide
 quoting a vendor must not have the quotation silently edited, so a spelling match inside
 `backticks` or "double quotes" is skipped. A backtick span may be fenced by any run of
-backticks and closes only on a run of the same length, which is what makes
-``serialise(`value`)`` one span rather than three.
+backticks, and this closes a run on the next run of the same length, which is what makes
+``serialise(`value`)`` one span rather than three. It is not CommonMark's rule, which
+requires the closing run to be a MAXIMAL run of exactly that length, so a line carrying
+unequal runs is matched differently here than a renderer would match it. Two demonstrated
+cases sit either side of that difference and are recorded as known limits.
 
 The placeholder check does NOT take that exemption, because a placeholder's natural home
 is a command inside backticks. Applying the carve-out to both is how the first draft of
@@ -51,12 +56,15 @@ also listed example.org as a bad placeholder, which is wrong: RFC 2606 reserves
 example.com, example.net and example.org alike. A placeholder is also only judged on its
 own labels: `yourdomain.com.internal` and `yourdomain.com.example.com` are house
 placeholders whatever the label on the left, so the match is extended to the end of the
-hostname before it is judged. Two exemption limits are known and left open rather than
-papered over. Quote state is per line, so a quotation opened on one line and closed on
-another does not blank the lines between. And inside a fenced block only a shell-style
-trailing comment is read as prose, which means a `#` inside a Python triple-quoted string
-is read as one; treating it correctly would mean tracking multiline string state per
-language, which is a parser, and this is not one.
+hostname before it is judged. The suffix list also accepts `.example.net` and
+`.example.org`, which RFC 2606 reserves alongside example.com, and CONTRIBUTING rule 2
+now names all three so that the gate is not quietly more permissive than the rule it
+enforces. Two exemption limits are known and left open rather than papered over. Quote
+state is per line, so a quotation opened on one line and closed on another does not
+blank the lines between. And inside a fenced block only a shell-style trailing comment is
+read as prose, which means a `#` inside a Python triple-quoted string is read as one;
+treating it correctly would mean tracking multiline string state per language, which is a
+parser, and this is not one.
 """
 import re
 import sys
@@ -115,8 +123,10 @@ QUOTED_RE = re.compile(r"(`+)(?:(?!\1)[\s\S])*?\1|\"[^\"]*\"")
 # link. UK government and vendor documentation routinely does this. The URL stops at a
 # quotation mark, a backtick or an angle bracket rather than running to whitespace: a
 # `\S+` tail ate the closing `"` of a quoted sentence, and the quotation blanking that
-# followed then hid real prose after the quotation ended.
-URL_RE = re.compile(r"""https?://[^\s"'`<>]+""")
+# followed then hid real prose after the quotation ended. An apostrophe is not in that set:
+# single quotes are not a quotation delimiter here, so excluding one only truncated a valid
+# URL path.
+URL_RE = re.compile(r"""https?://[^\s"`<>]+""")
 
 
 def unquoted(line):

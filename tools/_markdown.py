@@ -52,6 +52,10 @@ class Fences:
     def inside(self):
         return self.char is not None
 
+    def close(self):
+        """Force the block closed, for a container that ended before its fence did."""
+        self.char, self.length = None, 0
+
     def feed(self, line):
         m = FENCE_RE.match(line)
         if not m:

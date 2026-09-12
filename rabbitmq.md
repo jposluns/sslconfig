@@ -53,15 +53,21 @@ openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
 
 # Negative, and this half is what discriminates: drop -cert and -key, and the broker must
 # refuse the connection, because ssl_options.fail_if_no_peer_cert = true requires one.
-openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
-  -verify_hostname mq.example.com -verify_return_error </dev/null
+sleep 2 | openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
+  -verify_hostname mq.example.com -verify_return_error
+echo "negative run exit $?"
 
 # "Verification: OK" reports the SERVER certificate only, and it prints in BOTH runs. The
-# pass condition is the pair: the first run reaches a session and the second does not. Do
+# pass condition is the pair: the first run exits 0 and the second does not. Do
 # not match on a particular message. The broker rejects an empty client certificate list
-# with a fatal alert during the TLS 1.2 handshake, and after it on TLS 1.3, and the exact
-# wording comes from whichever TLS stack is reporting it. What you are looking for is that
-# the second run ends without a session while the first one has one. Reading
+# with a fatal alert. On TLS 1.3 the client can consider its own side finished before that
+# alert arrives, and the exact wording comes from whichever TLS stack is reporting it.
+# What you are looking for is a non-zero exit from the second run. Note the `sleep 2` on it:
+# with `</dev/null` s_client reaches end of input and exits before the rejection arrives,
+# because on TLS 1.3 the server can only refuse the empty client certificate after the
+# client's flight. Measured, that negative run exits 0 and prints a full session block four
+# times in five, which is indistinguishable from the positive one. Holding stdin open for a
+# couple of seconds is what makes the refusal observable. Reading
 # "Verification: OK" from the second run as a success is the mistake this pair exists to
 # catch. Without -verify_return_error the handshake completes even when the server
 # certificate fails to verify, so -CAfile alone proves only that TLS is on. If you set

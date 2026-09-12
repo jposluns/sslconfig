@@ -5,12 +5,14 @@ WHAT THIS CATCHES: the patterns listed in CHECKS below, in a command inside any 
 code block in a guide. Indented code blocks are NOT scanned. An earlier version scanned
 them and flagged a four-space-indented prose bullet that warned readers against the very
 flag it named. A fenced block inside a block quotation IS scanned, because a reader copies
-from one just as readily; the quotation markers are stripped before the fence is read. It
-scans every block rather than only Verify sections, because an insecure flag is a defect
-wherever a reader copies it from, and because two rounds of review found bugs in the
-section-tracking logic itself. It exists because this corpus forbids disabling TLS
-verification in three places (common-mistakes.md item 5, self-signed.md,
-README.sources.md) and three Verify blocks did it anyway. A probe that skips verification
+from one just as readily; the quotation markers are stripped before the fence is read.
+Nested markers are stripped too, and a quotation that ends closes the fence inside it, since
+both were demonstrated to hide a block or to scan a paragraph. It scans every block rather
+than only Verify sections, because an insecure flag is a defect wherever a reader copies it
+from, and because two rounds of review found bugs in the section-tracking logic itself. It
+exists because this corpus forbids disabling TLS verification in three places
+(common-mistakes.md item 5, self-signed.md, README.sources.md) and three Verify blocks did
+it anyway. A probe that skips verification
 is satisfied by a substituted certificate as readily as by the right one, and one of those
 three sent credentials over the unverified connection.
 
@@ -42,8 +44,11 @@ for a guarantee:
     second line as a comment and loses the flag with it.
   - Anything else that needs a shell parser rather than a scanner. Six rounds of review have
     now traded new edge cases for new edge cases here, and the line is drawn deliberately:
-    this file will not become a shell parser, because a wrong parser that looks authoritative
-    is worse for a reader than a scanner that says what it is.
+    this file will not become a shell parser or a Markdown one, because a wrong parser that
+    looks authoritative is worse for a reader than a scanner that says what it is. Eight
+    rounds is where that line is drawn. What remains open is recorded in
+    `tools/test_convention_gates.py` as cases asserting the current wrong answer, so a
+    future change that closes one will fail loudly rather than pass quietly.
 
 Passing this gate is not evidence that a Verify step is correct, that the certificate it
 accepts is the right one, or that the connection is trustworthy.
@@ -75,7 +80,7 @@ NOT_A_GUIDE = {"CONTRIBUTING.md", "CLAUDE.md", "AGENTS.md", "CHANGELOG.md", "REA
 
 # A fenced block can sit inside a block quotation, where a reader copies from it exactly as
 # readily. Review showed a `> ```bash` / `> curl -k ...` block was invisible to this gate.
-BLOCKQUOTE_RE = re.compile(r"^ {0,3}(?:> ?)+")
+BLOCKQUOTE_RE = re.compile(r"^ {0,3}(?:>[ \t]{0,3})+")
 
 
 def _substitution_end(code, start):
@@ -186,7 +191,13 @@ def split_segments(code, _depth=0):
     return out
 
 INSECURE_CURL = re.compile(r"(?:^|[\s'\"/=`(])curl\b")
-CURL_FLAG = re.compile(r"(?:\s|^)(?:-[a-zA-Z]*k[a-zA-Z]*|--insecure|--proxy-insecure)(?:[\s=)`]|$)")
+# The trailing class must accept everything that can legally abut a flag, including the
+# quote that closes a remote command and a redirect glued straight onto it. Review
+# demonstrated `ssh host 'curl https://h/ -k'` and `curl https://h/ -k>/dev/null` both
+# passing, because the PREFIX class accepted quotes and this one did not. The same
+# asymmetry was fixed for the s_client flags in an earlier round and never mirrored here.
+CURL_FLAG = re.compile(
+    r"""(?:\s|^)(?:-[a-zA-Z]*k[a-zA-Z]*|--insecure|--proxy-insecure)(?:[\s=)`'"<>|;&]|$)""")
 
 CHECKS = (
     ("wget --no-check-certificate (prefix abbreviations included)",
@@ -208,11 +219,11 @@ SCLIENT = re.compile(r"(?:^|[\s'\"/=`(])openssl\s+s_client\b")
 # OpenSSL: "the verify operation continues after errors" unless -verify_return_error is
 # given, so a trust source alone does not make verification fatal. The negative forms
 # (-no-CAfile and friends) DISABLE trust, so they must not satisfy this.
-SCLIENT_VERIFIES = re.compile(r"(?:^|\s)-verify_return_error(?:[\s<>|)]|$)")
+SCLIENT_VERIFIES = re.compile(r"""(?:^|\s)-verify_return_error(?:[\s<>|)`'";&]|$)""")
 SCLIENT_HELP = re.compile(r"\s-(?:help|h)\b")
 # Chain verification without an identity check binds nothing to the endpoint: it accepts
 # any unexpired certificate that CA signed, for any hostname. self-signed.md says so.
-SCLIENT_BINDS = re.compile(r"(?:^|\s)-verify_(?:hostname|ip|email)(?:[\s<>|)=]|$)")
+SCLIENT_BINDS = re.compile(r"""(?:^|\s)-verify_(?:hostname|ip|email)(?:[\s<>|)=`'";&]|$)""")
 
 
 def logical_lines(text):
@@ -244,6 +255,13 @@ def logical_lines(text):
         m = BLOCKQUOTE_RE.match(raw)
         if m and (not fences.inside or bq):
             line, marked = raw[m.end():], True
+        if fences.inside and bq and not marked and raw.strip():
+            # The quotation ended, so the fence inside it ended with it. Without this the
+            # scanner stayed in that fence and read the rest of the document as code: a
+            # later unquoted `curl -k` block was skipped as if it were the close, and an
+            # ordinary paragraph warning against the flag was reported as a finding.
+            fences.close()
+            bq = False
         was_inside = fences.inside
         if fences.feed(line):
             if not was_inside:

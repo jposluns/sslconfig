@@ -93,6 +93,28 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   The detection gap worth recording: the audit flagged redirects that lost path depth, which catches a
   page collapsing to a documentation root, but not `docs.gunicorn.org/` redirecting to `gunicorn.org/`,
   where the depth is unchanged and only the host differs.
+- The `rabbitmq.md` Verify step could not complete the mutually authenticated connection the guide's own
+  configuration requires (#21). `ssl_options.fail_if_no_peer_cert = true` makes the broker demand a
+  client certificate and the command supplied neither `-cert` nor `-key`, so the run that failed to
+  connect still printed "Verification: OK", which reports the server certificate rather than the
+  client's, and the comment named that line as the pass condition. It is now a pair: one invocation
+  carrying client credentials that must reach a session, one without them that the broker must refuse,
+  with the pass condition stated as the shape of the outcome rather than a message to match on. The
+  negative run holds stdin open with `sleep 2` rather than closing it with `</dev/null`, because on TLS
+  1.3 the server can only refuse an empty client certificate after the client's flight and s_client
+  otherwise reaches end of input and exits before the rejection arrives; measured against a server
+  requiring a client certificate, the `</dev/null` form exited 0 and printed a full session block in four
+  trials of five, indistinguishable from the positive run.
+- `deserialises` in `ray.md`, a second `-ise` spelling in the same file (#21). It sits in the opening
+  risk statement, describing what cloudpickle does to arbitrary Python objects, and now reads
+  `deserializes`.
+- `kafka.md` named the unprefixed `ssl.client.auth=required` as the way to require client certificates
+  (#21). The guide configures a SASL_SSL listener, and its own section 5 already states that the
+  unprefixed setting applies to SSL listeners only and that Kafka logs a warning when it is set without
+  the prefix on a SASL_SSL broker, so the advice was inert: a reader who followed it would have believed
+  client certificates were required while they were not. It now names
+  `listener.name.sasl_ssl.ssl.client.auth=required`, which is what the rest of the guide already says.
+  The clause was added earlier in this branch and corrected within it.
 
 ### Changed
 
@@ -163,6 +185,13 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   that inspect a publicly trusted certificate, `deployment-lifecycle.md` and `free-certificates.md`,
   now pass because their commands carry `-verify_hostname` and `-verify_return_error`, not because an
   exemption covers them.
+- `tools/test_convention_gates.py`, the regression suite for the two new gates (#21). It records one case
+  per input a reviewer demonstrated against them, so every way past a gate that review found is a
+  standing check rather than a one-off fix, and the inputs the gates still get wrong are asserted as the
+  gates' current answer rather than dropped: quote state is per physical line, so a quotation spanning a
+  line break hides what follows it, and inside a fence only a shell-style trailing comment is read as
+  prose, so a hash inside a Python triple-quoted string is read as one. Both limits are named in the
+  gates' docstrings as well.
 - A "Bound the expensive endpoints" section in each of the four proxy guides (#20).
   `realtime-webhooks.md` and `authentication.md` both require request-size, concurrency and timeout
   limits on inference, upload and job-submission endpoints, naming denial of wallet as the failure

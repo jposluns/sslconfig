@@ -17,6 +17,14 @@ Some cases here record a KNOWN LIMIT rather than a fix. Their description begins
 assert the gate's CURRENT wrong answer, and the gate's own docstring discloses the same thing in
 prose. They are counted separately in the success line, because reporting an open false alarm as a
 closed finding is the kind of quiet overclaim this whole file exists to prevent.
+
+Two limits of this file itself, named because a reviewer found the first one by mutation
+testing rather than by reading. A case whose expectation holds under a BROKEN implementation
+guards nothing: one recorded case paired a URL fragment with a harmless flag and passed under
+a comment stripper with its position guard removed, so the case it was protecting could have
+regressed with a green suite. It now has a twin that fails under that mutation. And these
+helpers re-implement `main()`'s per-line glue rather than calling it, so `main()`'s own
+wiring, the file filters and the double comment strip, has no coverage here.
 """
 import sys
 from pathlib import Path
@@ -79,6 +87,18 @@ TLS_CASES = (
     # per physical line, so a quotation spanning a line break hides what follows it.
     ("known limit: quotation spanning a line break",
      "curl --data-binary 'first line\n# second line' -k https://example.com/", False, 5),
+    ("a flag after a URL fragment, which comment stripping must not eat",
+     'curl https://example.com/#health -k', True, 5),
+    ("a flag immediately before a closing quote",
+     "ssh deploy@host 'curl https://example.com/health -k'", True, 5),
+    ("a flag glued to a redirect",
+     'curl -sf https://example.com/health -k>/dev/null', True, 5),
+    ("a flag after a quoted query string, which a quote-blind splitter would sever",
+     "curl 'https://example.com/?a=1&b=2' -k", True, 6),
+    ("a block quotation that ends before its fence does",
+     "PLACEHOLDER_BQ_ENDS", True, 6),
+    ("a fenced block inside nested block quotations",
+     "PLACEHOLDER_BQ_NESTED", True, 6),
 
     # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
     ("sort -k inside a quoted command substitution",
@@ -107,6 +127,9 @@ TLS_CASES = (
      'curl https://example.com/ -o \\>& sort -k 2 paths.txt', False, 5),
     ("a doubled backslash is a literal argument, not a continuation",
      'curl https://example.com/ -o \\\\\n sort -k 2 paths.txt', False, 5),
+    ("a fully verified s_client inside a quoted remote command",
+     "ssh probe@host 'openssl s_client -connect mq.example.com:5671 -CAfile ca.pem "
+     "-verify_hostname mq.example.com -verify_return_error'", False, 5),
 )
 
 
@@ -184,6 +207,13 @@ PROSE_CASES = (
     # string is read as one. Fixing it means tracking multiline string state per language.
     ("known limit: a hash inside a fenced triple-quoted string",
      '```python\ntext = """\n# randomised\n"""\n```', True, 5),
+    # KNOWN LIMITS, both disclosed in the gate's docstring: the backtick matching here is
+    # run-length based rather than CommonMark's maximal-run rule, and these two lines fall
+    # on either side of that difference.
+    ("known limit: unequal backtick runs hide real prose",
+     "Use `a``; randomised ports ``` here.", False, 6),
+    ("known limit: unequal backtick runs inside a valid span expose an identifier",
+     "Use `printf '%s' '`` ``` serialise'` to print the vendor identifier.", True, 6),
 )
 
 
@@ -191,9 +221,20 @@ def main() -> int:
     failures = []
 
     for desc, body, should_catch, rnd in TLS_CASES:
-        if body == "PLACEHOLDER_BLOCKQUOTE":
+        SPECIAL = {
             # A fenced block nested inside a block quotation, which `fenced()` cannot build.
-            doc = "## Verify\n\n> ```bash\n> curl -k https://example.com/\n> ```\n"
+            "PLACEHOLDER_BLOCKQUOTE":
+                "## Verify\n\n> ```bash\n> curl -k https://example.com/\n> ```\n",
+            # The quotation ends while its fence is still open, and an ordinary fenced block
+            # follows. The scanner used to read the second fence as the first one's close.
+            "PLACEHOLDER_BQ_ENDS":
+                "## Verify\n\n> ```bash\n> echo ok\n\n```bash\ncurl -k https://example.com/\n```\n",
+            # Two levels of quotation marker with a space between them.
+            "PLACEHOLDER_BQ_NESTED":
+                "## Verify\n\n>  > ```bash\n>  > curl -k https://example.com/\n>  > ```\n",
+        }
+        if body in SPECIAL:
+            doc = SPECIAL[body]
             caught = bool([x for _n, ln in tls.logical_lines(doc)
                            for x in tls.findings_for(tls.strip_comment(ln))])
         else:

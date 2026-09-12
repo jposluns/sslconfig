@@ -51,6 +51,12 @@ openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_ip 10.0.0.5 \
                                                           # name instead where the certificate carries
                                                           # a DNS SAN. Chain checks alone accept any
                                                           # certificate that CA signed
+                                                          # Omit -CAfile only for a publicly trusted
+                                                          # certificate, whose issuer is already in the system
+                                                          # store. On that path use -verify_hostname with the
+                                                          # name on the certificate rather than -verify_ip,
+                                                          # since a certificate issued for a DNS name carries
+                                                          # no iPAddress SAN.
                                                           # This matches the default, which does not require
                                                           # client certificates. With -o ssl_verify_mode=2, add
                                                           # -cert and -key: without them memcached refuses the
