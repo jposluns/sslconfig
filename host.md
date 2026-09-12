@@ -67,6 +67,8 @@ Run the SSH test from a second terminal before closing your working session.
 ## Sources (checked September 2026)
 
 - OpenSSH sshd_config manual: https://man.openbsd.org/sshd_config
+- ufw(8), for `default deny incoming`, `allow` and `status verbose`: https://manpages.ubuntu.com/manpages/noble/man8/ufw.8.html
+- firewall-cmd(1), for `--permanent --add-service`: https://firewalld.org/documentation/man-pages/firewall-cmd.html
 - fail2ban: https://github.com/fail2ban/fail2ban
 - CrowdSec: https://www.crowdsec.net/
 - google-authenticator-libpam: https://github.com/google/google-authenticator-libpam
