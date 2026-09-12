@@ -4359,7 +4359,7 @@ A connection pooler sits in front of PostgreSQL and becomes the thing clients ac
 
 Default posture: bind the pooler to the interface the application uses and nothing wider, require TLS on the client hop, require a verified server certificate on the database hop, and leave the client's PostgreSQL role intact through the pooler.
 
-Run a current PgBouncer. 1.25.2 fixes four advisories, three of which an unauthenticated remote client can reach: an integer overflow in packet parsing that crashes the process from a malformed SCRAM packet (CVE-2026-6664), a SCRAM `strlcat` return value that a malicious backend can exploit (CVE-2026-6665), a null dereference on a server error response with no SQLSTATE (CVE-2026-6666), and a missing authorization check that let any console user, including a read-only one, run `KILL_CLIENT` (CVE-2026-6667). The last one matters to section 6 below, which treats `stats_users` as read-only; on an older build it is not.
+Run a current PgBouncer. 1.25.2 fixes four advisories, and they need different things of an attacker. CVE-2026-6664 is the one an unauthenticated remote client can reach on its own: an integer overflow in packet parsing that crashes the process from a malformed SCRAM packet. CVE-2026-6665 needs a malicious PostgreSQL server, and CVE-2026-6666 a server that returns an error response with no SQLSTATE, so both are about what the pooler trusts on the database side rather than the client side. CVE-2026-6667 needs console access, which the vendor notes "itself requires authorization", and it let any console user run `KILL_CLIENT`. That last one matters to section 6 below, which treats `stats_users` as read-only; on an older build it is not.
 
 ## 1. What the pooler binds, and on which port
 
@@ -4403,7 +4403,9 @@ client_tls_cert_file = /etc/pgbouncer/tls/pooler.crt
 
 To require client certificates as well, set `client_tls_sslmode = verify-full` and point `client_tls_ca_file` at the CA that issued them. Give the key file mode `600` and the pooler user's ownership, as with any private key ([self-signed.md](self-signed.md), [free-certificates.md](free-certificates.md)).
 
-Pgpool-II uses one switch for both hops: `ssl` is "off" by default, and setting it on "enables the SSL for both the frontend and backend communications". Its documentation notes that `ssl_key` and `ssl_cert` must also be configured for frontend connections to work. Turning SSL on only makes TLS available; it does not refuse a client that declines it. Refusing one is `pool_hba.conf`, in section 5.
+Pgpool-II uses one switch for both hops: `ssl` is "off" by default, and setting it on "enables the SSL for both the frontend and backend communications". Its documentation notes that `ssl_key` and `ssl_cert` must also be configured for frontend connections to work.
+
+Turning it on makes TLS available and does not require it. A client that declines TLS still connects, because a `pool_hba.conf` `host` record "match[es] either SSL or non-SSL connection attempts". Requiring it means `hostssl` records, and those have their own trap in the other direction: "SSL must be enabled by setting the `ssl` configuration parameter. Otherwise, the `hostssl` record is ignored." So a `hostssl` rule written while `ssl` is off does not fail closed, it does not apply at all. Section 5 has the file.
 
 ```ini
 ssl = on                        # default is off; covers frontend and backend
@@ -4453,7 +4455,9 @@ PgBouncer opens its own server connections and reuses them across clients, so a 
 SELECT inet_client_addr();   -- run through the pooler, on the database server
 ```
 
-A line such as `hostssl app app 10.0.0.0/24 scram-sha-256`, which used to restrict a range of clients, now restricts one host. That is not a reason to loosen it, and narrowing it is not the whole job either: installing a pooler does not stop anything else in that range connecting directly. Narrow the database server's rules to the address you just read, and put the client-facing restriction where the clients now arrive.
+Over a Unix socket the function returns NULL and the `local` rules apply instead.
+
+A line such as `hostssl app app 10.0.0.0/24 scram-sha-256`, which used to restrict a range of clients, now matches whatever the pooler's backend connections come from. Narrowing it to that address is right, and it is worth being exact about what it buys: an address is not an identity. A `/24` still admits its whole range, and even a `/32` can be several workloads sharing one NAT egress, so the rule says where a connection came from and never which process opened it. Installing a pooler also does not stop anything else in the old range connecting directly. Narrow the database server's rules to the address you actually read, put the client-facing restriction where the clients now arrive, and treat the two as separate jobs rather than one moved.
 
 On the database server:
 
@@ -4477,17 +4481,30 @@ local      all       all                  peer
 hostssl    app       app   10.0.0.0/24    scram-sha-256
 ```
 
-Pgpool-II has the same file and does not read it by default: `enable_pool_hba` is documented as "Default is false", and with it off "the client authentication method is completely managed by PostgreSQL", which after section 4 means it is not discriminating between your clients at all.
+Pgpool-II has the same file and does not read it by default: `enable_pool_hba` is documented as "Default is false", and with it off "the client authentication method is completely managed by PostgreSQL". That does not merge your clients into one role the way a forced `user=` does, because pgpool-II pools per user and database and the backend still authenticates each one. What it means is narrower and still worth fixing: pgpool-II applies no client-facing policy of its own, so it will not refuse a plaintext connection or a client from an address you never meant to serve.
 
 ```ini
 enable_pool_hba = on            # default is false
 pool_passwd = 'pool_passwd'
 ```
 
+```
+# /etc/pgpool-II/pool_hba.conf
+# `host` matches SSL and non-SSL alike, so requiring TLS means hostssl plus an explicit
+# rejection of the plaintext path. The last line is what makes the requirement real: without
+# it an unmatched connection is denied anyway, but a later permissive `host` rule would not be.
+local      all       all                        trust
+hostssl    all       app   10.0.0.0/24          scram-sha-256
+hostnossl  all       all   0.0.0.0/0            reject
+```
+
+A `hostssl` record is ignored entirely while `ssl` is off, so set `ssl = on` first and confirm it took effect before relying on these lines.
+
 Because the server no longer sees the client, its logs no longer identify one either. `application_name_add_host` "adds the client host address and port to the application name setting set on connection start", and its default is `0`. It is diagnostic metadata rather than an audit trail: the same page says the value applies "only at the start of a connection" and that after a later `SET application_name` "PgBouncer does not change it again", so a client can overwrite it. PostgreSQL's `log_line_prefix` defaults to `'%m [%p] '`, which carries no application name at all, so turning the setting on changes nothing in the log until `%a` is in the prefix.
 
 ```ini
-application_name_add_host = 1   # default is 0
+; The default is 0.
+application_name_add_host = 1
 ```
 
 ```
@@ -4499,7 +4516,7 @@ log_line_prefix = '%m [%p] %a '
 
 PgBouncer reserves one database name for its control channel: "The database name 'pgbouncer' is reserved for the admin console and cannot be used as a key here." Access is governed by `admin_users` for full commands and `stats_users` for read-only `SHOW` commands, both of which default to empty.
 
-`auth_type = any` removes that gate, and the vendor's two pages disagree about how far. The configuration page says `admin_users` is "Ignored when `auth_type` is `any`, in which case any user name is allowed in as admin". The usage page says "Only users listed in the configuration parameters `admin_users` or `stats_users` are allowed to log in to the console. (Except when `auth_type=any`, then any user is allowed in as a `stats_user`.)" The released 1.25.2 source agrees with the usage page: admin status is granted to names matching `admin_users`, and an `any` connection that matches neither list is admitted without it. Either way `any` is unsafe, because an unauthenticated stranger gets console read access and can also simply claim a listed administrator's name, and this guide states the disagreement rather than picking the reading that suits it.
+`auth_type = any` removes that gate, and the vendor's two pages disagree about how far. The configuration page says `admin_users` is "Ignored when `auth_type` is `any`, in which case any user name is allowed in as admin". The usage page says "Only users listed in the configuration parameters `admin_users` or `stats_users` are allowed to log in to the console. (Except when `auth_type=any`, then any user is allowed in as a `stats_user`.)" The released 1.25.2 source agrees with the usage page: admin status is granted to names matching `admin_users`, and an `any` connection that matches neither list is admitted without it. Either way `any` is unsafe, because an unauthenticated stranger gets console read access and can also simply claim a listed administrator's name, and this guide states the disagreement rather than picking the reading that suits it. The practical consequence matters for section 7: under `any`, a command with no administrator gate of its own, such as `SHOW VERSION`, SUCCEEDS for a user on neither list. A probe that expects a rejection has to tell one at login from one at the command, because only the first means the console is closed.
 
 The other weak values are described plainly by the vendor: `trust` is "No authentication is done", `any` is "Like the trust method, but the user name given is ignored", and `plain` sends "The clear-text password ... over the wire" and is marked deprecated. The default is `md5`.
 
@@ -4520,6 +4537,8 @@ stats_users = pgbmetrics
 
 One account bypasses all of this by design, and it is worth knowing about: the documentation states that "the user name `pgbouncer` is allowed to log in without password, if the login comes via the Unix socket and the client has same Unix user UID as the running process". Anyone who can run a process as the pooler's Unix user already has the console.
 
+The `local ... peer` line above has the same shape and the same requirement. `peer` takes the identity from the operating system, so `user=pgbadmin` in a connection string does not supply it: the command has to run as an OS user that maps to `pgbadmin`, or it is rejected whatever password it carries.
+
 `auth_file` "may contain both MD5-encrypted and plain-text passwords", so it is a secret file regardless of what you put in it: mode `600`, owned by the pooler's user, and out of the repository ([secrets.md](secrets.md)). `auth_query` avoids the file for user passwords by reading them from the database, and the documentation warns that "Direct access to `pg_authid` requires admin rights. It's preferable to use a non-superuser that calls a SECURITY DEFINER function instead."
 
 ## 7. Verify
@@ -4530,19 +4549,27 @@ ss -tlnp | grep -E '6432|9999|9898'
 
 Read that as an inventory rather than a pass. Every address printed is one the pooler answers on, so an entry showing `0.0.0.0:9898` or `[::]:9898` is section 1 not applied, whatever `listen_addresses` says.
 
-The client hop takes two commands, not one. A single failing connection proves nothing, because a wrong password fails exactly the same way as a refused plaintext connection. Run the pair with the same account and require one of each result:
+The client hop takes three commands, not one. A single failing connection proves nothing, because a wrong password fails the same way as a refused plaintext connection; and a passing pair proves less than it looks, because a `trust` method in the HBA file lets any password through. Put the real password in `~/.pgpass` at mode `600` rather than the environment, which PostgreSQL says is "not recommended for security reasons" because some systems expose a process's environment to other users.
 
 ```bash
-PGPASSWORD=REPLACE_WITH_THE_APP_PASSWORD
-export PGPASSWORD
+# ~/.pgpass, mode 600: hostname:port:database:username:password
+# pooler.internal:6432:app:app:REPLACE_WITH_THE_APP_PASSWORD
 
-# Must FAIL, and the error must name TLS rather than authentication.
+TLS="sslmode=verify-full sslrootcert=/etc/ssl/certs/ca.crt"
+
+# 1. Must FAIL, and the error must name TLS rather than authentication.
 psql "host=pooler.internal port=6432 dbname=app user=app sslmode=disable" -c 'SELECT 1;'
 
-# Must SUCCEED. This is the control: it proves the credential is good, so the
-# failure above was the TLS requirement and not a bad password.
-psql "host=pooler.internal port=6432 dbname=app user=app sslmode=verify-full sslrootcert=/etc/ssl/certs/ca.crt" -c 'SELECT 1;'
+# 2. Must SUCCEED. The control: the credential is good, so the failure above was
+#    the TLS requirement and not a bad password.
+psql "host=pooler.internal port=6432 dbname=app user=app $TLS" -c 'SELECT 1;'
+
+# 3. Must FAIL on authentication. Without this, a `trust` method in auth_hba_file
+#    passes both commands above while checking no password at all.
+PGPASSWORD=definitely-not-the-password psql "host=pooler.internal port=6432 dbname=app user=app $TLS" -c 'SELECT 1;'
 ```
+
+Run the same three against pgpool-II on port 9999 where that is the pooler in front, because nothing above tests its listener.
 
 For the database hop, know what the probe can and cannot tell you:
 
@@ -4550,7 +4577,7 @@ For the database hop, know what the probe can and cannot tell you:
 psql "host=pooler.internal port=6432 dbname=app user=app sslmode=verify-full sslrootcert=/etc/ssl/certs/ca.crt" -c "SELECT current_user, inet_client_addr(), ssl FROM pg_stat_ssl JOIN pg_stat_activity USING (pid) WHERE pid = pg_backend_pid();"
 ```
 
-`ssl` reports whether the pooler-to-PostgreSQL connection uses SSL. It does not report whether the pooler validated the certificate, so a `t` here is consistent with `server_tls_sslmode = require`, which validates nothing. Certificate validation cannot be observed from the client at all: the only test is to present the pooler with a certificate that should fail, one signed by an untrusted CA and one valid but issued for a different host name, and confirm on a fresh connection that it refuses both. `inet_client_addr()` is the address section 5 tells you to write into `pg_hba.conf`.
+`ssl` reports whether the pooler-to-PostgreSQL connection uses SSL. It does not report whether the pooler validated the certificate, so a `t` here is consistent with `server_tls_sslmode = require`, which validates nothing. Certificate validation cannot be observed from the client at all: the only test is to present the pooler with a certificate that should fail, one signed by an untrusted CA and one valid but issued for a different host name, and confirm that it refuses both. It has to be a fresh BACKEND connection rather than a fresh client one: a new client is routinely handed a server connection that was opened earlier, under the old certificate. `inet_client_addr()` is the address section 5 tells you to write into `pg_hba.conf`.
 
 Ask the pooler what it negotiated, and what identity it forces:
 
@@ -4568,7 +4595,11 @@ Finally, the console must reject a user on neither list, and it must reject it a
 psql "host=pooler.internal port=6432 dbname=pgbouncer user=app" -c 'SHOW VERSION;'
 ```
 
-That has to fail while connecting, with `not allowed`. A failure at the command instead means the login succeeded, which is what `auth_type = any` produces: the connection is admitted as a stats user and only privileged commands are refused. If the connection is accepted at all, check `auth_type` before anything else.
+That has to fail while connecting, with `not allowed`. `SHOW VERSION` is chosen because it has no administrator gate of its own, so it cannot fail for the wrong reason: if the connection is accepted, the command succeeds and prints a version, which is exactly what `auth_type = any` produces. Any answer other than a refusal at login means the console admitted a user on neither list, and `auth_type` is the first thing to check.
+
+This probe must also be run as an OS user that does NOT map to a console account, or `peer` on the Unix socket answers instead of the rule being tested.
+
+MFA: neither pooler adds a factor of its own, and the PostgreSQL wire protocol has no TOTP dialogue, so there is nothing here to turn on. PgBouncer's `auth_type` accepts `pam` and `ldap`, which is the hook for chaining to an MFA service where policy requires one; `cert`, or `client_tls_sslmode = verify-full` with `client_tls_ca_file`, adds a possession factor held by the connecting machine rather than by a person. Put the human paths to the host behind MFA per [mfa.md](mfa.md).
 
 ## Common mistakes
 
@@ -4579,6 +4610,8 @@ That has to fail while connecting, with `not allowed`. A failure at the command 
 - Widening the database server's `pg_hba.conf` because the old client ranges stopped matching, or assuming that narrowing it to the pooler stops anything else in the old range connecting directly.
 - Setting `user=` on a `[databases]` entry for convenience, which merges every client into one role and disables per-role privileges on the server.
 - Switching `auth_type` from `hba` to `scram-sha-256` to "tighten" it, which stops `auth_hba_file` being read and drops the client-range restriction with it.
+- Writing a `hostssl` rule in `pool_hba.conf` while `ssl` is still off, which does not fail closed: the record is ignored and the plaintext path stays open.
+- Putting a database password in `PGPASSWORD` in a shell you are pasting commands into. Use `~/.pgpass` at mode `600`.
 - Setting `listen_addresses` in `pgpool.conf` and expecting PCP to follow. `pcp_listen_addresses` is a separate setting, and `enable_pool_hba` is off by default, so pgpool-II authenticates nobody of its own until you turn it on.
 
 ## Sources (checked September 2026)
@@ -4595,6 +4628,12 @@ That has to fail while connecting, with `not allowed`. A failure at the command 
 - PostgreSQL connection information functions (`inet_client_addr`): https://www.postgresql.org/docs/current/functions-info.html
 - PostgreSQL statistics views, for what `pg_stat_ssl.ssl` does and does not report: https://www.postgresql.org/docs/current/monitoring-stats.html
 - PostgreSQL logging configuration (`log_line_prefix`): https://www.postgresql.org/docs/current/runtime-config-logging.html
+- PostgreSQL peer authentication, for why a console user name is not an OS identity: https://www.postgresql.org/docs/current/auth-peer.html
+- PostgreSQL environment variables, on `PGPASSWORD` being "not recommended for security reasons": https://www.postgresql.org/docs/current/libpq-envars.html
+- PostgreSQL password file, for the `~/.pgpass` format and its permission requirement: https://www.postgresql.org/docs/current/libpq-pgpass.html
+- psql, for what `-c` accepts: https://www.postgresql.org/docs/current/app-psql.html
+- Pgpool-II parameter syntax, which unlike pgbouncer.ini does treat a trailing `#` as a comment: https://www.pgpool.net/docs/latest/en/html/config-setting.html
+- Pgpool-II authentication methods: https://www.pgpool.net/docs/latest/en/html/auth-methods.html
 
 ======================================================================
 ==> mysql.md
