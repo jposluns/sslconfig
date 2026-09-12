@@ -30,7 +30,7 @@ Choose every route that applies; a deployment usually needs both service-specifi
 - Public web app with its own domain: [free-certificates.md](free-certificates.md), then the guide for your web server or proxy, then [authentication.md](authentication.md).
 - App on a home server or behind NAT, with a domain you can put on Cloudflare: [cloudflare.md](cloudflare.md). The tunnel removes the need for open inbound ports and Access adds login in front of the app. With no domain at all: [tailscale.md](tailscale.md) (Serve for tailnet-only access, Funnel only with the app's own login), or [self-signed.md](self-signed.md) for internal use.
 - Internal tool, staging, or local development: [self-signed.md](self-signed.md), with authentication still enabled.
-- Human login or SSO: [identity-providers.md](identity-providers.md), [oidc-integration.md](oidc-integration.md) for app integration; [cloud-identity-proxies.md](cloud-identity-proxies.md) or [fronting-auth.md](fronting-auth.md) for login in front; [mfa.md](mfa.md) for the second factor, with an explicit access policy.
+- Human login or SSO: [identity-providers.md](identity-providers.md) to choose one and [self-hosted-idp.md](self-hosted-idp.md) if you run it yourself, [oidc-integration.md](oidc-integration.md) for app integration; [cloud-identity-proxies.md](cloud-identity-proxies.md) or [fronting-auth.md](fronting-auth.md) for login in front; [mfa.md](mfa.md) for the second factor, with an explicit access policy.
 - Service-to-service or agent access: [machine-auth.md](machine-auth.md), [secrets.md](secrets.md).
 - AI or agent deployment: the matching model-server, MCP, agent-builder, vector-database, UI, or observability guide, plus [gpu-clouds.md](gpu-clouds.md) where applicable and [egress-metadata.md](egress-metadata.md) for outbound and metadata.
 - Containers and clusters: [docker.md](docker.md), [container-hardening.md](container-hardening.md), [kubernetes.md](kubernetes.md), then the host, cloud, PaaS, or GPU guide.
@@ -57,6 +57,7 @@ Choose every route that applies; a deployment usually needs both service-specifi
 |---|---|
 | [authentication.md](authentication.md) | Password storage, MFA, API keys, sessions, rate limiting, and secret handling |
 | [identity-providers.md](identity-providers.md) | Hosted identity and MFA: Entra ID, Google, Okta, Entra External ID, Firebase and Identity Platform, Auth0, Cognito, Clerk, WorkOS, Supabase Auth, Duo; free tiers and who each fits |
+| [self-hosted-idp.md](self-hosted-idp.md) | Self-hosted Keycloak and authentik: separating the admin surface at the proxy, the first-boot admin window, and the management port |
 | [oidc-integration.md](oidc-integration.md) | OIDC login wiring for Google, Microsoft Entra, GitHub, and Okta: PKCE, redirect URIs, token validation, and the allowlist check |
 | [cloud-identity-proxies.md](cloud-identity-proxies.md) | Login in front of the app with no code change: AWS ALB, Google IAP, Azure App Service, Cloudflare Access, ngrok, Vercel |
 | [fronting-auth.md](fronting-auth.md) | oauth2-proxy, Authelia, Pomerium: login and MFA in front of an app that has none |

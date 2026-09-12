@@ -15,6 +15,7 @@
         "mfa.md",
         "secrets.md",
         "identity-providers.md",
+        "self-hosted-idp.md",
         "oidc-integration.md",
         "cloud-identity-proxies.md",
         "machine-auth.md",

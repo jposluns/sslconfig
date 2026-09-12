@@ -21,6 +21,7 @@
 - [authentication](https://raw.githubusercontent.com/jposluns/secureconfig/main/authentication.md): password storage, sessions, API keys, rate limiting
 - [mfa](https://raw.githubusercontent.com/jposluns/secureconfig/main/mfa.md): MFA options: identity layers with QR-code TOTP enrolment, app libraries, SSH modules, Duo
 - [identity-providers](https://raw.githubusercontent.com/jposluns/secureconfig/main/identity-providers.md): hosted identity and MFA: Entra ID, Google, Okta, Auth0, Cognito, Clerk, WorkOS, Supabase Auth, Duo; free tiers and who each fits
+- [self-hosted-idp](https://raw.githubusercontent.com/jposluns/secureconfig/main/self-hosted-idp.md): Self-hosted Keycloak and authentik: separating the admin surface at the proxy, the first-boot admin window, and the management port
 - [oidc-integration](https://raw.githubusercontent.com/jposluns/secureconfig/main/oidc-integration.md): OIDC login wiring for Google, Microsoft Entra, GitHub, and Okta: PKCE, redirect URIs, token validation, allowlist check
 - [cloud-identity-proxies](https://raw.githubusercontent.com/jposluns/secureconfig/main/cloud-identity-proxies.md): login in front of the app with no code change: AWS ALB, Google IAP, Azure App Service, Cloudflare Access, ngrok, Vercel
 - [secrets](https://raw.githubusercontent.com/jposluns/secureconfig/main/secrets.md): keeping keys out of repositories, scanning, rotation after a leak
