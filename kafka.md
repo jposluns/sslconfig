@@ -4,7 +4,7 @@ Kafka's broker defaults are `listeners=PLAINTEXT://:9092`, `security.inter.broke
 
 ## 1. Replace the plaintext listener
 
-In `server.properties`, publish one `SASL_SSL` listener and use it between brokers too. Remove `PLAINTEXT://:9092`; if local tooling still needs it, bind it to `127.0.0.1` and never advertise it. KRaft controllers use their own listener (`controller.listener.names`); map it to `SASL_SSL` in `listener.security.protocol.map` (the documentation's example is `BROKER:SASL_SSL,CONTROLLER:SASL_SSL`) or keep it on a private interface.
+In `server.properties`, publish one `SASL_SSL` listener and use it between brokers too. Remove `PLAINTEXT://:9092`; if local tooling still needs it, bind it to `127.0.0.1` and never advertise it. KRaft controllers use their own listener (`controller.listener.names`); map it to `SASL_SSL` in `listener.security.protocol.map` (the documentation's example is `BROKER:SASL_SSL,CONTROLLER:SASL_SSL`) or keep it on a private interface. The prefix in `listener.name.<name>.*` is the listener's name lowercased, so if you rename a listener you must rename the prefix on every such line in this guide; a prefix that matches no listener is silently ignored rather than rejected.
 
 ```properties
 listeners=SASL_SSL://0.0.0.0:9093
@@ -87,7 +87,20 @@ Redpanda implements the Kafka wire protocol, so the client-side and protocol-lev
 
 ```bash
 ss -tlnp | grep -E '9092|9093'                                # 9093 only, or 9092 on 127.0.0.1
-openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake with your certificate
+openssl s_client -connect kafka.example.com:9093 -verify_hostname kafka.example.com \
+  -verify_return_error -CAfile ca.pem </dev/null              # prints Verification: OK. Point -CAfile at
+                                                              # the CA that signed the broker certificate;
+                                                              # omit it only for a publicly trusted one,
+                                                              # since an internal CA is not in the system
+                                                              # store and the check would fail on a
+                                                              # correct cluster. Without the verify flags
+                                                              # the handshake succeeds against any
+                                                              # certificate and shows only that TLS is on
+                                                              # This matches the listener as configured above, which
+                                                              # does not require client certificates. If you set
+                                                              # listener.name.sasl_ssl.ssl.client.auth=required, add
+                                                              # -cert and -key: without them the broker refuses the
+                                                              # connection and "Verification: OK" still prints.
 # wrong.properties: a copy of client.properties (security.protocol=SASL_SSL) with a deliberately wrong SCRAM password
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
   --group app-workers --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)

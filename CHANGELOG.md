@@ -93,6 +93,28 @@ with the merged pull request is therefore an authoring obligation, not an enforc
   The detection gap worth recording: the audit flagged redirects that lost path depth, which catches a
   page collapsing to a documentation root, but not `docs.gunicorn.org/` redirecting to `gunicorn.org/`,
   where the depth is unchanged and only the host differs.
+- The `rabbitmq.md` Verify step could not complete the mutually authenticated connection the guide's own
+  configuration requires (#21). `ssl_options.fail_if_no_peer_cert = true` makes the broker demand a
+  client certificate and the command supplied neither `-cert` nor `-key`, so the run that failed to
+  connect still printed "Verification: OK", which reports the server certificate rather than the
+  client's, and the comment named that line as the pass condition. It is now a pair: one invocation
+  carrying client credentials that must reach a session, one without them that the broker must refuse,
+  with the pass condition stated as the shape of the outcome rather than a message to match on. The
+  negative run holds stdin open with `sleep 2` rather than closing it with `</dev/null`, because on TLS
+  1.3 the server can only refuse an empty client certificate after the client's flight and s_client
+  otherwise reaches end of input and exits before the rejection arrives; measured against a server
+  requiring a client certificate, the `</dev/null` form exited 0 and printed a full session block in four
+  trials of five, indistinguishable from the positive run.
+- `deserialises` in `ray.md`, a second `-ise` spelling in the same file (#21). It sits in the opening
+  risk statement, describing what cloudpickle does to arbitrary Python objects, and now reads
+  `deserializes`.
+- `kafka.md` named the unprefixed `ssl.client.auth=required` as the way to require client certificates
+  (#21). The guide configures a SASL_SSL listener, and its own section 5 already states that the
+  unprefixed setting applies to SSL listeners only and that Kafka logs a warning when it is set without
+  the prefix on a SASL_SSL broker, so the advice was inert: a reader who followed it would have believed
+  client certificates were required while they were not. It now names
+  `listener.name.sasl_ssl.ssl.client.auth=required`, which is what the rest of the guide already says.
+  The clause was added earlier in this branch and corrected within it.
 
 ### Changed
 
@@ -142,6 +164,34 @@ with the merged pull request is therefore an authoring obligation, not an enforc
 
 ### Added
 
+- Two gates for conventions this repository stated and never checked (#21).
+  `tools/check_verify_safety.py` fails when a command inside a Verify block skips TLS certificate
+  verification, a rule stated in `common-mistakes.md`, `self-signed.md` and `README.sources.md` and
+  broken in three Verify blocks before anything checked. `tools/check_prose_conventions.py` fails on
+  British `-ise` spellings and on placeholders outside the house set. Both found defects live on `main`
+  the first time they ran: `ray.md` carried `randomised`, which the corpus-wide conversion in #18 missed
+  because its word list omitted that stem, and `pocketbase.md` carried `yourdomain.com`, a real
+  registered domain that an audit had identified and no change had fixed.
+- Three Verify steps that asserted a certificate check they did not perform (#21). `kafka.md`,
+  `neo4j.md` and `memcached.md` each ran a bare `openssl s_client -connect` in a Verify block, two of
+  them commented "TLS handshake with your certificate". Without `-CAfile`, `-verify_hostname` or
+  `-verify_return_error` the handshake succeeds against any certificate, so the comment asserted what
+  the command did not check, and `self-signed.md` and `rabbitmq.md` already carried the correct form.
+  These surfaced only because the first version of the new gate got the openssl case backwards: it
+  matched `-verify_return_error 0`, a syntax OpenSSL does not have, for a flag whose presence is the
+  safe state. Cross-family review found the dead pattern, and fixing it exposed the guides behind it.
+  The exemption for certificate inspection was removed after review showed it was a laundering pipe,
+  since appending `| openssl x509` to an unverified handshake made the line pass, and the two guides
+  that inspect a publicly trusted certificate, `deployment-lifecycle.md` and `free-certificates.md`,
+  now pass because their commands carry `-verify_hostname` and `-verify_return_error`, not because an
+  exemption covers them.
+- `tools/test_convention_gates.py`, the regression suite for the two new gates (#21). It records one case
+  per input a reviewer demonstrated against them, so every way past a gate that review found is a
+  standing check rather than a one-off fix, and the inputs the gates still get wrong are asserted as the
+  gates' current answer rather than dropped: quote state is per physical line, so a quotation spanning a
+  line break hides what follows it, and inside a fence only a shell-style trailing comment is read as
+  prose, so a hash inside a Python triple-quoted string is read as one. Both limits are named in the
+  gates' docstrings as well.
 - A "Bound the expensive endpoints" section in each of the four proxy guides (#20).
   `realtime-webhooks.md` and `authentication.md` both require request-size, concurrency and timeout
   limits on inference, upload and job-submission endpoints, naming denial of wallet as the failure

@@ -40,7 +40,27 @@ MFA: there is no login for a person, so no second factor applies; human access t
 ss -tlnup | grep 11211                                    # 127.0.0.1 or the private address; no UDP line
 printf 'stats\r\nquit\r\n' | nc 127.0.0.1 11211           # works locally
 printf 'stats\r\nquit\r\n' | nc cache.example.com 11211   # from outside: connection refused or timeout
-openssl s_client -connect 10.0.0.5:11211 </dev/null       # TLS handshake when -Z is on
+openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_ip 10.0.0.5 \
+  -verify_return_error </dev/null
+                                                          # prints Verification: OK when -Z is on. A bare
+                                                          # handshake with no CA file shows TLS is enabled,
+                                                          # not that the certificate is trusted
+                                                          # -verify_ip binds the certificate to this
+                                                          # address, so it needs an iPAddress SAN for
+                                                          # 10.0.0.5; use -verify_hostname with the
+                                                          # name instead where the certificate carries
+                                                          # a DNS SAN. Chain checks alone accept any
+                                                          # certificate that CA signed
+                                                          # Omit -CAfile only for a publicly trusted
+                                                          # certificate, whose issuer is already in the system
+                                                          # store. On that path use -verify_hostname with the
+                                                          # name on the certificate rather than -verify_ip,
+                                                          # since a certificate issued for a DNS name carries
+                                                          # no iPAddress SAN.
+                                                          # This matches the default, which does not require
+                                                          # client certificates. With -o ssl_verify_mode=2, add
+                                                          # -cert and -key: without them memcached refuses the
+                                                          # connection and "Verification: OK" still prints.
 ```
 
 With `-S`, a plain `stats` over the text protocol is rejected, because the binary protocol is enforced.

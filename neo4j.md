@@ -56,7 +56,20 @@ Clients and drivers connect with `neo4j+s://`, which verifies the certificate; `
 
 ```bash
 ss -tlnp | grep -E '7474|7473|7687'                             # 7473 and 7687 only, on the intended address
-openssl s_client -connect neo4j.example.com:7687 </dev/null      # TLS handshake with your certificate
+openssl s_client -connect neo4j.example.com:7687 -verify_hostname neo4j.example.com \
+  -verify_return_error -CAfile ca.pem </dev/null                 # prints Verification: OK. Point -CAfile
+                                                                 # at the CA that signed the server
+                                                                 # certificate; omit it only for a
+                                                                 # publicly trusted one, since a
+                                                                 # self-signed or internal CA is not in
+                                                                 # the system store and the check would
+                                                                 # fail on a correct deployment. Without
+                                                                 # the verify flags the handshake succeeds
+                                                                 # against any certificate
+                                                                 # This matches client_auth=NONE as configured above.
+                                                                 # With client_auth=REQUIRE, add -cert and -key: without
+                                                                 # them the server refuses the connection and
+                                                                 # "Verification: OK" still prints.
 curl -sI http://neo4j.example.com:7474/                          # connection refused
 cypher-shell -a neo4j://neo4j.example.com:7687 -u app -p '...'   # unencrypted: refused with tls_level=REQUIRED
 cypher-shell -a neo4j+s://neo4j.example.com:7687 -u neo4j -p neo4j   # default credential: authentication failure

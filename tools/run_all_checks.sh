@@ -120,6 +120,11 @@ echo "== every guide has a Verify section and dated Sources =="
 # appears on the page it cites; both stay authoring obligations enforced by review.
 if guide_shape=$(python3 tools/check_guide_shape.py 2>&1); then
   printf '%s\n' "$guide_shape"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  # Aligned with the two gates below; not new behaviour for this gate.
+  if grep -q '^  FAIL  ' <<< "$guide_shape"; then
+    bad "check_guide_shape.py printed findings but exited 0"
+  fi
 elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$guide_shape"; then
   # A crash, INCLUDING one that printed some FAIL lines before dying. The gate did not
   # finish, so its findings are incomplete and must never read as a complete verdict.
@@ -133,6 +138,73 @@ else
   # Exited non-zero saying nothing useful: a kill, or an empty failure.
   bad "check_guide_shape.py exited non-zero without reporting a gate result"
   printf '%s\n' "$guide_shape" | sed 's/^/          /'
+fi
+
+echo "== no code block disables TLS verification =="
+# Three Verify blocks passed curl -k before anything checked, while three other files in this corpus
+# told the reader not to. A probe that skips certificate verification is satisfied by a substituted
+# certificate as readily as by the right one, so the TLS half of such a check certifies nothing. This
+# gate reads only fenced code blocks, never prose, so a guide may still NAME the flag in a sentence to
+# warn against it.
+if verify_safety=$(python3 tools/check_verify_safety.py 2>&1); then
+  printf '%s\n' "$verify_safety"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$verify_safety"; then
+    bad "check_verify_safety.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$verify_safety"; then
+  bad "check_verify_safety.py crashed; its findings are incomplete"
+  printf '%s\n' "$verify_safety" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$verify_safety"; then
+  printf '%s\n' "$verify_safety"
+  fail=1
+else
+  bad "check_verify_safety.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$verify_safety" | sed 's/^/          /'
+fi
+
+echo "== prose conventions: Oxford -ize and house placeholders =="
+# A corpus-wide -ize conversion missed a word because its word list was incomplete, and the same word
+# was written into a new guide hours later. A placeholder outside the house set reached the corpus and
+# stayed. Both are closed lists, so this catches what it names and nothing else. Quoted and backticked
+# spans are exempt from the SPELLING check only, so a changelog entry can quote the old spelling.
+if prose_conv=$(python3 tools/check_prose_conventions.py 2>&1); then
+  printf '%s\n' "$prose_conv"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$prose_conv"; then
+    bad "check_prose_conventions.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$prose_conv"; then
+  bad "check_prose_conventions.py crashed; its findings are incomplete"
+  printf '%s\n' "$prose_conv" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$prose_conv"; then
+  printf '%s\n' "$prose_conv"
+  fail=1
+else
+  bad "check_prose_conventions.py exited non-zero without reporting a gate result"
+  printf '%s\n' "$prose_conv" | sed 's/^/          /'
+fi
+
+echo "== the convention gates still catch what review found =="
+# The two gates above were broken repeatedly across rounds of cross-family review, and
+# several of those rounds broke something an earlier round had fixed. Each case in this
+# file is an input a reviewer actually ran, recorded so that a future change lands on a
+# named prior finding instead of silently reopening it. It checks the gates, not the corpus.
+if gate_tests=$(python3 tools/test_convention_gates.py 2>&1); then
+  printf '%s\n' "$gate_tests"
+  # A gate that exits 0 while printing findings would otherwise read as a pass.
+  if grep -q '^  FAIL  ' <<< "$gate_tests"; then
+    bad "test_convention_gates.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$gate_tests"; then
+  bad "test_convention_gates.py crashed; the gates are unverified"
+  printf '%s\n' "$gate_tests" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$gate_tests"; then
+  printf '%s\n' "$gate_tests"
+  fail=1
+else
+  bad "test_convention_gates.py exited non-zero without reporting a result"
+  printf '%s\n' "$gate_tests" | sed 's/^/          /'
 fi
 
 echo "== local links resolve =="

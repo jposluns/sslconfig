@@ -316,7 +316,8 @@ A CAA DNS record restricts which certificate authorities may issue for your doma
 ```bash
 sudo certbot certificates                       # what is issued and when it expires
 curl -sI https://example.com/                   # succeeds without -k
-openssl s_client -connect example.com:443 -servername example.com </dev/null \
+openssl s_client -connect example.com:443 -servername example.com \
+  -verify_hostname example.com -verify_return_error </dev/null \
   | openssl x509 -noout -issuer -dates
 ```
 
@@ -3801,7 +3802,8 @@ nmap -p- 203.0.113.10                                  # only the intended ports
 nmap -6 -p- 2001:db8::10                               # same, over the public IPv6 address
 curl -sI https://retired-preview.example.com/          # expect DNS failure or connection error
 dig +short retired-preview.example.com                 # expect no record, not a dangling CNAME
-openssl s_client -connect app.example.com:443 -servername app.example.com </dev/null \
+openssl s_client -connect app.example.com:443 -servername app.example.com \
+  -verify_hostname app.example.com -verify_return_error </dev/null \
   | openssl x509 -noout -enddate                        # run from outside on a schedule
 ```
 
@@ -4294,7 +4296,49 @@ The management plugin's web UI is an admin panel: keep it off public interfaces 
 
 ```bash
 ss -tlnp | grep -E '5671|5672|15672'      # 5672 gone once listeners.tcp = none; UI private
-openssl s_client -connect mq.example.com:5671 -CAfile ca.pem </dev/null   # TLS handshake
+
+# Positive: a client holding a certificate connects.
+# client.pem and client.key are a CLIENT certificate and key issued by the CA in
+# ssl_options.cacertfile, with TLS Web Client Authentication in its extended key usage.
+# A serverAuth-only certificate signed by that same CA is NOT a substitute, and the
+# reason is the extended key usage rather than the chain: the chain verifies either way,
+# which is what makes this an easy mistake to make and a hard one to see. A certificate
+# carrying both serverAuth and clientAuth does satisfy it, which RabbitMQ documents
+# while still recommending separate certificates for the two purposes.
+sleep 10 | openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
+  -cert client.pem -key client.key \
+  -verify_hostname mq.example.com -verify_return_error
+echo "positive run exit $?"
+
+# Negative, and this half is what discriminates: drop -cert and -key, and the broker must
+# refuse the connection, because ssl_options.fail_if_no_peer_cert = true requires one.
+sleep 10 | openssl s_client -connect mq.example.com:5671 -CAfile ca.pem \
+  -verify_hostname mq.example.com -verify_return_error
+echo "negative run exit $?"
+
+# "Verification: OK" reports the SERVER certificate only, and it prints in BOTH runs. The
+# pass condition is the pair: the first run exits 0 and the second does not. Do
+# not match on a particular message. The broker rejects an empty client certificate list
+# with a fatal alert. On TLS 1.3 the client can consider its own side finished before that
+# alert arrives, and the exact wording comes from whichever TLS stack is reporting it.
+# What you are looking for is a non-zero exit from the second run. Note the `sleep 10` on
+# BOTH runs: with `</dev/null` s_client reaches end of input and exits before the rejection
+# arrives, because on TLS 1.3 the server can only refuse the empty client certificate after
+# the client's flight. Measured, that negative run exits 0 and prints a full session block
+# four times in five, which is indistinguishable from the positive one. Holding stdin open
+# is what makes the refusal observable, and the hold has to outlast the broker's own
+# handshake timeout, not just the round trip: `sleep 10` starts at the same moment as
+# s_client, before DNS, the TCP connect and the negotiation, so a short hold can be spent
+# before the moment it was meant to cover. This check is timing-dependent and says so. If
+# BOTH runs exit 0, treat that as inconclusive rather than as a pass, and read the broker
+# log, which records the rejection regardless of what the client saw. The positive run
+# needs it for the same reason in reverse: with `</dev/null` it exits 0 before a rejection
+# of a WRONG client certificate can arrive, so a broken deployment reads as a working one.
+# Reading "Verification: OK" from the second run as a success is the mistake this pair
+# exists to catch. Without -verify_return_error the handshake completes even when the
+# server certificate fails to verify, so -CAfile alone proves only that TLS is on. If you
+# set fail_if_no_peer_cert = false, the second run succeeds as well and the pair proves
+# nothing, because a password is then the client's only identity.
 # Remote login attempt as guest fails: "user 'guest' can only connect via localhost"
 ```
 
@@ -4363,7 +4407,7 @@ Kafka's broker defaults are `listeners=PLAINTEXT://:9092`, `security.inter.broke
 
 ## 1. Replace the plaintext listener
 
-In `server.properties`, publish one `SASL_SSL` listener and use it between brokers too. Remove `PLAINTEXT://:9092`; if local tooling still needs it, bind it to `127.0.0.1` and never advertise it. KRaft controllers use their own listener (`controller.listener.names`); map it to `SASL_SSL` in `listener.security.protocol.map` (the documentation's example is `BROKER:SASL_SSL,CONTROLLER:SASL_SSL`) or keep it on a private interface.
+In `server.properties`, publish one `SASL_SSL` listener and use it between brokers too. Remove `PLAINTEXT://:9092`; if local tooling still needs it, bind it to `127.0.0.1` and never advertise it. KRaft controllers use their own listener (`controller.listener.names`); map it to `SASL_SSL` in `listener.security.protocol.map` (the documentation's example is `BROKER:SASL_SSL,CONTROLLER:SASL_SSL`) or keep it on a private interface. The prefix in `listener.name.<name>.*` is the listener's name lowercased, so if you rename a listener you must rename the prefix on every such line in this guide; a prefix that matches no listener is silently ignored rather than rejected.
 
 ```properties
 listeners=SASL_SSL://0.0.0.0:9093
@@ -4446,7 +4490,20 @@ Redpanda implements the Kafka wire protocol, so the client-side and protocol-lev
 
 ```bash
 ss -tlnp | grep -E '9092|9093'                                # 9093 only, or 9092 on 127.0.0.1
-openssl s_client -connect kafka.example.com:9093 </dev/null   # TLS handshake with your certificate
+openssl s_client -connect kafka.example.com:9093 -verify_hostname kafka.example.com \
+  -verify_return_error -CAfile ca.pem </dev/null              # prints Verification: OK. Point -CAfile at
+                                                              # the CA that signed the broker certificate;
+                                                              # omit it only for a publicly trusted one,
+                                                              # since an internal CA is not in the system
+                                                              # store and the check would fail on a
+                                                              # correct cluster. Without the verify flags
+                                                              # the handshake succeeds against any
+                                                              # certificate and shows only that TLS is on
+                                                              # This matches the listener as configured above, which
+                                                              # does not require client certificates. If you set
+                                                              # listener.name.sasl_ssl.ssl.client.auth=required, add
+                                                              # -cert and -key: without them the broker refuses the
+                                                              # connection and "Verification: OK" still prints.
 # wrong.properties: a copy of client.properties (security.protocol=SASL_SSL) with a deliberately wrong SCRAM password
 bin/kafka-console-consumer.sh --bootstrap-server kafka.example.com:9093 --consumer.config wrong.properties \
   --group app-workers --topic orders --from-beginning --max-messages 1   # must fail with an authentication error (SaslAuthenticationException)
@@ -4625,7 +4682,20 @@ Clients and drivers connect with `neo4j+s://`, which verifies the certificate; `
 
 ```bash
 ss -tlnp | grep -E '7474|7473|7687'                             # 7473 and 7687 only, on the intended address
-openssl s_client -connect neo4j.example.com:7687 </dev/null      # TLS handshake with your certificate
+openssl s_client -connect neo4j.example.com:7687 -verify_hostname neo4j.example.com \
+  -verify_return_error -CAfile ca.pem </dev/null                 # prints Verification: OK. Point -CAfile
+                                                                 # at the CA that signed the server
+                                                                 # certificate; omit it only for a
+                                                                 # publicly trusted one, since a
+                                                                 # self-signed or internal CA is not in
+                                                                 # the system store and the check would
+                                                                 # fail on a correct deployment. Without
+                                                                 # the verify flags the handshake succeeds
+                                                                 # against any certificate
+                                                                 # This matches client_auth=NONE as configured above.
+                                                                 # With client_auth=REQUIRE, add -cert and -key: without
+                                                                 # them the server refuses the connection and
+                                                                 # "Verification: OK" still prints.
 curl -sI http://neo4j.example.com:7474/                          # connection refused
 cypher-shell -a neo4j://neo4j.example.com:7687 -u app -p '...'   # unencrypted: refused with tls_level=REQUIRED
 cypher-shell -a neo4j+s://neo4j.example.com:7687 -u neo4j -p neo4j   # default credential: authentication failure
@@ -4696,7 +4766,27 @@ MFA: there is no login for a person, so no second factor applies; human access t
 ss -tlnup | grep 11211                                    # 127.0.0.1 or the private address; no UDP line
 printf 'stats\r\nquit\r\n' | nc 127.0.0.1 11211           # works locally
 printf 'stats\r\nquit\r\n' | nc cache.example.com 11211   # from outside: connection refused or timeout
-openssl s_client -connect 10.0.0.5:11211 </dev/null       # TLS handshake when -Z is on
+openssl s_client -connect 10.0.0.5:11211 -CAfile ca.pem -verify_ip 10.0.0.5 \
+  -verify_return_error </dev/null
+                                                          # prints Verification: OK when -Z is on. A bare
+                                                          # handshake with no CA file shows TLS is enabled,
+                                                          # not that the certificate is trusted
+                                                          # -verify_ip binds the certificate to this
+                                                          # address, so it needs an iPAddress SAN for
+                                                          # 10.0.0.5; use -verify_hostname with the
+                                                          # name instead where the certificate carries
+                                                          # a DNS SAN. Chain checks alone accept any
+                                                          # certificate that CA signed
+                                                          # Omit -CAfile only for a publicly trusted
+                                                          # certificate, whose issuer is already in the system
+                                                          # store. On that path use -verify_hostname with the
+                                                          # name on the certificate rather than -verify_ip,
+                                                          # since a certificate issued for a DNS name carries
+                                                          # no iPAddress SAN.
+                                                          # This matches the default, which does not require
+                                                          # client certificates. With -o ssl_verify_mode=2, add
+                                                          # -cert and -key: without them memcached refuses the
+                                                          # connection and "Verification: OK" still prints.
 ```
 
 With `-S`, a plain `stats` over the text protocol is rejected, because the binary protocol is enforced.
@@ -5884,7 +5974,7 @@ A token issued for a different resource (wrong audience) must also fail with `40
 
 # Ray: dashboard, Jobs, and Client ports execute code
 
-Ray's own security page is blunt: if you expose the Ray Dashboard, Ray Jobs, or Ray Client services, "anybody who can access the associated ports can execute arbitrary code on your Ray Cluster", explicitly by submitting a Job or connecting a Client, indirectly through the Dashboard REST API, and implicitly because Ray deserialises arbitrary Python objects with cloudpickle. Ray "doesn't implement access controls for developers interacting with a given cluster"; security and isolation "must be enforced outside of the Ray Cluster". The ports in question are the dashboard (and Jobs API) on `8265`, the Ray Client server on `10001`, and the head node port `6379`, all plain HTTP or gRPC with no login of their own.
+Ray's own security page is blunt: if you expose the Ray Dashboard, Ray Jobs, or Ray Client services, "anybody who can access the associated ports can execute arbitrary code on your Ray Cluster", explicitly by submitting a Job or connecting a Client, indirectly through the Dashboard REST API, and implicitly because Ray deserializes arbitrary Python objects with cloudpickle. Ray "doesn't implement access controls for developers interacting with a given cluster"; security and isolation "must be enforced outside of the Ray Cluster". The ports in question are the dashboard (and Jobs API) on `8265`, the Ray Client server on `10001`, and the head node port `6379`, all plain HTTP or gRPC with no login of their own.
 
 ## 1. Keep the dashboard on loopback
 
@@ -5909,7 +5999,7 @@ A tailnet ([tailscale.md](tailscale.md)) is the other clean option: the dashboar
 
 ## 2. Network isolation is the primary boundary
 
-Ray expects "a controlled, isolated network" between all its components. Beyond `8265`, the head node listens on `6379` (head process), `10001` (Ray Client), and every node opens worker ports `10002` to `19999` by default plus several randomised ports. Put every node of a cluster in one private network or security group that admits only the cluster's own members ([cloud-firewalls.md](cloud-firewalls.md), [host.md](host.md), [kubernetes.md](kubernetes.md)), and expose nothing from that group to the internet. The Ray Client port in particular is a remote code execution endpoint by design; use Ray Jobs over the forwarded dashboard port instead of publishing `10001`.
+Ray expects "a controlled, isolated network" between all its components. Beyond `8265`, the head node listens on `6379` (head process), `10001` (Ray Client), and every node opens worker ports `10002` to `19999` by default plus several randomized ports. Put every node of a cluster in one private network or security group that admits only the cluster's own members ([cloud-firewalls.md](cloud-firewalls.md), [host.md](host.md), [kubernetes.md](kubernetes.md)), and expose nothing from that group to the internet. The Ray Client port in particular is a remote code execution endpoint by design; use Ray Jobs over the forwarded dashboard port instead of publishing `10001`.
 
 Ray does not isolate jobs from each other. Workloads that must not see each other's data or credentials go on separate clusters.
 
@@ -7218,7 +7308,7 @@ the server's own startup log. Do not leave a fresh instance open to the network 
 is still unclaimed.
 
 PocketBase has no native TLS listener beyond its own ACME integration: run
-`./pocketbase serve yourdomain.com` and it issues and renews a Let's Encrypt certificate for that
+`./pocketbase serve example.com` and it issues and renews a Let's Encrypt certificate for that
 domain automatically, or put it behind your own reverse proxy per [nginx.md](nginx.md) or
 [caddy.md](caddy.md) and terminate TLS there instead.
 

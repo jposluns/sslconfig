@@ -1,6 +1,6 @@
 # Ray: dashboard, Jobs, and Client ports execute code
 
-Ray's own security page is blunt: if you expose the Ray Dashboard, Ray Jobs, or Ray Client services, "anybody who can access the associated ports can execute arbitrary code on your Ray Cluster", explicitly by submitting a Job or connecting a Client, indirectly through the Dashboard REST API, and implicitly because Ray deserialises arbitrary Python objects with cloudpickle. Ray "doesn't implement access controls for developers interacting with a given cluster"; security and isolation "must be enforced outside of the Ray Cluster". The ports in question are the dashboard (and Jobs API) on `8265`, the Ray Client server on `10001`, and the head node port `6379`, all plain HTTP or gRPC with no login of their own.
+Ray's own security page is blunt: if you expose the Ray Dashboard, Ray Jobs, or Ray Client services, "anybody who can access the associated ports can execute arbitrary code on your Ray Cluster", explicitly by submitting a Job or connecting a Client, indirectly through the Dashboard REST API, and implicitly because Ray deserializes arbitrary Python objects with cloudpickle. Ray "doesn't implement access controls for developers interacting with a given cluster"; security and isolation "must be enforced outside of the Ray Cluster". The ports in question are the dashboard (and Jobs API) on `8265`, the Ray Client server on `10001`, and the head node port `6379`, all plain HTTP or gRPC with no login of their own.
 
 ## 1. Keep the dashboard on loopback
 
@@ -25,7 +25,7 @@ A tailnet ([tailscale.md](tailscale.md)) is the other clean option: the dashboar
 
 ## 2. Network isolation is the primary boundary
 
-Ray expects "a controlled, isolated network" between all its components. Beyond `8265`, the head node listens on `6379` (head process), `10001` (Ray Client), and every node opens worker ports `10002` to `19999` by default plus several randomised ports. Put every node of a cluster in one private network or security group that admits only the cluster's own members ([cloud-firewalls.md](cloud-firewalls.md), [host.md](host.md), [kubernetes.md](kubernetes.md)), and expose nothing from that group to the internet. The Ray Client port in particular is a remote code execution endpoint by design; use Ray Jobs over the forwarded dashboard port instead of publishing `10001`.
+Ray expects "a controlled, isolated network" between all its components. Beyond `8265`, the head node listens on `6379` (head process), `10001` (Ray Client), and every node opens worker ports `10002` to `19999` by default plus several randomized ports. Put every node of a cluster in one private network or security group that admits only the cluster's own members ([cloud-firewalls.md](cloud-firewalls.md), [host.md](host.md), [kubernetes.md](kubernetes.md)), and expose nothing from that group to the internet. The Ray Client port in particular is a remote code execution endpoint by design; use Ray Jobs over the forwarded dashboard port instead of publishing `10001`.
 
 Ray does not isolate jobs from each other. Workloads that must not see each other's data or credentials go on separate clusters.
 
