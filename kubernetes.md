@@ -88,6 +88,11 @@ Gateway API defines no authentication filter; each implementation adds its own. 
 read -rs -p 'basic auth password: ' PASSWORD
 echo
 printf '%s' "$PASSWORD" | htpasswd -cis .htpasswd admin
+# -i does no verification, so a mistyped or mis-consumed value is written silently. Check it
+# before the secret is created: `read` takes the NEXT LINE of input, so pasting this whole
+# block into a shell without bracketed paste feeds it the following line instead of your
+# password, and every command after that still succeeds.
+printf '%s' "$PASSWORD" | htpasswd -vi .htpasswd admin
 unset PASSWORD
 kubectl create secret generic app-basic-auth --from-file=.htpasswd
 ```
