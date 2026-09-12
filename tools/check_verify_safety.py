@@ -234,19 +234,28 @@ SEARCH_COMMAND = re.compile(
     r"""^\s*['"(`]*(?:grep|egrep|fgrep|rg|ag|ack)\b"""
     r"""|^\s*['"(`]*git\s+(?:grep\b|log\b.*?\s-S\b)""")
 
+# A search tool that has been handed something to RUN is not searching any more. `git grep
+# --open-files-in-pager=...` executes its argument on a match, and ripgrep's --pre runs a
+# preprocessor, so the exemption has to stand down whenever one of these appears. Denying the
+# exemption only means the segment is scanned normally, which is the safe direction.
+SEARCH_EXECUTES = re.compile(
+    r"(?:^|\s)(?:-O|--open-files-in-pager|--pre|--pager|--exec)\b")
+
 # openssl s_client verifies nothing unless one of these appears.
 SCLIENT = re.compile(r"(?:^|[\s'\"/=`(])openssl\s+s_client\b")
 # OpenSSL: "the verify operation continues after errors" unless -verify_return_error is
 # given, so a trust source alone does not make verification fatal. The negative forms
 # (-no-CAfile and friends) DISABLE trust, so they must not satisfy this.
-SCLIENT_VERIFIES = re.compile(r"""(?:^|\s)-verify_return_error(?:[\s<>|)`'";&]|$)""")
+# Leading class mirrors CURL_FLAG's. Fixing one and not the other is how a correct quoted
+# invocation came to be reported as unverified.
+SCLIENT_VERIFIES = re.compile(r"""(?:^|[\s'"])-verify_return_error(?:[\s<>|)`'";&]|$)""")
 SCLIENT_HELP = re.compile(r"\s-(?:help|h)\b")
 # Chain verification without an identity check binds nothing to the endpoint: it accepts
 # any unexpired certificate that CA signed, for any hostname. self-signed.md says so.
 # `-verify_email` is deliberately NOT here. It matches an email SAN, which says nothing about
 # the host you connected to: a certificate for wrong.example.com carrying the right email
 # address passes it and fails -verify_hostname, demonstrated against OpenSSL.
-SCLIENT_BINDS = re.compile(r"""(?:^|\s)-verify_(?:hostname|ip)(?:[\s<>|)=`'";&]|$)""")
+SCLIENT_BINDS = re.compile(r"""(?:^|[\s'"])-verify_(?:hostname|ip)(?:[\s<>|)=`'";&]|$)""")
 
 
 def logical_lines(text):
@@ -357,7 +366,7 @@ def findings_for(code):  # noqa: C901
     """
     hits = []
     for segment, _sep in split_segments(code):
-        if SEARCH_COMMAND.search(segment):
+        if SEARCH_COMMAND.search(segment) and not SEARCH_EXECUTES.search(segment):
             continue
         if INSECURE_CURL.search(segment) and CURL_FLAG.search(segment):
             hits.append("curl -k / --insecure")

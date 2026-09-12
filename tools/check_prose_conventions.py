@@ -138,7 +138,10 @@ QUOTED_RE = re.compile("(`+)(?:(?!\\1)[\\s\\S])*?\\1|\"[^\"]*\"|“[^”]*”")
 # URL path.
 # Case-insensitive, because a URI scheme is: `HTTPS://host/authorisation` is a valid URL and
 # respelling its path breaks the link just the same.
-URL_RE = re.compile(r"""https?://[^\s"`<>]+""", re.I)
+# The curly quotes are in that class for the same reason the straight one is: adding them to
+# QUOTED_RE without adding them here reopened the interaction the straight quote had already
+# closed, and hid a real finding behind a blanked span.
+URL_RE = re.compile("""https?://[^\\s"`<>“”]+""", re.I)
 
 
 def unquoted(line):
@@ -192,9 +195,12 @@ def _url_tail_spans(line):
         scheme_end = url.find("://")
         if scheme_end == -1:
             continue
-        slash = url.find("/", scheme_end + 3)
-        if slash != -1:
-            spans.append((m.start() + slash, m.end()))
+        # The authority ends at the first of `/`, `?` or `#`. Looking only for a slash left a
+        # URL with an empty path reading as all authority, so its query data was judged as a
+        # hostname.
+        cuts = [i for i in (url.find(c, scheme_end + 3) for c in "/?#") if i != -1]
+        if cuts:
+            spans.append((m.start() + min(cuts), m.end()))
     return spans
 
 

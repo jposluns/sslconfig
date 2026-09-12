@@ -118,6 +118,8 @@ TLS_CASES = (
      'curl "-k" https://example.com/', True, 10),
     ("a git flag that really does disable verification is still caught",
      "git -c http.sslVerify=false clone https://example.com/r.git", True, 10),
+    ("a search tool handed something to run",
+     "git grep --open-files-in-pager='curl -k https://example.com/' certificate", True, 13),
 
     # FALSE ALARMS. Each of these was legitimate text a shipped version rejected.
     ("sort -k inside a quoted command substitution",
@@ -161,6 +163,9 @@ TLS_CASES = (
      "grep -rn 'curl -k' /etc/cron.d", False, 10),
     ("a git history search for the pattern",
      "git log -S 'rejectUnauthorized: false' -- src/", False, 10),
+    ("quoted s_client flags are still the flags",
+     "openssl s_client -connect example.com:443 '-verify_hostname' example.com "
+     "'-verify_return_error'", False, 13),
 )
 
 
@@ -203,6 +208,8 @@ PROSE_CASES = (
      "The vendor characterises the endpoint as internal.", True, 10),
     ("emphasise, which needs a suffix to be wrong",
      "They emphasise the default is insecure.", True, 10),
+    ("a URL ending against a typographic closing quote",
+     "The vendor says “see https://example.com/”; randomised ports are “normal”.", True, 13),
 
     # FALSE ALARMS.
     ("a .internal host whose left label looks like a placeholder",
@@ -258,6 +265,8 @@ PROSE_CASES = (
      "The vendor says “requests are randomised per connection”.", False, 9),
     ("emphasis, the ordinary noun, is not a British spelling",
      "The emphasis here is on the default.", False, 10),
+    ("a placeholder in a URL query is not the hostname",
+     "See https://example.com?previous=yourdomain.com for migration details.", False, 13),
 )
 
 
