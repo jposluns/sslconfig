@@ -8,7 +8,7 @@ Run a current PgBouncer. 1.25.2 fixes four advisories, and they need different t
 
 ## 1. What the pooler binds, and on which port
 
-A comment in `pgbouncer.ini` must start its own line. The vendor is explicit that "the characters `;` and `#` are not recognized as special when they appear later in the line", so a trailing comment becomes part of the value and the setting is not what it looks like.
+A comment in `pgbouncer.ini` must start its own line. The vendor is explicit: "The characters “;” and “#” are not recognized as special when they appear later in the line." A trailing comment therefore becomes part of the value and the setting is not what it looks like.
 
 ```ini
 ; /etc/pgbouncer/pgbouncer.ini
@@ -80,9 +80,11 @@ ssl_ca_cert = '/etc/ssl/certs/postgres-ca.crt'
 
 The documentation describes CA verification and does not document a host name check on the backend connection, so do not assume the two products' strictest modes are equivalent: where a host name match matters, PgBouncer's `verify-full` is the one that states it.
 
+One more thing is not established for pgpool-II, and this guide will not claim it. A CA file decides what happens when TLS is negotiated; it does not decide what happens when the backend declines TLS altogether. pgpool-II documents no setting equivalent to PgBouncer's `server_tls_sslmode = require`, and the upstream implementation of the backend handshake, read on `master` rather than on a release tag, continues without SSL when the server answers that it will not do it. So treat the backend hop here the way section 3 treats `prefer`: test it rather than assume it, by refusing TLS at the PostgreSQL end and confirming pgpool-II fails instead of connecting. If it connects, the encryption on that hop is the server's choice rather than yours.
+
 ## 4. A forced `user=` collapses every client into one PostgreSQL role
 
-In the `[databases]` section, the `user` key changes who the pooler is on the database server: "If `user=` is set, all connections to the destination database will be done with the specified user, meaning that there will be only one pool for this database. Otherwise, PgBouncer logs into the destination database with the client user name."
+In the `[databases]` section, the `user` key changes who the pooler is on the database server: "If `user=` is set, all connections to the destination database will be done with the specified user, meaning that there will be only one pool for this database. Otherwise, PgBouncer logs into the destination database with the client user name, meaning that there will be one pool per user."
 
 That single key undoes per-role access control. Every `GRANT` you wrote, every row-level policy keyed on `current_user`, and every per-user line in `pg_hba.conf` stops discriminating between clients, because there is only one role left. A forced user is a legitimate choice for a single-tenant service with one application account; it is a silent privilege merge anywhere else.
 
@@ -136,8 +138,10 @@ Pgpool-II has the same file and does not read it by default: `enable_pool_hba` i
 
 ```ini
 enable_pool_hba = on            # default is false
-pool_passwd = 'pool_passwd'
+pool_passwd = 'pool_passwd'     # a path, relative to the directory holding this file
 ```
+
+Setting that path does not create the entries. For `scram-sha-256` the vendor's steps are to "Create pool_passwd file entry for database user and password in plain text or AES encrypted format", where `pg_enc` writes the AES form, and it warns that "User name and password must be identical to those registered in the PostgreSQL server". An `md5`-format entry cannot serve SCRAM. AES also needs an OpenSSL-enabled build and a decryption key the service can read, normally `.pgpoolkey`. Reload after changing either side.
 
 ```
 # /etc/pgpool-II/pool_hba.conf
@@ -150,7 +154,7 @@ hostnossl  all       all   0.0.0.0/0            reject
 hostnossl  all       all   ::/0                 reject
 ```
 
-Three things about that file are easy to get wrong. `local ... trust` is the tempting first line and it is a hole: the vendor says `trust` admits a client under "whatever database user name they specify", and the Unix socket lives in `unix_socket_dir`, which defaults to `/tmp`, so any local account can claim any database identity. Authenticate the local path too, or move the socket somewhere only the application user can reach. The `0.0.0.0/0` rejection covers IPv4 only, which is why the second one is there. And records are read in order, so a permissive rule above these wins; the rejections protect against what comes after them, not before.
+Three things about that file are easy to get wrong. `local ... trust` is the tempting first line and it is a hole: the vendor says `trust` admits a client under "whatever database user name they specify", and the Unix socket lives in `unix_socket_directories`, which defaults to `/tmp`, so any local account can claim any database identity. Authenticate the local path too, or move the socket somewhere only the application user can reach. The setting is `unix_socket_directories`, which takes a comma-separated list, so restricting it means covering every directory in that list rather than one. The `0.0.0.0/0` rejection covers IPv4 only, which is why the second one is there. And records are read in order, so a permissive rule above these wins; the rejections protect against what comes after them, not before.
 
 A `hostssl` record is ignored entirely while `ssl` is off. That does not by itself open the plaintext path, because "if no record matches, access is denied"; what it means is that the rule you wrote to require TLS is not the rule being applied, so whichever other record does match is deciding instead. Set `ssl = on` first and confirm it took effect.
 
@@ -193,7 +197,7 @@ One account bypasses all of this by design, and it is worth knowing about: the d
 
 The `local ... peer` line above has the same shape and the same requirement. `peer` takes the identity from the operating system, so `user=pgbadmin` in a connection string does not supply it: the command has to run as an OS user that maps to `pgbadmin`, or it is rejected whatever password it carries.
 
-`auth_file` "may contain both MD5-encrypted and plain-text passwords", so it is a secret file regardless of what you put in it: mode `600`, owned by the pooler's user, and out of the repository ([secrets.md](secrets.md)). `auth_query` avoids the file for user passwords by reading them from the database, and the documentation warns that "Direct access to `pg_authid` requires admin rights. It's preferable to use a non-superuser that calls a SECURITY DEFINER function instead."
+`auth_file` "may contain both MD5-encrypted and plain-text passwords", so it is a secret file regardless of what you put in it: mode `600`, owned by the pooler's user, and out of the repository ([secrets.md](secrets.md)). Choosing `scram-sha-256` in the HBA file constrains what has to be in there: the documented format is `"username" "password"` where the second field is "either a plain-text, a MD5-hashed password, or a SCRAM secret", and a SCRAM secret is `SCRAM-SHA-256$<iterations>:<salt>$<storedkey>:<serverkey>`. Copying a stored secret across means copying it exactly, salt and iteration count included, or the two sides do not agree. `auth_query` avoids the file for user passwords by reading them from the database, and the documentation warns that "Direct access to `pg_authid` requires admin rights. It's preferable to use a non-superuser that calls a SECURITY DEFINER function instead."
 
 ## 7. Verify
 
@@ -228,11 +232,14 @@ Run the same three against pgpool-II on port 9999 where that is the pooler in fr
 Three commands from one address prove one path. They say nothing about a second `hostssl` line further down the file that ends in `trust`, and nothing at all if `auth_type` is not `hba`, because `auth_hba_file` is then never read and the client-range restriction you wrote is inert while still sitting in the repository looking applied. So read the effective configuration as well as probing it:
 
 ```bash
-psql -X "host=/var/run/postgresql port=6432 dbname=pgbouncer user=pgbadmin" -c 'SHOW CONFIG;' | grep -E 'auth_type|auth_hba_file|client_tls_sslmode|server_tls_sslmode'
+psql -X "host=/var/run/postgresql port=6432 dbname=pgbouncer user=pgbadmin" \
+  -c 'RELOAD;' -c 'SHOW CONFIG;' | grep -E 'auth_type|auth_hba_file|client_tls_sslmode|server_tls_sslmode'
 grep -vE '^\s*(#|$)' /etc/pgbouncer/pg_hba.conf
 ```
 
-`auth_type` must read `hba` for the file below it to matter, and every line in that file has to be one you meant, because the first match wins and a `trust` anywhere in it is a way in.
+`auth_type` must read `hba` for the file below it to matter. Read the rules in order: the first match wins, so a `trust` line decides for every path that reaches it before something stricter does, while one sitting below a rejection that already covers the same path is unreachable. Judge each line by what reaches it, not by its presence.
+
+The `RELOAD` is not decoration. `SHOW CONFIG` reports the running settings and the file read reports the disk, and those are two different things: PgBouncer evaluates the HBA rules it parsed at load, so an edited file that has not been reloaded leaves the old rules deciding while the clean file sits on disk looking correct. A probe run against that state passes and certifies nothing. Reload first, or treat the file read as evidence about the next restart rather than about now.
 
 For the database hop, know what the probe can and cannot tell you:
 
@@ -260,7 +267,14 @@ psql -X "host=pooler.internal port=6432 dbname=pgbouncer user=app $TLS" -c 'SHOW
 
 That has to fail while connecting, with `not allowed`. `SHOW VERSION` is chosen because it has no administrator gate of its own, so it cannot fail for the wrong reason: if the connection is accepted, the command succeeds and prints a version, which is exactly what `auth_type = any` produces. Read the outcome in three ways rather than two. A refusal at login is the pass. A version printed is a failure, and `auth_type` is the first thing to check. Anything else, a DNS failure, a TLS failure, a refused connection, is inconclusive and has to be resolved before the probe means anything.
 
-None of this tests the privileged name, and testing an unlisted one only proves the list is consulted. Run the same pair on `pgbadmin` that section 7 runs on `app`: a correct password must succeed and a wrong one must be refused, because `admin_users` is an allowlist of names and says nothing about whether those names have to prove anything.
+None of this tests the privileged name, and testing an unlisted one only proves the list is consulted. `admin_users` is an allowlist of names and says nothing about whether those names have to prove anything, so run the pair against the console itself rather than reusing the application query:
+
+```bash
+psql -X "host=pooler.internal port=6432 dbname=pgbouncer user=pgbadmin $TLS" -c 'SHOW VERSION;'
+PGPASSWORD=definitely-not-the-password psql -X "host=pooler.internal port=6432 dbname=pgbouncer user=pgbadmin $TLS" -c 'SHOW VERSION;'
+```
+
+The first must succeed and the second must be refused at login. Both have to name `dbname=pgbouncer`: changing only the user name on the application probe leaves it asking the `app` database for `SELECT 1`, which tests nothing about the console.
 
 The console commands over the Unix socket are a different path with a different requirement, and `peer` there takes the identity from the operating system.
 
@@ -281,7 +295,7 @@ Put the human paths to the host behind MFA per [mfa.md](mfa.md).
 - Widening the database server's `pg_hba.conf` because the old client ranges stopped matching, or assuming that narrowing it to the pooler stops anything else in the old range connecting directly.
 - Setting `user=` on a `[databases]` entry for convenience, which merges every client into one role and disables per-role privileges on the server.
 - Switching `auth_type` from `hba` to `scram-sha-256` to "tighten" it, which stops `auth_hba_file` being read and drops the client-range restriction with it.
-- Writing a `hostssl` rule in `pool_hba.conf` while `ssl` is still off, which does not fail closed: the record is ignored and the plaintext path stays open.
+- Writing a `hostssl` rule in `pool_hba.conf` while `ssl` is still off. The record is ignored, so the rule you wrote to require TLS is not the rule being applied; whichever other record matches decides instead, and an unmatched connection is denied.
 - Putting a database password in `PGPASSWORD` in a shell you are pasting commands into. Use `~/.pgpass` at mode `600`.
 - Setting `listen_addresses` in `pgpool.conf` and expecting PCP to follow. `pcp_listen_addresses` is a separate setting, and `enable_pool_hba` is off by default, so pgpool-II authenticates nobody of its own until you turn it on.
 
