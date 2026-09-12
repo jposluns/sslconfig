@@ -33,19 +33,32 @@ TOOLS = Path(__file__).resolve().parent
 HAVE_SHELLCHECK = shutil.which("shellcheck") is not None
 
 
-def run_against(block, fence="```bash", env=None, path_prefix=None, raw=None, home=None):
+def run_against(block, fence="```bash", env=None, path_prefix=None, raw=None, home=None,
+                raw_bytes=None, unreadable_dir=False):
     """Build a throwaway repository holding one guide and run the real gate. (exit, output)."""
     d = Path(tempfile.mkdtemp())
     try:
         (d / "tools").mkdir()
         for f in ("check_shell_blocks.py", "_walk.py", "_markdown.py"):
             shutil.copy(TOOLS / f, d / "tools" / f)
-        if raw is not None:
+        if raw_bytes is not None:
+            body = None
+        elif raw is not None:
             body = raw
         else:
             marker = re.match(r"[`~]+", fence).group(0)
             body = "# T\n\n## Verify\n\n" + fence + "\n" + block + "\n" + marker + "\n"
-        (d / "guide.md").write_text(body, encoding="utf-8")
+        if raw_bytes is not None:
+            (d / "guide.md").write_bytes(raw_bytes)
+        else:
+            (d / "guide.md").write_text(body, encoding="utf-8")
+        if unreadable_dir:
+            # A subtree the walk cannot list. The fail-closed walk refuses; a bare glob would
+            # not notice, and no case covered the difference.
+            blocked = d / "blocked"
+            blocked.mkdir()
+            (blocked / "x.md").write_text("# x\n", encoding="utf-8")
+            blocked.chmod(0o000)
         run_env = dict(os.environ)
         if env:
             run_env.update(env)
@@ -57,6 +70,8 @@ def run_against(block, fence="```bash", env=None, path_prefix=None, raw=None, ho
                            capture_output=True, text=True, env=run_env)
         return r.returncode, r.stdout.strip()
     finally:
+        if unreadable_dir:
+            (d / "blocked").chmod(0o755)
         shutil.rmtree(d, ignore_errors=True)
 
 
@@ -110,6 +125,13 @@ CASES = (
      "local cert=/etc/ssl/a.pem\necho \"$cert\"", True, "SC2168", True),
     # The escape a guide should use when a fragment genuinely needs a rule off, in view of the
     # reader rather than buried in a suite-wide exclusion.
+    # bash parses every block separately, because a guide can silence shellcheck. Suppressing
+    # a parser error suppresses everything after it, so this block was reported as parsing.
+    ("a parse error a disable directive told shellcheck to ignore",
+     "# shellcheck disable=SC1009,SC1072,SC1073\nif then\ncp $HOME/a /tmp/b", True,
+     "bash cannot parse", False),
+    ("an unfinished block with no directive at all",
+     "for f in a b\ndo\n  echo \"$f\"", True, "bash cannot parse", False),
     ("a fragment that disables one rule in view of the reader",
      "# shellcheck disable=SC1091\nsource ./deployment.env\ncurl -sS https://app.example.com/",
      False, None, True),
@@ -311,6 +333,50 @@ def main() -> int:
             finally:
                 shutil.rmtree(stub, ignore_errors=True)
 
+        # A temporary directory whose path contains a colon. The canary used to be matched by
+        # splitting the row at its first colon, which made a perfectly good lint read as no
+        # lint at all: a false failure rather than a bypass, and still wrong.
+        colon = Path(tempfile.mkdtemp()) / "with:colon"
+        colon.mkdir()
+        try:
+            rc, out = run_against("cp a.pem ${HOME}/b.pem", env={"TMPDIR": str(colon)})
+            if not rc or "SC2086" not in out or "did not lint" in out:
+                failures.append(
+                    f"a colon in the temporary path broke the canary match: {out!r}")
+        finally:
+            shutil.rmtree(colon.parent, ignore_errors=True)
+
+        # A row this gate cannot parse is uncertainty, and skipping it made a pass of it.
+        stub = Path(tempfile.mkdtemp())
+        try:
+            (stub / "shellcheck").write_text(
+                '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "version: 9.9.9"; exit 0; fi\n'
+                'for a in "$@"; do case "$a" in */canary.sh) printf "%s:2:4: note: x [SC2086]\\n" "$a";; '
+                'esac; done\necho "guide.sh:not-a-number: something went wrong"\nexit 1\n',
+                encoding="utf-8")
+            (stub / "shellcheck").chmod(0o755)
+            rc, out = run_against("echo ok", path_prefix=str(stub))
+            if not rc or "cannot read" not in out:
+                failures.append(
+                    f"an unparseable shellcheck row was skipped rather than reported: {out!r}")
+        finally:
+            shutil.rmtree(stub, ignore_errors=True)
+
+        # The reported version has to be the one that ran, since it is the gate's whole
+        # explanation for a corpus that reddens without changing.
+        stub = Path(tempfile.mkdtemp())
+        try:
+            (stub / "shellcheck").write_text(
+                '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "version: 1.2.3-testing"; exit 0; fi\n'
+                'for a in "$@"; do case "$a" in */canary.sh) printf "%s:2:4: note: x [SC2086]\\n" "$a";; '
+                'esac; done\nexit 1\n', encoding="utf-8")
+            (stub / "shellcheck").chmod(0o755)
+            rc, out = run_against("echo ok", path_prefix=str(stub))
+            if rc or "1.2.3-testing" not in out:
+                failures.append(f"the pass line does not report the version that ran: {out!r}")
+        finally:
+            shutil.rmtree(stub, ignore_errors=True)
+
         # The canary: a shellcheck that answers without linting must not read as a pass,
         # whatever exit code it chooses. This stub is the GHCRTS shape through a channel the
         # gate does not strip.
@@ -345,6 +411,16 @@ def main() -> int:
                     f"pass: {out!r}")
         finally:
             shutil.rmtree(stub, ignore_errors=True)
+
+    # A guide that is not valid UTF-8 is a finding, not a file to pass over silently.
+    rc, out = run_against(None, raw_bytes=b"# T\n\n## Verify\n\n```bash\necho \xff\n```\n")
+    if not rc or "unreadable" not in out:
+        failures.append(f"a guide that is not UTF-8 did not produce a finding: {out!r}")
+
+    # A subtree the walk cannot list has to fail closed. A bare glob would not notice.
+    rc, out = run_against("echo ok", unreadable_dir=True)
+    if not rc or "could not walk" not in out:
+        failures.append(f"an unlistable subtree did not fail the walk: {out!r}")
 
     if failures:
         for f in failures:

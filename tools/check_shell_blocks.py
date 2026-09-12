@@ -78,8 +78,22 @@ offline, and is declined because a multi-megabyte executable does not belong in 
 repository. So the version is printed: a corpus that reddens without changing is then one log
 line from its explanation.
 
+BASH PARSES EVERY BLOCK, separately from shellcheck. The pass line has always said the blocks
+parse, and until now that rested on shellcheck, which a guide can silence: a reviewer put
+`# shellcheck disable=SC1009,SC1072,SC1073` above an unfinished `if` and shellcheck said nothing
+about a block `bash -n` rejects outright. Suppressing a parser error suppresses everything after
+it, so that directive is not a narrow escape. `bash -n` answers the parse question itself, cannot
+be turned off from inside a guide, and is deterministic and offline.
+
 WHAT THIS DOES NOT PROVE: that a Verify step is correct, that its commands do what their comments
 claim, or that a valid command carries valid arguments.
+
+WHAT IS DISCLOSED RATHER THAN COVERED. The temporary directory is removed on the way out and
+nothing asserts that it was. Both subprocess timeouts are a contract rather than measured
+elapsed time. And extraction still misses a fence indented four spaces inside a list, a
+tab-indented one, and one inside a blockquote, and still reads one inside an HTML comment;
+`_markdown.Fences` discloses the list-indentation limit, no guide has any of these, and closing
+them means a Markdown parser rather than another expression.
 """
 import os
 import re
@@ -178,6 +192,20 @@ def main() -> int:  # noqa: C901
                 n_files += 1
             for first, body in found:
                 n_blocks += 1
+                # bash's own parser, which is the only thing that settles whether a block
+                # parses. A reviewer showed `# shellcheck disable=SC1009,SC1072,SC1073` above
+                # an unfinished `if` making shellcheck silent about a block `bash -n` rejects,
+                # and this gate then claimed the block parsed.
+                try:
+                    parsed = subprocess.run(["bash", "-n"], input="#!/usr/bin/env bash\n" + body,
+                                            capture_output=True, text=True, timeout=30)
+                except (OSError, subprocess.SubprocessError) as exc:
+                    findings.append(f"{path.name}:{first}: could not run bash -n ({exc})")
+                else:
+                    if parsed.returncode:
+                        why = parsed.stderr.strip().splitlines()
+                        findings.append(f"{path.name}:{first}: bash cannot parse this block: "
+                                        f"{why[0][:150] if why else 'no message'}")
                 if have_shellcheck:
                     name = tmp / f"{n_blocks:04d}.sh"
                     name.write_text("#!/usr/bin/env bash\n" + body, encoding="utf-8")
@@ -200,8 +228,8 @@ def main() -> int:  # noqa: C901
             # with a row naming `<canary path>.forged`, and past the substring test with
             # SC20860. Neither is a defence against a hostile executable on PATH, which owns
             # the answer either way; both were ways for an accident to read as a pass.
-            if not any(r.split(":", 1)[0] == str(canary) and f"[{CANARY_CODE}]" in r
-                       for r in rows):
+            prefix = f"{canary}:"
+            if not any(r.startswith(prefix) and f"[{CANARY_CODE}]" in r for r in rows):
                 # See THE CANARY. Whatever the exit code says, a lint that did not report a
                 # defect it was handed did not happen.
                 print(f"  FAIL  shellcheck did not report {CANARY_CODE} against the canary "
@@ -218,7 +246,13 @@ def main() -> int:  # noqa: C901
                 # split misread the filename, and a row whose line number is not a number used
                 # to raise an uncaught ValueError out of the gate.
                 m = ROW.match(row)
-                if not m or Path(m.group("file")).name == canary.name:
+                if m is None:
+                    # Skipping an unreadable row turned an uncertain result into a pass. A
+                    # diagnostic this gate cannot parse is still a diagnostic.
+                    findings.append(f"shellcheck printed a line this gate cannot read, so its "
+                                    f"findings are not fully accounted for: {row.strip()[:160]}")
+                    continue
+                if Path(m.group("file")).name == canary.name:
                     continue
                 guide, first = index.get(Path(m.group("file")).name, ("?", 0))
                 # The block gains a shebang, so extracted line 2 is the block's first line.
