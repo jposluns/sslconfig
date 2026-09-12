@@ -353,6 +353,27 @@ else
   printf '%s\n' "$csp" | sed 's/^/          /'
 fi
 
+echo "== the CSP hash gate still catches what review found =="
+# The gate's first version read the page with regular expressions and a reviewer demonstrated
+# six ways that was wrong. It reads the page with html.parser now. One case is a FALSE ALARM
+# the old version raised rather than a miss it had, and the file checks that the old approach
+# really would have failed it, so the case cannot quietly stop meaning anything.
+if csp_tests=$(python3 tools/test_csp_hashes.py 2>&1); then
+  printf '%s\n' "$csp_tests"
+  if grep -q '^  FAIL  ' <<< "$csp_tests"; then
+    bad "test_csp_hashes.py printed findings but exited 0"
+  fi
+elif grep -qE '^Traceback \(most recent call last\):|^[A-Za-z_.]+Error: ' <<< "$csp_tests"; then
+  bad "test_csp_hashes.py crashed; the CSP hash gate is unverified"
+  printf '%s\n' "$csp_tests" | sed 's/^/          /'
+elif grep -q '^  FAIL  ' <<< "$csp_tests"; then
+  printf '%s\n' "$csp_tests"
+  fail=1
+else
+  bad "test_csp_hashes.py exited non-zero without reporting a result"
+  printf '%s\n' "$csp_tests" | sed 's/^/          /'
+fi
+
 echo "== AIQT baseline =="
 # The vendored gates derive the repo root from their own location, so they operate on this tree.
 # AIQT_SITE_HOST retargets the upstream helper, which hardcodes aiqt.ai; see .aiqt/PIN.

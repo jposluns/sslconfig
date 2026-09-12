@@ -28,6 +28,7 @@ import base64
 import hashlib
 import re
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 PAGE = Path("site") / "index.html"
@@ -36,14 +37,60 @@ HEADERS = Path("site") / "_headers"
 KINDS = (("script", "script-src"), ("style", "style-src"))
 
 
-def inline_hashes(html, tag):
-    """The sha256 of every inline block of one tag, base64 encoded, in document order."""
-    out = []
-    for attrs, body in re.findall(rf"<{tag}(\s[^>]*)?>(.*?)</{tag}>", html, re.S):
-        if attrs and re.search(r"\bsrc\s*=", attrs):
-            continue
-        out.append(base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode())
-    return out
+class Inline(HTMLParser):
+    """Collect the text of inline <script> and <style>, and any style= attribute.
+
+    An earlier version read the page with regular expressions and a reviewer demonstrated
+    six ways that was wrong: a quoted `>` inside an attribute swallowed attribute text into
+    the hash, `data-src` matched a test for `src` so a real block was skipped, an uppercase
+    `<STYLE>` passed unpinned, a `<style>` written inside a JavaScript string was hashed as
+    if it were an element, and stripping HTML comments with a regex changed what was hashed
+    when the characters were stylesheet text rather than a comment node.
+
+    Every one of those is a question about HTML, and the standard library answers them. The
+    previous docstring said that if the regular expressions stopped being adequate this
+    should read the page with a real parser rather than grow more expressions. They did, so
+    it does.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.blocks = {"script": [], "style": []}
+        self.style_attrs = []
+        self._open = None
+
+    def handle_starttag(self, tag, attrs):
+        names = {k.lower() for k, _ in attrs}
+        if "style" in names:
+            self.style_attrs.append(tag)
+        if tag in ("script", "style") and "src" not in names:
+            self._open = tag
+            self.blocks[tag].append([])
+        elif tag in ("script", "style"):
+            self._open = None
+
+    def handle_endtag(self, tag):
+        if tag == self._open:
+            self._open = None
+
+    def handle_data(self, data):
+        if self._open:
+            self.blocks[self._open][-1].append(data)
+
+    def hashes(self, tag):
+        out = []
+        for parts in self.blocks[tag]:
+            body = "".join(parts)
+            out.append(base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode())
+        return out
+
+
+def parse_page(html):
+    """Parsed inline blocks and style attributes, or raises on malformed markup."""
+    p = Inline()
+    p.feed(html)
+    p.close()
+    return p
 
 
 def applicable_block(headers_text):
@@ -67,7 +114,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     findings = []
     try:
-        html = re.sub(r"<!--.*?-->", "", (root / PAGE).read_text(encoding="utf-8"), flags=re.S)
+        page = parse_page((root / PAGE).read_text(encoding="utf-8"))
         headers_text = (root / HEADERS).read_text(encoding="utf-8")
     except Exception as exc:
         print(f"  FAIL  could not read the site files: {exc}")
@@ -89,15 +136,17 @@ def main() -> int:
 
     pinned = 0
     for tag, directive in KINDS:
-        hashes = inline_hashes(html, tag)
+        hashes = page.hashes(tag)
         if not hashes:
             findings.append(f"no inline <{tag}> found in {PAGE}; this gate expects at least one")
             continue
         found = None
         for d in csp.split(";"):
-            d = d.strip()
-            if re.match(rf"{directive}\b", d, re.I):
-                found = d.split()
+            parts = d.split()
+            # Exact name. `style-src-attr` is a different directive, and matching it as a
+            # prefix of `style-src` let a rename pass unnoticed.
+            if parts and parts[0].lower() == directive:
+                found = parts
                 break
         if found is None:
             findings.append(f"the Content-Security-Policy has no {directive} directive")
@@ -112,6 +161,12 @@ def main() -> int:
                     f"{directive} lacks the hash of an inline <{tag}> in {PAGE} (sha256-{h})")
             else:
                 pinned += 1
+
+    for tag in sorted(set(page.style_attrs)):
+        findings.append(
+            f"<{tag}> in {PAGE} carries a style= attribute. A CSP hash covers an element's "
+            f"text, never an attribute, so this needs 'unsafe-hashes' or the rule moved into "
+            f"the stylesheet; pinning the block by hash does not cover it")
 
     if findings:
         for f in findings:
