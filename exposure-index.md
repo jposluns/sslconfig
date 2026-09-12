@@ -62,26 +62,27 @@ one of them is the application's.
 | 7860 | Gradio, Stable Diffusion WebUI, or Langflow | [gradio.md](gradio.md), [image-gen-uis.md](image-gen-uis.md), [agent-builders.md](agent-builders.md) |
 | 8000 | SurrealDB, Chroma, Triton HTTP, Coolify, Vaultwarden outside Docker, or Portainer's Edge agent tunnel | [surrealdb.md](surrealdb.md), [vector-databases.md](vector-databases.md), [model-servers.md](model-servers.md), [devops-uis.md](devops-uis.md) |
 | 8001, 8002 | Triton gRPC and Triton Prometheus metrics | [model-servers.md](model-servers.md) |
-| 8080 | llama.cpp, Weaviate HTTP, Airflow, code-server, Open WebUI's container port, Dify's nginx when mapped to `127.0.0.1:8080`, Spring Boot, Go, and the Vast.ai Jupyter deployment | [model-servers.md](model-servers.md), [vector-databases.md](vector-databases.md), [workflow-orchestrators.md](workflow-orchestrators.md), [code-server.md](code-server.md), [open-webui.md](open-webui.md), [agent-builders.md](agent-builders.md), [java.md](java.md), [go.md](go.md), [gpu-clouds.md](gpu-clouds.md) |
+| 8080 | llama.cpp, Weaviate HTTP, Airflow, code-server, Open WebUI's container port, Dify's nginx when mapped to `127.0.0.1:8080`, Spring Boot, Go, and the Vast.ai Jupyter deployment; Keycloak's HTTP port, which exists only when `--http-enabled=true` | [model-servers.md](model-servers.md), [vector-databases.md](vector-databases.md), [workflow-orchestrators.md](workflow-orchestrators.md), [code-server.md](code-server.md), [open-webui.md](open-webui.md), [agent-builders.md](agent-builders.md), [java.md](java.md), [go.md](go.md), [gpu-clouds.md](gpu-clouds.md), [self-hosted-idp.md](self-hosted-idp.md) |
 | 8088 | Apache Superset | [bi-dashboards.md](bi-dashboards.md) |
 | 8123 | ClickHouse HTTP, plaintext | [clickhouse.md](clickhouse.md) |
 | 8188 | ComfyUI | [image-gen-uis.md](image-gen-uis.md) |
 | 8222 | NATS monitoring endpoints | [nats.md](nats.md) |
 | 8233 | Temporal Web UI as started by `temporal server start-dev`, which is the context this corpus documents | [workflow-orchestrators.md](workflow-orchestrators.md) |
 | 8265 | Ray dashboard | [ray.md](ray.md) |
-| 8443 | ClickHouse HTTPS, the Kubernetes Dashboard forwarding example, and the configured HTTPS listeners in the Gradio, Python, Java and Ruby guides | [clickhouse.md](clickhouse.md), [devops-uis.md](devops-uis.md), [gradio.md](gradio.md), [python.md](python.md), [java.md](java.md), [ruby.md](ruby.md) |
+| 8443 | ClickHouse HTTPS, the Kubernetes Dashboard forwarding example, and the configured HTTPS listeners in the Gradio, Python, Java and Ruby guides; Keycloak's HTTPS port | [clickhouse.md](clickhouse.md), [devops-uis.md](devops-uis.md), [gradio.md](gradio.md), [python.md](python.md), [java.md](java.md), [ruby.md](ruby.md), [self-hosted-idp.md](self-hosted-idp.md) |
 | 8501 | Streamlit | [streamlit.md](streamlit.md) |
 | 8883 | MQTT over TLS | [mosquitto.md](mosquitto.md) |
 | 8888 | Jupyter, including RunPod deployments. The Vast.ai Jupyter launch mode uses 8080 instead | [jupyter.md](jupyter.md), [gpu-clouds.md](gpu-clouds.md) |
-| 9000 | ClickHouse native TCP (plaintext), MinIO's S3 API, PHP-FPM, TGI's Prometheus listener, or Portainer's legacy HTTP port | [clickhouse.md](clickhouse.md), [minio.md](minio.md), [php.md](php.md), [model-servers.md](model-servers.md), [devops-uis.md](devops-uis.md) |
+| 9000 | ClickHouse native TCP (plaintext), MinIO's S3 API, PHP-FPM, TGI's Prometheus listener, or Portainer's legacy HTTP port; Keycloak's management port serving `/health` and `/metrics`, or authentik's HTTP port | [clickhouse.md](clickhouse.md), [minio.md](minio.md), [php.md](php.md), [model-servers.md](model-servers.md), [devops-uis.md](devops-uis.md), [self-hosted-idp.md](self-hosted-idp.md) |
 | 9004, 9005, 9009, 9010 | ClickHouse MySQL compatibility, PostgreSQL compatibility, and interserver replica traffic over HTTP and HTTPS | [clickhouse.md](clickhouse.md) |
 | 9090 | InvokeAI. Prometheus also defaults here, though its guide does not state the number | [image-gen-uis.md](image-gen-uis.md), [admin-uis.md](admin-uis.md) |
 | 9091 | Milvus WebUI, or Authelia | [vector-databases.md](vector-databases.md), [fronting-auth.md](fronting-auth.md) |
 | 9092, 9093 | Kafka plaintext and SASL_SSL listeners. Which port carries which is configured, not fixed | [kafka.md](kafka.md) |
 | 9200 | Elasticsearch and OpenSearch HTTP | [elasticsearch.md](elasticsearch.md) |
 | 9292 | Puma standalone, whose default bind is all interfaces | [ruby.md](ruby.md) |
+| 9300 | authentik's Prometheus metrics, which carry no authentication | [self-hosted-idp.md](self-hosted-idp.md) |
 | 9440 | ClickHouse native TCP over TLS | [clickhouse.md](clickhouse.md) |
-| 9443 | Portainer HTTPS UI | [devops-uis.md](devops-uis.md) |
+| 9443 | Portainer HTTPS UI, authentik's HTTPS port | [devops-uis.md](devops-uis.md), [self-hosted-idp.md](self-hosted-idp.md) |
 | 10001 | Ray Client server, which executes code | [ray.md](ray.md) |
 | 10002 to 19999 | Ray worker ports, allocated across this whole range by default, plus several randomized ports. Anything in this range on a Ray node may be a worker rather than the service the row below suggests | [ray.md](ray.md) |
 | 11211 | Memcached. Check UDP as well as TCP | [memcached.md](memcached.md) |
