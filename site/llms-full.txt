@@ -1709,21 +1709,35 @@ Basic authentication is single-factor, and Authelia documents Apache as unsuppor
 
 ## 5. Verify
 
+These are read-and-judge checks. `curl` exits 0 for a 401 as readily as for a 200, so the
+status code is printed and you compare it; nothing here fails on its own.
+
 ```bash
 sudo apachectl configtest && sudo systemctl reload apache2   # httpd on RHEL
 curl -sI http://example.com/            # expect 301 with a https:// Location
-curl -sI https://example.com/           # expect 200 without -k
-curl -s  https://example.com/           # expect 401 when basic auth is on
-ss -tlnp | grep -E ':(80|443)\b'        # only the addresses you meant to serve
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/
+                                        # 200 before section 4, 401 after it. Once
+                                        # authentication is on, a 200 here is the finding
 
-# A request whose Host matches no ServerName or ServerAlias does not fail. Apache says it
-# falls through to "the first listed virtual host that matches" the address and port, so
-# authentication configured on one vhost is bypassed entirely if another vhost is listed
-# first and serves the same DocumentRoot.
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https://example.com/
-                                        # must not be 200. Expect the 401 from your own
-                                        # vhost, or whatever the first listed one answers,
-                                        # and read the body if you are not sure which
+# Read every listener. Do not filter to the ports you expect: a filter cannot show you a port
+# you did not think of, which is the whole question, and `grep ':(80|443)'` also matches an
+# address such as [2001:db8:80::1]:9000.
+ss -tlnp
+
+# A request whose Host matches no ServerName or ServerAlias does not fail. Apache says it falls
+# through to "the first listed virtual host that matches" the address and port, so a vhost
+# listed before yours over the same DocumentRoot answers without your authentication. Ask for
+# the PROTECTED path rather than `/`, because `/` can legitimately be public:
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' \
+  https://example.com/REPLACE_WITH_A_PROTECTED_PATH
+                                        # 401 is the pass. 200 means another vhost served the
+                                        # protected resource with no authentication. 421 means
+                                        # the TLS configuration for that combination was
+                                        # rejected before any of this was decided, so the probe
+                                        # says nothing: curl sends SNI for the URL's hostname
+                                        # and not for the Host header, and Apache's
+                                        # SSLVHostSNIPolicy decides whether that pairing is
+                                        # allowed at all
 ```
 
 ## Common mistakes
@@ -1738,6 +1752,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https
 - Apache SSL/TLS how-to: https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html
 - Apache authentication how-to: https://httpd.apache.org/docs/2.4/howto/auth.html
 - Apache name-based virtual hosts, for which vhost answers an unmatched Host header: https://httpd.apache.org/docs/2.4/vhosts/name-based.html
+- Apache mod_ssl `SSLVHostSNIPolicy`, for the 421 a mismatched SNI and Host pairing can produce: https://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslvhostsnipolicy
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
 
 ======================================================================
@@ -1973,17 +1988,26 @@ Basic authentication is single-factor, and lighttpd is absent from Authelia's su
 
 ## 4. Verify
 
+These are read-and-judge checks: the status code is printed and you compare it.
+
 ```bash
 sudo lighttpd -tt -f /etc/lighttpd/lighttpd.conf && sudo systemctl reload lighttpd
 curl -sI http://example.com/        # expect a redirect to https://
-curl -sI https://example.com/       # expect 401 without credentials once auth is on
-ss -tlnp | grep -E ':(80|443)\b'    # only the addresses you meant to serve
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/
+                                    # expect 401 without credentials once auth is on
 
-# The checks above prove the front door asks for credentials. They do not prove there is
-# only one door: a second server, or this one on another port, can serve the same files
-# with none of this configuration in front of them.
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https://example.com/
-                                    # must not be 200 with the protected content
+# Read every listener rather than filtering to the ports you expect. The checks above prove
+# the front door asks for credentials; they do not prove it is the only door, and a filtered
+# list cannot show you a port you did not think of.
+ss -tlnp
+
+# `auth.require` can sit at the top level or inside a `$HTTP["host"]` conditional, and a
+# conditional one applies only to the hosts it names. If yours is conditional, a request
+# carrying a host it does not name is served by the global configuration instead:
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' \
+  https://example.com/REPLACE_WITH_A_PROTECTED_PATH
+                                    # 401 is the pass. 200 means the protected path is served
+                                    # without authentication to anyone who sends another host
 ```
 
 ## Common mistakes
@@ -1995,7 +2019,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https
 ## Sources (checked September 2026)
 
 - lighttpd TLS documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_SSL
-- lighttpd mod_auth documentation: https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_auth
+- lighttpd mod_auth documentation, including `auth.require` inside a `$HTTP["host"]` conditional: https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_auth
 - lighttpd HTTP-to-HTTPS redirect how-to: https://redmine.lighttpd.net/projects/lighttpd/wiki/HowToRedirectHttpToHttps
 - lighttpd configuration options (`server.modules`, the three modules loaded by default): https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions
 

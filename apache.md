@@ -75,21 +75,35 @@ Basic authentication is single-factor, and Authelia documents Apache as unsuppor
 
 ## 5. Verify
 
+These are read-and-judge checks. `curl` exits 0 for a 401 as readily as for a 200, so the
+status code is printed and you compare it; nothing here fails on its own.
+
 ```bash
 sudo apachectl configtest && sudo systemctl reload apache2   # httpd on RHEL
 curl -sI http://example.com/            # expect 301 with a https:// Location
-curl -sI https://example.com/           # expect 200 without -k
-curl -s  https://example.com/           # expect 401 when basic auth is on
-ss -tlnp | grep -E ':(80|443)\b'        # only the addresses you meant to serve
+curl -s -o /dev/null -w '%{http_code}\n' https://example.com/
+                                        # 200 before section 4, 401 after it. Once
+                                        # authentication is on, a 200 here is the finding
 
-# A request whose Host matches no ServerName or ServerAlias does not fail. Apache says it
-# falls through to "the first listed virtual host that matches" the address and port, so
-# authentication configured on one vhost is bypassed entirely if another vhost is listed
-# first and serves the same DocumentRoot.
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https://example.com/
-                                        # must not be 200. Expect the 401 from your own
-                                        # vhost, or whatever the first listed one answers,
-                                        # and read the body if you are not sure which
+# Read every listener. Do not filter to the ports you expect: a filter cannot show you a port
+# you did not think of, which is the whole question, and `grep ':(80|443)'` also matches an
+# address such as [2001:db8:80::1]:9000.
+ss -tlnp
+
+# A request whose Host matches no ServerName or ServerAlias does not fail. Apache says it falls
+# through to "the first listed virtual host that matches" the address and port, so a vhost
+# listed before yours over the same DocumentRoot answers without your authentication. Ask for
+# the PROTECTED path rather than `/`, because `/` can legitimately be public:
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' \
+  https://example.com/REPLACE_WITH_A_PROTECTED_PATH
+                                        # 401 is the pass. 200 means another vhost served the
+                                        # protected resource with no authentication. 421 means
+                                        # the TLS configuration for that combination was
+                                        # rejected before any of this was decided, so the probe
+                                        # says nothing: curl sends SNI for the URL's hostname
+                                        # and not for the Host header, and Apache's
+                                        # SSLVHostSNIPolicy decides whether that pairing is
+                                        # allowed at all
 ```
 
 ## Common mistakes
@@ -104,4 +118,5 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: not-configured.example' https
 - Apache SSL/TLS how-to: https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html
 - Apache authentication how-to: https://httpd.apache.org/docs/2.4/howto/auth.html
 - Apache name-based virtual hosts, for which vhost answers an unmatched Host header: https://httpd.apache.org/docs/2.4/vhosts/name-based.html
+- Apache mod_ssl `SSLVHostSNIPolicy`, for the 421 a mismatched SNI and Host pairing can produce: https://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslvhostsnipolicy
 - Mozilla SSL Configuration Generator: https://ssl-config.mozilla.org/
