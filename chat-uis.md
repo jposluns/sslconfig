@@ -35,14 +35,31 @@ MFA: enforce it at whichever SSO provider you list in `AUTH_SSO_PROVIDERS`; Lobe
 Chainlit applications are public by default: no login, no gate, anyone who reaches the port gets the chat. Set `CHAINLIT_AUTH_SECRET` (generate one with `chainlit create-secret`; changing it logs out every user) and implement at least one auth callback: password authentication, OAuth, or header-based authentication. A callback that returns `None` refuses the login. There is no built-in MFA; put it behind an identity provider that enforces a second factor, or an [Authelia](https://www.authelia.com/)-fronted proxy.
 
 ```python
+import hmac
+import os
+from typing import Optional
+
 import chainlit as cl
 
+# Read the credential from the environment, never from source. Chainlit's own example
+# compares a literal "admin" against a literal "admin", which is a demonstration rather
+# than a deployment.
+EXPECTED_USER = os.environ["CHAINLIT_USER"].encode()
+EXPECTED_PASSWORD = os.environ["CHAINLIT_PASSWORD"].encode()
+
+
 @cl.password_auth_callback
-def auth_callback(username: str, password: str):
-    if username == "admin" and password == "REPLACE_WITH_LONG_RANDOM_VALUE":
-        return cl.User(identifier="admin")
+def auth_callback(username: str, password: str) -> Optional[cl.User]:
+    # Both comparisons run before the `and`, so a short circuit cannot reveal which half
+    # failed, and compare_digest takes the same time whatever the input.
+    ok_user = hmac.compare_digest(username.encode(), EXPECTED_USER)
+    ok_password = hmac.compare_digest(password.encode(), EXPECTED_PASSWORD)
+    if ok_user and ok_password:
+        return cl.User(identifier=username)
     return None
 ```
+
+That is one shared credential, which is a gate on the deployment rather than user accounts: everyone who gets in is the same `identifier`, and revoking access means changing the value for all of them. Chainlit does not provide a user store, and its documentation says to "hash password before storing them", so real accounts mean verifying against your own store inside this same callback, with a slow password hash such as argon2 or bcrypt rather than the constant-time comparison above. Put the credential in the environment either way ([secrets.md](secrets.md)).
 
 ## OpenHands
 
